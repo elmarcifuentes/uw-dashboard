@@ -185,6 +185,12 @@ provider.onPriceUpdate((price) => {
     price,
     interval:     s.currentInterval,
     isMarketHours: s.isMarketHours,
+    cascade: {
+      active:         latest?.cascade?.active        || false,
+      mid_dp:         latest?.cascade?.mid_dp        ?? null,
+      gap_to_trigger: latest?.cascade?.gap_to_trigger ?? null,
+      conditions:     latest?.cascade?.conditions    || [false, false, false],
+    },
     timestamp:    new Date().toISOString(),
   })
 })

@@ -7,8 +7,9 @@ export function useSSE(url) {
   const [levelAlert, setLevelAlert]       = useState(null)
   const [chartStale, setChartStale]       = useState(false)
   const [staleChanges, setStaleChanges]   = useState([])
-  const [expansionGex, setExpansionGex]   = useState([])
+  const [expansionGex, setExpansionGex]       = useState([])
   const [pinningSessions, setPinningSessions] = useState(0)
+  const [midDpHistory, setMidDpHistory]       = useState([])
   const esRef = useRef(null)
 
   useEffect(() => {
@@ -53,9 +54,14 @@ export function useSSE(url) {
 
         if (data.type === 'rescore') {
           setHistory(prev => [data, ...prev].slice(0, 50))
-          // Sync expansion state from rescore payload
           if (data.expansionGex !== undefined) {
             setExpansionGex(data.expansionGex || [])
+          }
+          const midLevel = data.result?.levels?.find(l => l.id === 'MID')
+          if (midLevel?.dark_pool !== undefined) {
+            setMidDpHistory(prev =>
+              [...prev, { value: midLevel.dark_pool, time: data.timestamp }].slice(-5)
+            )
           }
         }
       }
@@ -86,5 +92,6 @@ export function useSSE(url) {
     staleChanges,
     expansionGex,
     pinningSessions,
+    midDpHistory,
   }
 }
