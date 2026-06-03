@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 
 export function useSSE(url) {
-  const [lastEvent, setLastEvent] = useState(null)
-  const [connected, setConnected] = useState(false)
-  const [history, setHistory] = useState([])
+  const [lastEvent, setLastEvent]   = useState(null)
+  const [connected, setConnected]   = useState(false)
+  const [history, setHistory]       = useState([])
+  const [levelAlert, setLevelAlert] = useState(null)
   const esRef = useRef(null)
 
   useEffect(() => {
@@ -20,6 +21,12 @@ export function useSSE(url) {
         if (destroyed) return
         const data = JSON.parse(event.data)
         if (data.type === 'heartbeat') return
+
+        if (data.type === 'level_update_alert') {
+          setLevelAlert(data)
+          return
+        }
+
         setLastEvent(data)
         if (data.type === 'rescore') {
           setHistory(prev => [data, ...prev].slice(0, 50))
@@ -42,5 +49,5 @@ export function useSSE(url) {
     }
   }, [url])
 
-  return { lastEvent, connected, history }
+  return { lastEvent, connected, history, levelAlert, clearLevelAlert: () => setLevelAlert(null) }
 }

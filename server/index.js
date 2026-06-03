@@ -54,15 +54,52 @@ provider.onRescore(async ({ price, reason }) => {
   }
 })
 
-// Broadcast every price tick
+// Session open price tracking
+let sessionOpenPrice = null
+let sessionDate      = null
+let alertFired       = false  // fire once per session crossing
+
 provider.onPriceUpdate((price) => {
-  const s = provider.getStatus()
+  const s     = provider.getStatus()
+  const today = new Date().toISOString().split('T')[0]
+
+  // Reset on new calendar day
+  if (sessionDate !== today) {
+    sessionDate      = today
+    sessionOpenPrice = null
+    alertFired       = false
+  }
+
+  // Capture first price of market session
+  if (!sessionOpenPrice && s.isMarketHours) {
+    sessionOpenPrice = price
+    console.log(`[server] Session open price captured: $${price}`)
+  }
+
+  // $2.50 move alert — fire once per threshold crossing
+  if (sessionOpenPrice && !alertFired) {
+    const move = Math.abs(price - sessionOpenPrice)
+    if (move >= 2.50) {
+      alertFired = true
+      const signed = (price - sessionOpenPrice).toFixed(2)
+      console.log(`[server] Level update alert: move $${signed} from open $${sessionOpenPrice}`)
+      sseEmitter.emit('event', {
+        type:             'level_update_alert',
+        price,
+        sessionOpenPrice,
+        move:             signed,
+        message:          `Price moved $${move.toFixed(2)} from session open $${sessionOpenPrice.toFixed(2)} — consider updating levels`,
+        timestamp:        new Date().toISOString(),
+      })
+    }
+  }
+
   sseEmitter.emit('event', {
-    type: 'price',
+    type:         'price',
     price,
-    interval: s.currentInterval,
+    interval:     s.currentInterval,
     isMarketHours: s.isMarketHours,
-    timestamp: new Date().toISOString(),
+    timestamp:    new Date().toISOString(),
   })
 })
 
@@ -145,7 +182,14 @@ app.get('/health', (req, res) => {
 })
 
 app.get('/status', (req, res) => {
-  res.json(provider.getStatus())
+  const s = provider.getStatus()
+  res.json({
+    ...s,
+    sessionOpenPrice,
+    moveFromOpen: sessionOpenPrice && s.lastPrice
+      ? (s.lastPrice - sessionOpenPrice).toFixed(2)
+      : null,
+  })
 })
 
 app.post('/mode', (req, res) => {

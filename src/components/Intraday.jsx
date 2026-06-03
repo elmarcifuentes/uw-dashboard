@@ -12,7 +12,7 @@ const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log', 'Ctrl']
 
 export default function Intraday() {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-  const { lastEvent, connected, history } = useSSE(`${API_URL}/stream`)
+  const { lastEvent, connected, history, levelAlert, clearLevelAlert } = useSSE(`${API_URL}/stream`)
   const { compact, toggle } = useLayout()
   const [subTab, setSubTab] = useState(0)
 
@@ -42,6 +42,28 @@ export default function Intraday() {
           {compact ? '⛶ Full' : '⊡ Compact'}
         </button>
       </div>
+
+      {/* $2.50 move alert banner */}
+      {levelAlert && (
+        <div className="bg-amber-900/80 border border-amber-500 rounded px-3 py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-amber-400 text-sm font-bold shrink-0">⚡ LEVEL UPDATE RECOMMENDED</span>
+            <span className="text-amber-300 text-sm truncate">
+              Price moved {Number(levelAlert.move) >= 0 ? '+' : ''}{levelAlert.move} from open ${Number(levelAlert.sessionOpenPrice).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="text-amber-500 text-xs hidden sm:block">Re-read indicator → update levels → npm start</span>
+            <button
+              onClick={clearLevelAlert}
+              className="text-amber-600 hover:text-amber-300 text-sm leading-none"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sub-tab navigation */}
       <div className="flex gap-1 flex-wrap">
