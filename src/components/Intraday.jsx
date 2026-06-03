@@ -12,7 +12,7 @@ const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log', 'Ctrl']
 
 export default function Intraday() {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-  const { lastEvent, connected, history, levelAlert, clearLevelAlert } = useSSE(`${API_URL}/stream`)
+  const { lastEvent, connected, history, levelAlert, clearLevelAlert, chartStale, staleChanges } = useSSE(`${API_URL}/stream`)
   const { compact, toggle } = useLayout()
   const [subTab, setSubTab] = useState(0)
 
@@ -42,6 +42,35 @@ export default function Intraday() {
           {compact ? '⛶ Full' : '⊡ Compact'}
         </button>
       </div>
+
+      {/* Chart stale badge */}
+      {chartStale && (() => {
+        const isCritical = staleChanges.some(c => c.type === 'cascade')
+        return (
+          <div className={`flex items-center gap-2 border rounded px-3 py-1.5 ${
+            isCritical
+              ? 'bg-red-900/80 border-red-500 animate-pulse'
+              : 'bg-amber-900/80 border-amber-500'
+          }`}>
+            <span className={`text-sm font-bold shrink-0 ${isCritical ? 'text-red-400' : 'text-amber-400'}`}>
+              🔄 CHART STALE
+            </span>
+            <span className={`text-xs truncate ${isCritical ? 'text-red-300' : 'text-amber-300'}`}>
+              {staleChanges.map((c, i) => (
+                <span key={i}>
+                  {c.type === 'classification' && `${c.level} → ${c.to === 'buy_support' ? 'BUY SUP' : c.to === 'sell_resistance' ? 'SELL RES' : 'NO EDGE'}`}
+                  {c.type === 'full_stack' && `${c.level} FULL STACK ${c.active ? '★' : 'gone'}`}
+                  {c.type === 'cascade' && `CASCADE ${c.active ? 'ACTIVATED ⚠' : 'resolved'}`}
+                  {i < staleChanges.length - 1 && ' · '}
+                </span>
+              ))}
+            </span>
+            <span className={`text-xs ml-1 shrink-0 ${isCritical ? 'text-red-600' : 'text-amber-600'}`}>
+              — run /draw
+            </span>
+          </div>
+        )
+      })()}
 
       {/* $2.50 move alert banner */}
       {levelAlert && (

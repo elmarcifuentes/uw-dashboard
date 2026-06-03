@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 
 export function useSSE(url) {
-  const [lastEvent, setLastEvent]   = useState(null)
-  const [connected, setConnected]   = useState(false)
-  const [history, setHistory]       = useState([])
-  const [levelAlert, setLevelAlert] = useState(null)
+  const [lastEvent, setLastEvent]       = useState(null)
+  const [connected, setConnected]       = useState(false)
+  const [history, setHistory]           = useState([])
+  const [levelAlert, setLevelAlert]     = useState(null)
+  const [chartStale, setChartStale]     = useState(false)
+  const [staleChanges, setStaleChanges] = useState([])
   const esRef = useRef(null)
 
   useEffect(() => {
@@ -24,6 +26,18 @@ export function useSSE(url) {
 
         if (data.type === 'level_update_alert') {
           setLevelAlert(data)
+          return
+        }
+
+        if (data.type === 'chart_stale') {
+          setChartStale(true)
+          setStaleChanges(data.changes || [])
+          return
+        }
+
+        if (data.type === 'chart_synced') {
+          setChartStale(false)
+          setStaleChanges([])
           return
         }
 
@@ -49,5 +63,13 @@ export function useSSE(url) {
     }
   }, [url])
 
-  return { lastEvent, connected, history, levelAlert, clearLevelAlert: () => setLevelAlert(null) }
+  return {
+    lastEvent,
+    connected,
+    history,
+    levelAlert,
+    clearLevelAlert: () => setLevelAlert(null),
+    chartStale,
+    staleChanges,
+  }
 }

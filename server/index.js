@@ -16,9 +16,52 @@ app.use(cors({ origin: ALLOWED_ORIGINS }))
 app.use(express.json())
 
 // In-memory store
-let latest = null
+let latest         = null
+let previousResult = null
+let chartSynced    = true
 const history = []
 const MAX_HISTORY = 20
+
+function detectChanges(prev, next) {
+  if (!prev || !next) return []
+  const changes = []
+
+  for (const newLevel of next.levels || []) {
+    const prevLevel = prev.levels?.find(l => l.id === newLevel.id)
+    if (!prevLevel) continue
+
+    if (prevLevel.classification !== newLevel.classification) {
+      changes.push({ type: 'classification', level: newLevel.id, from: prevLevel.classification, to: newLevel.classification })
+    }
+    if (prevLevel.full_stack !== newLevel.full_stack) {
+      changes.push({ type: 'full_stack', level: newLevel.id, active: newLevel.full_stack })
+    }
+  }
+
+  if (prev.cascade?.active !== next.cascade?.active) {
+    changes.push({ type: 'cascade', active: next.cascade.active })
+  }
+
+  return changes
+}
+
+function emitStaleIfChanged(result) {
+  const changes = detectChanges(previousResult, result)
+  if (changes.length > 0) {
+    chartSynced = false
+    const message = changes.map(c => {
+      if (c.type === 'classification')
+        return `${c.level} → ${c.to === 'buy_support' ? 'BUY SUP' : c.to === 'sell_resistance' ? 'SELL RES' : 'NO EDGE'}`
+      if (c.type === 'full_stack')
+        return `${c.level} FULL STACK ${c.active ? '★ appeared' : 'gone'}`
+      if (c.type === 'cascade')
+        return `CASCADE ${c.active ? 'ACTIVATED ⚠' : 'resolved'}`
+    }).join(' · ')
+    console.log(`[server] Chart stale: ${message}`)
+    sseEmitter.emit('event', { type: 'chart_stale', changes, message, timestamp: new Date().toISOString() })
+  }
+  previousResult = result
+}
 
 // SSE event bus
 const sseEmitter = new EventEmitter()
@@ -42,6 +85,7 @@ provider.onRescore(async ({ price, reason }) => {
     if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
     provider.setLevels(result.levels)
     console.log(`[server] Auto-rescore complete — ${result.levels.length} levels scored`)
+    emitStaleIfChanged(result)
     sseEmitter.emit('event', {
       type: 'rescore',
       result,
@@ -158,6 +202,7 @@ app.post('/update', (req, res) => {
   if (result.levels) provider.setLevels(result.levels)
   if (result.current_price) provider.rest.lastPrice = Number(result.current_price)
   console.log(`[update] session=${result.session} run_type=${result.run_type}`)
+  emitStaleIfChanged(result)
   sseEmitter.emit('event', {
     type: 'rescore',
     result,
@@ -221,6 +266,14 @@ sseEmitter.on('event', (data) => {
   } catch (err) {
     console.warn('[logger] Error:', err.message)
   }
+})
+
+// ── Chart sync endpoint ───────────────────────────────────────────────────────
+app.post('/chart-synced', (req, res) => {
+  chartSynced = true
+  sseEmitter.emit('event', { type: 'chart_synced', timestamp: new Date().toISOString() })
+  console.log('[server] Chart marked as synced')
+  res.json({ success: true })
 })
 
 // ── Session story endpoints ───────────────────────────────────────────────────
