@@ -11,6 +11,7 @@ export function useSSE(url) {
   const [pinningSessions, setPinningSessions] = useState(0)
   const [midDpHistory, setMidDpHistory]       = useState([])
   const [dpHistory, setDpHistory]             = useState({})
+  const [narrative, setNarrative]             = useState([])
   const esRef = useRef(null)
 
   useEffect(() => {
@@ -61,6 +62,9 @@ export function useSSE(url) {
           if (data.dpHistory) {
             setDpHistory(data.dpHistory)
           }
+          if (data.narrative) {
+            setNarrative(data.narrative)
+          }
           const midLevel = data.result?.levels?.find(l => l.id === 'MID')
           if (midLevel?.dark_pool !== undefined) {
             setMidDpHistory(prev =>
@@ -98,5 +102,6 @@ export function useSSE(url) {
     pinningSessions,
     midDpHistory,
     dpHistory,
+    narrative,
   }
 }

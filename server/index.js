@@ -29,6 +29,114 @@ let allPinningSessions   = 0
 // DP history — last 3 readings per level
 const dpHistory = { R2: [], R1: [], MID: [], S1: [], S2: [] }
 
+function generateNarrative(result, dpHist) {
+  if (!result?.levels) return null
+  const lines  = []
+  const price  = result.current_price
+  const cascade = result.cascade
+  const sb     = result.structure_break
+  const levels = result.levels
+  const getLevel = id => levels.find(l => l.id === id)
+
+  // 1. Price location between nearest levels
+  if (price != null && levels.length) {
+    const sorted = [...levels].sort((a, b) => b.price - a.price)
+    const above  = sorted.filter(l => l.price > price)
+    const below  = sorted.filter(l => l.price < price)
+    const nearAbove = above[above.length - 1]
+    const nearBelow = below[0]
+    if (nearAbove && nearBelow) {
+      lines.push(
+        `Price $${price.toFixed(2)} is $${(nearAbove.price - price).toFixed(2)} below ` +
+        `${nearAbove.id} $${nearAbove.price.toFixed(2)} and ` +
+        `$${(price - nearBelow.price).toFixed(2)} above ${nearBelow.id} $${nearBelow.price.toFixed(2)}.`
+      )
+    } else if (!above.length) {
+      lines.push(`Price $${price.toFixed(2)} is above R2 — structure break upside.`)
+    } else if (!below.length) {
+      lines.push(`Price $${price.toFixed(2)} is below S2 — structure break downside.`)
+    }
+  }
+
+  // 2. Cascade status
+  if (cascade?.active) {
+    lines.push(
+      `⚠ CASCADE ACTIVE — all three conditions met. No institutional floor at S1 or S2. ` +
+      `MID confirmed resistance at ${cascade.mid_dp?.toFixed(3)}.`
+    )
+  } else if (cascade?.conditions?.[0]) {
+    lines.push(
+      `Cascade condition 1 met (MID dp ${cascade.mid_dp?.toFixed(3)}). ` +
+      `${Math.abs(cascade.gap_to_trigger ?? 0).toFixed(3)} past threshold. ` +
+      `S1 and S2 blocking full cascade.`
+    )
+  } else if (cascade?.mid_dp != null && cascade.mid_dp <= -0.500) {
+    lines.push(
+      `MID dark pool ${cascade.mid_dp.toFixed(3)} — approaching cascade threshold (-0.700). Watch S1 dark pool.`
+    )
+  }
+
+  // 3. Full stack / strongest signal
+  const classified  = levels.filter(l => l.classification !== 'no_edge' && l.confidence !== 'none')
+  const fullStacks  = classified.filter(l => l.full_stack)
+  if (fullStacks.length > 0) {
+    const names = fullStacks.map(l => `${l.id} $${l.price.toFixed(2)}`).join(' and ')
+    lines.push(`★ FULL STACK active on ${names} — maximum conviction setup.`)
+  } else if (classified.length > 0) {
+    const strongest = [...classified].sort((a, b) => b.score - a.score)[0]
+    const cls = strongest.classification === 'buy_support' ? 'buy support' : 'sell resistance'
+    lines.push(
+      `Strongest signal: ${strongest.id} $${strongest.price.toFixed(2)} — ` +
+      `${cls} score ${strongest.score}, ${strongest.confidence} confidence.`
+    )
+  } else {
+    lines.push(`No classified levels — all no_edge. Low-signal environment.`)
+  }
+
+  // 4. Expansion GEX
+  levels.filter(l => (l.net_gex ?? 0) < 0).forEach(l => {
+    lines.push(
+      `⚠ Expansion GEX at ${l.id} (${(l.net_gex ?? 0).toLocaleString()}) — ` +
+      `no mechanical friction, price accelerates through this level.`
+    )
+  })
+
+  // 5. MID DP trajectory
+  const midHist = dpHist?.MID
+  if (midHist && midHist.length >= 2) {
+    const last = midHist[midHist.length - 1].value
+    const prev = midHist[midHist.length - 2].value
+    if (last < prev && last <= -0.300) {
+      lines.push(
+        `MID dark pool declining: ${midHist.map(h => h.value.toFixed(3)).join(' → ')} ↓ — watch for cascade conditions building.`
+      )
+    }
+  }
+
+  // 6. Structure break
+  if (sb?.active) {
+    const dir = sb.direction === 'upside' ? 'UPSIDE' : 'DOWNSIDE'
+    const ext = sb.r3 ? ` R3/S3 at $${sb.r3}.` : ''
+    lines.push(`⚠ STRUCTURE BREAK ${dir}.${ext} Trail stop from broken level.`)
+  } else if (sb?.distance_to_r2 != null && sb.distance_to_r2 <= 0.50) {
+    lines.push(`Structure break imminent — R2 $${sb.distance_to_r2.toFixed(2)} away.`)
+  } else if (sb?.distance_to_s2 != null && sb.distance_to_s2 <= 0.50) {
+    lines.push(`Structure break imminent — S2 $${sb.distance_to_s2.toFixed(2)} away.`)
+  }
+
+  // 7. Passive targets
+  levels.filter(l => l.passive_target && l.passive_target_from).forEach(l => {
+    const target = getLevel(l.passive_target_from)
+    if (!target) return
+    const dist = Math.abs(target.price - l.price).toFixed(2)
+    const dir  = l.classification === 'buy_support' ? 'UP' : 'DOWN'
+    const sign = dir === 'UP' ? '+' : '-'
+    lines.push(`Passive target ${dir}: ${l.id} → ${target.id} ${sign}$${dist}.`)
+  })
+
+  return lines.length > 0 ? lines : null
+}
+
 function updateDpHistory(result) {
   if (!result?.levels) return
   for (const level of result.levels) {
@@ -147,6 +255,7 @@ provider.onRescore(async ({ price, reason }) => {
       price,
       expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
+      narrative:   generateNarrative(result, dpHistory),
       timestamp:   new Date().toISOString(),
     })
   } catch (err) {
@@ -273,8 +382,9 @@ app.post('/update', (req, res) => {
     trigger:     result.run_type || 'update',
     price:       result.current_price,
     expansionGex: detectExpansionGex(result),
-    dpHistory:   { ...dpHistory },
-    timestamp:   new Date().toISOString(),
+    dpHistory:    { ...dpHistory },
+    narrative:    generateNarrative(result, dpHistory),
+    timestamp:    new Date().toISOString(),
   })
   res.json({ ok: true })
 })
@@ -394,6 +504,7 @@ app.post('/rescore', async (req, res) => {
       price:       result.current_price,
       expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
+      narrative:   generateNarrative(result, dpHistory),
       timestamp: new Date().toISOString(),
     })
     res.json({ success: true })
