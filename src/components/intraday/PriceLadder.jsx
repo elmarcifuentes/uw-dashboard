@@ -42,7 +42,7 @@ function StructureBreakBar({ sb }) {
   )
 }
 
-export default function PriceLadder({ result, currentPrice, compact }) {
+export default function PriceLadder({ result, currentPrice, nqRatio, compact }) {
   if (!result) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
@@ -66,10 +66,12 @@ export default function PriceLadder({ result, currentPrice, compact }) {
 
       {levels.map(level => {
         const colors   = CLASS_COLORS[level.classification] || CLASS_COLORS.no_edge
-        const dist     = currentPrice != null ? (currentPrice - level.price) : null
-        const distStr  = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
-        const isNear   = dist != null && Math.abs(dist) <= 0.50
-        const isAbove  = dist != null && dist > 0
+        const dist       = currentPrice != null ? (currentPrice - level.price) : null
+        const distStr    = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
+        const nqDist     = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio) : null
+        const nqDistStr  = nqDist != null ? `${dist >= 0 ? '+' : '-'}${nqDist}` : null
+        const isNear     = dist != null && Math.abs(dist) <= 0.50
+        const isAbove    = dist != null && dist > 0
 
         return (
           <div
@@ -86,7 +88,7 @@ export default function PriceLadder({ result, currentPrice, compact }) {
                   ${level.price.toFixed(2)}
                 </span>
                 {result.nq_ratio && (
-                  <span className="text-gray-500 text-xs">
+                  <span className="text-gray-400 font-mono font-medium">
                     / NQ {Math.round(level.price * result.nq_ratio).toLocaleString()}
                   </span>
                 )}
@@ -97,9 +99,16 @@ export default function PriceLadder({ result, currentPrice, compact }) {
                 {level.boundary    && <span className="text-orange-400 text-xs">⚡</span>}
                 {level.lower_high  && <span className="text-purple-400 text-xs">↙</span>}
                 {distStr != null && (
-                  <span className={`text-xs font-mono tabular-nums ${isAbove ? 'text-green-400' : 'text-red-400'}`}>
-                    {distStr}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className={`text-xs font-mono tabular-nums ${isAbove ? 'text-green-400' : 'text-red-400'}`}>
+                      {distStr}
+                    </span>
+                    {nqDistStr && (
+                      <span className={`text-xs font-mono tabular-nums ${isAbove ? 'text-green-300' : 'text-red-300'}`}>
+                        {nqDistStr} NQ
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -140,8 +149,15 @@ export default function PriceLadder({ result, currentPrice, compact }) {
       })}
 
       {currentPrice != null && (
-        <div className="border border-yellow-500/60 rounded px-3 py-1.5 text-yellow-400 font-mono text-sm text-center mt-1">
-          ▶ {Number(currentPrice).toFixed(2)}
+        <div className="border border-yellow-500/60 rounded px-3 py-1.5 text-sm text-center mt-1 flex items-center justify-center gap-2">
+          <span className="text-yellow-400 font-mono font-bold">
+            ▶ QQQ ${Number(currentPrice).toFixed(2)}
+          </span>
+          {nqRatio && (
+            <span className="text-yellow-300 font-mono font-bold">
+              / NQ {Math.round(Number(currentPrice) * nqRatio).toLocaleString()}
+            </span>
+          )}
         </div>
       )}
     </div>

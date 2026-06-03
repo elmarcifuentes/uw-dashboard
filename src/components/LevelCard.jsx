@@ -24,10 +24,10 @@ const FLAG_TOOLTIPS = {
 }
 
 const BORDER_COLOR = {
-  buy_support:     'border-[#1A7A4A]',
-  sell_resistance: 'border-[#C0392B]',
-  no_edge:         'border-[#6B7280]',
-  mid:             'border-[#1B8CA6]',
+  buy_support:     '#1A7A4A',
+  sell_resistance: '#C0392B',
+  no_edge:         '#6B7280',
+  mid:             '#1B8CA6',
 }
 
 const CLASS_LABEL = {
@@ -59,8 +59,8 @@ const ETF_ARROW = {
 }
 
 export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
-  const classKey = level.classification === 'mid' ? 'mid' : level.classification
-  const border   = BORDER_COLOR[classKey] || 'border-gray-600'
+  const classKey    = level.classification === 'mid' ? 'mid' : level.classification
+  const borderColor = BORDER_COLOR[classKey] || '#6B7280'
   const nqPrice  = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : '—'
   const etfArrow = ETF_ARROW[level.etf_direction] || '—'
   const confStyle = CONFIDENCE_STYLE[level.confidence] || CONFIDENCE_STYLE.none
@@ -71,13 +71,13 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
     : null
 
   return (
-    <div className={`rounded border-l-4 ${border} bg-gray-900/60 p-3 space-y-2`}>
+    <div style={{ borderColor }} className="rounded border bg-gray-900/60 p-3 space-y-2">
       {/* Row 1: Level ID + prices */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-base font-bold text-white w-10">{level.id}</span>
           <span className="text-sm font-medium text-white">${level.price.toFixed(2)}</span>
-          <span className="text-xs text-gray-400">NQ {nqPrice}</span>
+          <span className="text-sm font-medium text-gray-400">/ NQ {nqPrice}</span>
         </div>
         <div className="flex items-center gap-1.5">
           {level.full_stack  && <span title={FLAG_TOOLTIPS.full_stack}  className="cursor-help"><SignalBadge type="full_stack" /></span>}

@@ -241,9 +241,8 @@ export default function PreSession() {
               Last fetch: {data.fetched_at || '—'}
             </div>
             <div className="flex items-center gap-3 text-sm mt-1">
-              <span>QQQ <span className="text-white font-medium">${data.current_price?.toFixed(2) ?? '—'}</span></span>
-              <span className="text-gray-600">|</span>
-              <span>NQ <span className="text-white font-medium">{nqPrice}</span></span>
+              <span className="text-white font-medium">${data.current_price?.toFixed(2) ?? '—'}</span>
+              <span className="text-gray-400 font-medium">/ NQ {nqPrice}</span>
               {nqRatio && <span className="text-xs text-gray-500">ratio {nqRatio.toFixed(3)}</span>}
               {!nqRatio && <span className="text-xs text-gray-600">ratio —</span>}
             </div>
@@ -330,14 +329,19 @@ export default function PreSession() {
 
       {/* Level cards */}
       <div className="space-y-2">
-        {[...enriched].reverse().map(level => (
-          <LevelCard
-            key={level.id}
-            level={level}
-            sessionMaxGex={sessionMaxGex}
-            nqRatio={nqRatio}
-          />
-        ))}
+        {(() => {
+          const LEVEL_ORDER = ['R2', 'R1', 'MID', 'S1', 'S2']
+          return [...enriched].sort((a, b) =>
+            LEVEL_ORDER.indexOf(a.id) - LEVEL_ORDER.indexOf(b.id)
+          ).map(level => (
+            <LevelCard
+              key={level.id}
+              level={level}
+              sessionMaxGex={sessionMaxGex}
+              nqRatio={nqRatio}
+            />
+          ))
+        })()}
       </div>
 
       {/* GEX cage */}

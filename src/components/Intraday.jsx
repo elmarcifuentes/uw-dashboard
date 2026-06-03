@@ -18,6 +18,7 @@ export default function Intraday() {
 
   const result       = lastEvent?.type === 'rescore' ? lastEvent.result : null
   const currentPrice = lastEvent?.price ?? result?.current_price
+  const nqRatio      = result?.nq_ratio ? Number(result.nq_ratio) : null
 
   return (
     <div className={`flex flex-col ${compact ? 'gap-2' : 'gap-4'}`}>
@@ -113,7 +114,7 @@ export default function Intraday() {
 
       {/* Sub-tab content */}
       <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
-        {subTab === 0 && <PriceLadder result={result} currentPrice={currentPrice} compact={compact} />}
+        {subTab === 0 && <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} />}
         {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
         {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
         {subTab === 3 && <RescoreLog history={history} compact={compact} />}
