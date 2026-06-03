@@ -6,13 +6,14 @@ import DarkPoolChart from './intraday/DarkPoolChart'
 import EtfTideChart from './intraday/EtfTideChart'
 import RescoreLog from './intraday/RescoreLog'
 import Controls from './intraday/Controls'
+import ExpansionGexAlert from './intraday/ExpansionGexAlert'
 
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log', 'Controls']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log', 'Ctrl']
 
 export default function Intraday() {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-  const { lastEvent, connected, history, levelAlert, clearLevelAlert, chartStale, staleChanges } = useSSE(`${API_URL}/stream`)
+  const { lastEvent, connected, history, levelAlert, clearLevelAlert, chartStale, staleChanges, expansionGex, pinningSessions } = useSSE(`${API_URL}/stream`)
   const { compact, toggle } = useLayout()
   const [subTab, setSubTab] = useState(0)
 
@@ -94,6 +95,9 @@ export default function Intraday() {
           </div>
         </div>
       )}
+
+      {/* Expansion GEX alert */}
+      <ExpansionGexAlert expansionGex={expansionGex} pinningSessions={pinningSessions} />
 
       {/* Sub-tab navigation */}
       <div className="flex gap-1 flex-wrap">

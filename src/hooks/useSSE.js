@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 
 export function useSSE(url) {
-  const [lastEvent, setLastEvent]       = useState(null)
-  const [connected, setConnected]       = useState(false)
-  const [history, setHistory]           = useState([])
-  const [levelAlert, setLevelAlert]     = useState(null)
-  const [chartStale, setChartStale]     = useState(false)
-  const [staleChanges, setStaleChanges] = useState([])
+  const [lastEvent, setLastEvent]         = useState(null)
+  const [connected, setConnected]         = useState(false)
+  const [history, setHistory]             = useState([])
+  const [levelAlert, setLevelAlert]       = useState(null)
+  const [chartStale, setChartStale]       = useState(false)
+  const [staleChanges, setStaleChanges]   = useState([])
+  const [expansionGex, setExpansionGex]   = useState([])
+  const [pinningSessions, setPinningSessions] = useState(0)
   const esRef = useRef(null)
 
   useEffect(() => {
@@ -41,9 +43,20 @@ export function useSSE(url) {
           return
         }
 
+        if (data.type === 'expansion_gex') {
+          setExpansionGex(data.levels || [])
+          setPinningSessions(data.consecutivePinningSessions ?? 0)
+          return
+        }
+
         setLastEvent(data)
+
         if (data.type === 'rescore') {
           setHistory(prev => [data, ...prev].slice(0, 50))
+          // Sync expansion state from rescore payload
+          if (data.expansionGex !== undefined) {
+            setExpansionGex(data.expansionGex || [])
+          }
         }
       }
 
@@ -71,5 +84,7 @@ export function useSSE(url) {
     clearLevelAlert: () => setLevelAlert(null),
     chartStale,
     staleChanges,
+    expansionGex,
+    pinningSessions,
   }
 }

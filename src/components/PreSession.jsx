@@ -378,7 +378,7 @@ export default function PreSession() {
       <GexCageSummary levels={levels} />
 
       {/* Stat boxes */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {/* Resistance magnet streak */}
         <div className="bg-gray-900/60 rounded border border-gray-700 p-3 text-center">
           <div className="text-3xl font-bold text-white">
@@ -424,6 +424,27 @@ export default function PreSession() {
                 {(apiPct * 100).toFixed(1)}% used
               </div>
             </div>
+          )}
+        </div>
+
+        {/* GEX regime */}
+        <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">GEX Regime</div>
+          {providerStatus?.expansionGexActive ? (
+            <>
+              <div className="text-lg font-bold text-red-400 animate-pulse">EXPANSION</div>
+              <div className="text-xs text-red-300 mt-1">
+                {(providerStatus.expansionGexLevels || []).map(l => l.level).join(', ')}
+                {' '}— no pinning friction
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-bold text-green-400">
+                {providerStatus?.allPinningSessions ?? '—'}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">Consecutive pinning sessions</div>
+            </>
           )}
         </div>
       </div>

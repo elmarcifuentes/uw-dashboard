@@ -16,11 +16,51 @@ app.use(cors({ origin: ALLOWED_ORIGINS }))
 app.use(express.json())
 
 // In-memory store
-let latest         = null
-let previousResult = null
-let chartSynced    = true
-const history = []
-const MAX_HISTORY = 20
+let latest            = null
+let previousResult    = null
+let chartSynced       = true
+const history         = []
+const MAX_HISTORY     = 20
+
+// Expansion GEX tracking
+let expansionGexHistory  = []   // levels currently showing expansion
+let allPinningSessions   = 0    // consecutive sessions with all-pinning GEX
+
+function detectExpansionGex(result) {
+  if (!result?.levels) return []
+  return result.levels
+    .filter(l => (l.net_gex ?? l.gex?.net_gex) < 0)
+    .map(l => ({
+      level:          l.id,
+      net_gex:        l.net_gex ?? l.gex?.net_gex,
+      price:          l.price,
+      classification: l.classification,
+      gex_bias:       l.gex_bias ?? l.gex?.gex_bias ?? 'expansion',
+    }))
+}
+
+function checkExpansionGex(result) {
+  const expansionLevels = detectExpansionGex(result)
+  if (expansionLevels.length === 0) {
+    allPinningSessions++
+    expansionGexHistory = []
+  } else {
+    const sessionCount = allPinningSessions
+    allPinningSessions   = 0
+    expansionGexHistory  = expansionLevels
+    const message = expansionLevels.map(l =>
+      `${l.level} GEX ${l.net_gex.toLocaleString()} — EXPANSION`
+    ).join(' · ')
+    console.log(`[server] Expansion GEX: ${message} (after ${sessionCount} pinning sessions)`)
+    sseEmitter.emit('event', {
+      type:                     'expansion_gex',
+      levels:                   expansionLevels,
+      consecutivePinningSessions: sessionCount,
+      message,
+      timestamp:                new Date().toISOString(),
+    })
+  }
+}
 
 function detectChanges(prev, next) {
   if (!prev || !next) return []
@@ -86,12 +126,14 @@ provider.onRescore(async ({ price, reason }) => {
     provider.setLevels(result.levels)
     console.log(`[server] Auto-rescore complete — ${result.levels.length} levels scored`)
     emitStaleIfChanged(result)
+    checkExpansionGex(result)
     sseEmitter.emit('event', {
-      type: 'rescore',
+      type:        'rescore',
       result,
-      trigger: reason,
+      trigger:     reason,
       price,
-      timestamp: new Date().toISOString(),
+      expansionGex: detectExpansionGex(result),
+      timestamp:   new Date().toISOString(),
     })
   } catch (err) {
     console.error('[server] Auto-rescore failed:', err.message)
@@ -203,12 +245,14 @@ app.post('/update', (req, res) => {
   if (result.current_price) provider.rest.lastPrice = Number(result.current_price)
   console.log(`[update] session=${result.session} run_type=${result.run_type}`)
   emitStaleIfChanged(result)
+  checkExpansionGex(result)
   sseEmitter.emit('event', {
-    type: 'rescore',
+    type:        'rescore',
     result,
-    trigger: result.run_type || 'update',
-    price: result.current_price,
-    timestamp: new Date().toISOString(),
+    trigger:     result.run_type || 'update',
+    price:       result.current_price,
+    expansionGex: detectExpansionGex(result),
+    timestamp:   new Date().toISOString(),
   })
   res.json({ ok: true })
 })
@@ -234,6 +278,9 @@ app.get('/status', (req, res) => {
     moveFromOpen: sessionOpenPrice && s.lastPrice
       ? (s.lastPrice - sessionOpenPrice).toFixed(2)
       : null,
+    expansionGexActive: expansionGexHistory.length > 0,
+    expansionGexLevels: expansionGexHistory,
+    allPinningSessions,
   })
 })
 
@@ -315,11 +362,13 @@ app.post('/rescore', async (req, res) => {
     history.unshift(result)
     if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
     provider.setLevels(result.levels)
+    checkExpansionGex(result)
     sseEmitter.emit('event', {
-      type: 'rescore',
+      type:        'rescore',
       result,
-      trigger: 'manual — dashboard button',
-      price: result.current_price,
+      trigger:     'manual — dashboard button',
+      price:       result.current_price,
+      expansionGex: detectExpansionGex(result),
       timestamp: new Date().toISOString(),
     })
     res.json({ success: true })

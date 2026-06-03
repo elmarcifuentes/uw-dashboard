@@ -134,6 +134,14 @@ export default function PriceLadder({ result, currentPrice, nqRatio, compact }) 
                 <span>
                   ETF {level.etf_direction === 'bullish' ? '↑' : level.etf_direction === 'bearish' ? '↓' : '—'}
                 </span>
+                {level.net_gex != null && (() => {
+                  const isExp = level.net_gex < 0
+                  return (
+                    <span className={`text-xs font-mono ${isExp ? 'text-red-400 font-bold' : 'text-gray-500'}`}>
+                      GEX {isExp ? '⚠ ' : ''}{(level.net_gex / 1000).toFixed(0)}K{isExp ? ' EXP' : ' pin'}
+                    </span>
+                  )
+                })()}
                 <span className={`px-1.5 py-0.5 rounded text-xs ${
                   level.confidence === 'high'   ? 'bg-green-900 text-green-300'  :
                   level.confidence === 'medium' ? 'bg-amber-900 text-amber-300'  :

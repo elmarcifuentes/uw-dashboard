@@ -136,15 +136,20 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
             </div>
           )
         })()}
-        {level.gex !== undefined && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 w-6">GEX</span>
-            <GexBar value={level.gex?.net_gex ?? 0} sessionMax={sessionMaxGex} />
-            <span className="text-xs text-gray-400">
-              {typeof level.gex?.net_gex === 'number' ? level.gex.net_gex.toLocaleString() : '—'}
-            </span>
-          </div>
-        )}
+        {(() => {
+          const netGex = level.net_gex ?? level.gex?.net_gex
+          if (netGex == null) return null
+          const isExp = netGex < 0
+          return (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 w-6">GEX</span>
+              <GexBar value={netGex} sessionMax={sessionMaxGex} />
+              <span className={`text-xs font-mono ${isExp ? 'text-red-400 font-bold' : 'text-gray-400'}`}>
+                {isExp ? '⚠ EXPANSION' : 'pinning'} {(netGex / 1000).toFixed(0)}K
+              </span>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Row 4: Passive target */}
