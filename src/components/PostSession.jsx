@@ -1,184 +1,254 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
-const CLASS_COLOR = {
-  buy_support:     'text-green-400',
-  sell_resistance: 'text-red-400',
-  no_edge:         'text-gray-400',
-  mid:             'text-cyan-400',
+const OUTCOME_COLOR = {
+  correct:   'text-green-400',
+  incorrect: 'text-red-400',
+  noise:     'text-gray-500',
 }
 
-const CLASS_BG = {
-  buy_support:     'bg-green-900/20',
-  sell_resistance: 'bg-red-900/20',
-  no_edge:         '',
-  mid:             'bg-cyan-900/10',
-}
-
-const CLASS_LABEL = {
-  buy_support:     'BUY SUP',
-  sell_resistance: 'SELL RES',
-  no_edge:         'NO EDGE',
-  mid:             'MID',
-}
-
-function buildStoryJSON(session) {
-  return {
-    _type:          'session_story',
-    session:        session.session,
-    run_type:       session.run_type,
-    fetched_at:     session.fetched_at,
-    current_price:  session.current_price,
-    cascade_fired:  session.cascade?.active ?? false,
-    structure_break: session.structure_break?.active ?? false,
-    levels:         (session.levels || []).map(l => ({
-      id:             l.id,
-      price:          l.price,
-      classification: l.classification,
-      confidence:     l.confidence,
-      score:          l.score,
-      dark_pool:      l.dark_pool,
-      etf_direction:  l.etf_direction,
-    })),
-  }
+const CONF_COLOR = {
+  high:   'text-green-400',
+  medium: 'text-amber-400',
+  low:    'text-red-400',
 }
 
 export default function PostSession() {
-  const [history, setHistory]         = useState([])
-  const [loading, setLoading]         = useState(true)
-  const [selectedIdx, setSelectedIdx] = useState(0)
-  const [toastMsg, setToastMsg]       = useState(null)
+  const [sessions, setSessions]       = useState([])
+  const [selectedDate, setSelectedDate] = useState(null)
+  const [story, setStory]             = useState(null)
+  const [storyLoading, setStoryLoading] = useState(false)
+  const [copied, setCopied]           = useState(false)
+  const [noSessions, setNoSessions]   = useState(false)
 
+  // Load session list on mount
   useEffect(() => {
-    axios.get(`${API}/history`)
-      .then(r => setHistory(r.data || []))
-      .catch(() => setHistory([]))
-      .finally(() => setLoading(false))
+    fetch(`${API}/sessions`)
+      .then(r => r.json())
+      .then(data => {
+        if (!Array.isArray(data) || data.length === 0) {
+          setNoSessions(true)
+          return
+        }
+        setSessions(data)
+        setSelectedDate(data[0].date)
+      })
+      .catch(() => setNoSessions(true))
   }, [])
 
-  const selected = history[selectedIdx]
+  // Load story when date changes
+  useEffect(() => {
+    if (!selectedDate) return
+    setStoryLoading(true)
+    fetch(`${API}/story/${selectedDate}`)
+      .then(r => r.json())
+      .then(data => { setStory(data); setStoryLoading(false) })
+      .catch(() => setStoryLoading(false))
+  }, [selectedDate])
 
-  function handleExport() {
-    if (!selected) return
-    const story = buildStoryJSON(selected)
+  const exportStory = () => {
+    if (!story) return
     navigator.clipboard.writeText(JSON.stringify(story, null, 2))
-      .then(() => {
-        setToastMsg('Copied to clipboard')
-        setTimeout(() => setToastMsg(null), 2500)
-      })
-      .catch(() => setToastMsg('Copy failed'))
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
-        Loading history…
-      </div>
-    )
+  const updateOutcome = async (levelId, outcome) => {
+    await fetch(`${API}/outcome`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: selectedDate, level_id: levelId, outcome }),
+    })
+    // Refresh story
+    fetch(`${API}/story/${selectedDate}`)
+      .then(r => r.json())
+      .then(setStory)
   }
 
-  if (!history.length) {
+  if (noSessions) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-400 text-sm">
         <span className="text-2xl">—</span>
-        <p>No session history yet. Run the scoring engine to populate.</p>
+        <p>No sessions logged yet. Run <code className="bg-gray-800 px-1.5 rounded text-gray-300">npm start</code> to begin logging.</p>
       </div>
     )
   }
 
-  const levels = selected?.levels || []
-
   return (
-    <div className="space-y-4 relative">
-      {/* Toast */}
-      {toastMsg && (
-        <div className="fixed top-4 right-4 bg-green-700 text-white px-4 py-2 rounded shadow-lg text-sm z-50 transition-all">
-          {toastMsg}
-        </div>
-      )}
+    <div className="space-y-4">
 
-      {/* Session selector */}
-      <div className="flex items-center gap-3">
+      {/* Session selector + export */}
+      <div className="flex items-center gap-3 flex-wrap">
         <label className="text-xs text-gray-500 uppercase tracking-wider">Session</label>
         <select
-          value={selectedIdx}
-          onChange={e => setSelectedIdx(Number(e.target.value))}
+          value={selectedDate || ''}
+          onChange={e => setSelectedDate(e.target.value)}
           className="bg-gray-800 border border-gray-600 text-gray-200 text-sm rounded px-2 py-1 focus:outline-none"
         >
-          {history.map((s, i) => (
-            <option key={i} value={i}>
-              {s.session} — {s.run_type}
+          {sessions.map(s => (
+            <option key={s.date} value={s.date}>
+              {s.date}{s.cascade_fired ? ' ⚠' : ''}
             </option>
           ))}
         </select>
         <button
-          onClick={handleExport}
-          className="ml-auto px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded border border-gray-600 text-gray-300 transition-colors"
+          onClick={exportStory}
+          disabled={!story}
+          className="ml-auto px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 disabled:opacity-40 rounded border border-gray-600 text-gray-300 transition-colors"
         >
-          Export Session JSON
+          {copied ? '✓ Copied' : '⬇ Export Session JSON'}
         </button>
       </div>
 
-      {/* Session summary */}
-      {selected && (
-        <div className="bg-gray-900/60 rounded border border-gray-700 p-3 space-y-2">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-            <div><span className="text-gray-500">Date: </span><span className="text-gray-200">{selected.session}</span></div>
-            <div><span className="text-gray-500">Run: </span><span className="text-gray-200">{selected.run_type}</span></div>
-            <div><span className="text-gray-500">Price: </span><span className="text-gray-200">${selected.current_price?.toFixed(2) ?? '—'}</span></div>
-            <div><span className="text-gray-500">Fetched: </span><span className="text-gray-200">{selected.fetched_at ?? '—'}</span></div>
-          </div>
-          <div className="flex gap-4 pt-1 text-xs">
-            <span>Cascade: <span className={selected.cascade?.active ? 'text-red-400 font-bold' : 'text-green-400'}>{selected.cascade?.active ? 'FIRED' : 'inactive'}</span></span>
-            <span>Structure Break: <span className={selected.structure_break?.active ? 'text-red-400 font-bold' : 'text-green-400'}>{selected.structure_break?.active ? 'YES' : 'no'}</span></span>
-            <span>Resistance Magnet: <span className="text-gray-400">{selected.resistance_magnet_validated ? 'validated' : 'not fired'}</span></span>
-          </div>
-        </div>
+      {storyLoading && (
+        <div className="text-gray-500 text-sm text-center py-8">Loading…</div>
       )}
 
-      {/* Level outcome table */}
-      {levels.length > 0 && (
-        <div className="rounded border border-gray-700 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-                <th className="px-3 py-2 text-left">Level</th>
-                <th className="px-3 py-2 text-right">Price</th>
-                <th className="px-3 py-2 text-left">Classification</th>
-                <th className="px-3 py-2 text-center">Conf</th>
-                <th className="px-3 py-2 text-right">Score</th>
-                <th className="px-3 py-2 text-right">DP</th>
-                <th className="px-3 py-2 text-center">ETF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...levels].reverse().map(l => {
-                const classKey = l.classification === 'mid' ? 'mid' : l.classification
-                return (
-                  <tr key={l.id} className={`border-t border-gray-800 ${CLASS_BG[classKey] || ''}`}>
-                    <td className="px-3 py-2 font-bold text-white">{l.id}</td>
-                    <td className="px-3 py-2 text-right text-gray-200">${l.price?.toFixed(2)}</td>
-                    <td className={`px-3 py-2 font-medium ${CLASS_COLOR[classKey] || 'text-gray-400'}`}>
-                      {CLASS_LABEL[classKey] || l.classification}
+      {story && !storyLoading && (
+        <>
+          {/* Summary boxes */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+              <div className="text-xs text-gray-500 mb-1">Price Range</div>
+              <div className="text-white font-mono text-sm">
+                ${story.session.session_low?.toFixed(2)} — ${story.session.session_high?.toFixed(2)}
+              </div>
+              <div className="text-gray-500 text-xs mt-1">
+                Open ${story.session.open_price?.toFixed(2)} → Close ${story.session.close_price?.toFixed(2) ?? '—'}
+              </div>
+            </div>
+
+            <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+              <div className="text-xs text-gray-500 mb-1">Signal Accuracy</div>
+              <div className={`text-2xl font-bold ${
+                story.accuracy.accuracy_pct == null        ? 'text-gray-500' :
+                story.accuracy.accuracy_pct >= 70         ? 'text-green-400' :
+                story.accuracy.accuracy_pct >= 50         ? 'text-amber-400' : 'text-red-400'
+              }`}>
+                {story.accuracy.accuracy_pct != null ? `${story.accuracy.accuracy_pct}%` : '—'}
+              </div>
+              <div className="text-gray-500 text-xs">
+                {story.accuracy.correct}✓ &nbsp;{story.accuracy.incorrect}✗ &nbsp;{story.accuracy.noise}~
+                &nbsp;of {story.accuracy.total_classified}
+              </div>
+            </div>
+
+            <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+              <div className="text-xs text-gray-500 mb-1">Session Events</div>
+              <div className={`text-sm ${story.session.cascade_fired ? 'text-red-400' : 'text-green-400'}`}>
+                {story.session.cascade_fired ? '⚠ Cascade fired' : '✓ No cascade'}
+              </div>
+              <div className={`text-sm ${story.session.structure_break_fired ? 'text-amber-400' : 'text-green-400'}`}>
+                {story.session.structure_break_fired ? '⚠ Structure break' : '✓ No break'}
+              </div>
+              <div className="text-gray-500 text-xs mt-1">
+                Magnet streak: {story.session.magnet_streak ?? '—'}
+              </div>
+            </div>
+          </div>
+
+          {/* Level outcomes table */}
+          <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+            <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Level Outcomes</div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500 border-b border-gray-700">
+                  <th className="text-left py-1.5 pr-2">Level</th>
+                  <th className="text-left py-1.5 pr-2">Classification</th>
+                  <th className="text-left py-1.5 pr-2">Conf</th>
+                  <th className="text-right py-1.5 pr-2">Score</th>
+                  <th className="text-right py-1.5 pr-2">DP</th>
+                  <th className="text-right py-1.5 pr-2">Move</th>
+                  <th className="text-left py-1.5 pr-2">Outcome</th>
+                  <th className="text-left py-1.5">Override</th>
+                </tr>
+              </thead>
+              <tbody>
+                {story.level_outcomes.map(level => (
+                  <tr key={level.level} className="border-b border-gray-800/60 hover:bg-gray-800/30">
+                    <td className="py-1.5 pr-2 font-mono font-bold text-white">
+                      {level.level}
+                      {level.full_stack && <span className="text-yellow-400 ml-1">★</span>}
                     </td>
-                    <td className="px-3 py-2 text-center text-xs text-gray-300 uppercase">
-                      {l.confidence}
+                    <td className="py-1.5 pr-2 text-gray-300">
+                      {level.classification === 'buy_support'    ? 'BUY SUP'  :
+                       level.classification === 'sell_resistance' ? 'SELL RES' : 'NO EDGE'}
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-300">{l.score}</td>
-                    <td className="px-3 py-2 text-right text-gray-400 tabular-nums">
-                      {typeof l.dark_pool === 'number' ? l.dark_pool.toFixed(3) : '—'}
+                    <td className={`py-1.5 pr-2 ${CONF_COLOR[level.confidence] || 'text-gray-500'}`}>
+                      {level.confidence?.toUpperCase() || '—'}
                     </td>
-                    <td className={`px-3 py-2 text-center text-sm ${l.etf_direction === 'bullish' ? 'text-green-400' : l.etf_direction === 'bearish' ? 'text-red-400' : 'text-gray-500'}`}>
-                      {l.etf_direction === 'bullish' ? '↑' : l.etf_direction === 'bearish' ? '↓' : '—'}
+                    <td className="py-1.5 pr-2 text-right font-mono text-gray-300">{level.score}</td>
+                    <td className="py-1.5 pr-2 text-right font-mono text-gray-400">
+                      {level.dark_pool?.toFixed(3) ?? '—'}
+                    </td>
+                    <td className={`py-1.5 pr-2 text-right font-mono tabular-nums ${
+                      level.price_move == null ? 'text-gray-600' :
+                      level.price_move >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {level.price_move != null
+                        ? `${level.price_move >= 0 ? '+' : ''}${level.price_move.toFixed(2)}`
+                        : '—'}
+                    </td>
+                    <td className={`py-1.5 pr-2 font-bold ${OUTCOME_COLOR[level.outcome] || 'text-gray-600'}`}>
+                      {level.outcome?.toUpperCase() || 'PENDING'}
+                    </td>
+                    <td className="py-1.5">
+                      <select
+                        defaultValue=""
+                        onChange={e => e.target.value && updateOutcome(level.level, e.target.value)}
+                        className="bg-gray-700 border border-gray-600 text-gray-300 text-xs rounded px-1 py-0.5"
+                      >
+                        <option value="">—</option>
+                        <option value="correct">✓ Correct</option>
+                        <option value="incorrect">✗ Incorrect</option>
+                        <option value="noise">~ Noise</option>
+                      </select>
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* High confidence box */}
+          {story.accuracy.high_confidence_calls > 0 && (
+            <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+              <div className="text-xs text-gray-500 mb-1 uppercase tracking-wider">High Confidence Accuracy</div>
+              <div className="text-2xl font-bold text-green-400">
+                {story.accuracy.high_confidence_accuracy_pct}%
+              </div>
+              <div className="text-xs text-gray-500">
+                {story.accuracy.high_confidence_correct} correct of {story.accuracy.high_confidence_calls} high confidence calls
+              </div>
+            </div>
+          )}
+
+          {/* Session timeline */}
+          {story.timeline.length > 0 && (
+            <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+              <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">
+                Timeline ({story.timeline.length} events)
+              </div>
+              <div className="overflow-y-auto max-h-48 space-y-0">
+                {story.timeline.map((event, i) => (
+                  <div key={i} className="flex gap-3 text-xs py-1 border-b border-gray-800/60">
+                    <span className="text-gray-500 font-mono w-14 shrink-0">
+                      {new Date(event.time).toLocaleTimeString('en-US', {
+                        hour: '2-digit', minute: '2-digit', hour12: false
+                      })}
+                    </span>
+                    <span className="text-gray-400 truncate flex-1">{event.trigger}</span>
+                    <span className="text-gray-300 font-mono tabular-nums">
+                      {event.price != null ? `$${Number(event.price).toFixed(2)}` : ''}
+                    </span>
+                    {event.cascade_active        && <span className="text-red-400 shrink-0">⚠ CASCADE</span>}
+                    {event.structure_break_active && <span className="text-amber-400 shrink-0">⚠ BREAK</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -5,6 +5,8 @@ import { EventEmitter } from 'events'
 import SmartDataProvider from './dataProvider/SmartDataProvider.js'
 import pollingConfig from './dataProvider/pollingConfig.js'
 import { runFullScore } from './scorer/index.js'
+import db from './db.js'
+import { logger } from './sessionLogger.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -165,6 +167,46 @@ app.get('/budget', (req, res) => {
     percentUsed:   (pct * 100).toFixed(1),
     status:        pct >= 0.80 ? 'red' : pct >= 0.50 ? 'amber' : 'green',
   })
+})
+
+// ── Session logger — tap SSE bus ──────────────────────────────────────────────
+sseEmitter.on('event', (data) => {
+  try {
+    if (data.type === 'rescore') logger.logRescore(data)
+    if (data.type === 'price')   logger.logPrice(data.price, data.timestamp)
+  } catch (err) {
+    console.warn('[logger] Error:', err.message)
+  }
+})
+
+// ── Session story endpoints ───────────────────────────────────────────────────
+app.get('/sessions', (req, res) => {
+  res.json(logger.getAllSessions())
+})
+
+app.get('/story/today', (req, res) => {
+  const today = new Date().toISOString().split('T')[0]
+  const story = logger.getSessionStory(today)
+  if (!story) return res.status(404).json({ error: 'No session today yet' })
+  res.json(story)
+})
+
+app.get('/story/:date', (req, res) => {
+  const story = logger.getSessionStory(req.params.date)
+  if (!story) return res.status(404).json({ error: 'Session not found' })
+  res.json(story)
+})
+
+app.post('/outcome', (req, res) => {
+  const { date, level_id, outcome, notes } = req.body
+  if (!date || !level_id || !outcome) {
+    return res.status(400).json({ error: 'date, level_id, outcome required' })
+  }
+  db.prepare(`
+    UPDATE level_outcomes SET outcome = ?, outcome_auto = 0, notes = ?, updated_at = datetime('now')
+    WHERE session_date = ? AND level_id = ?
+  `).run(outcome, notes || null, date, level_id)
+  res.json({ success: true })
 })
 
 app.post('/rescore', async (req, res) => {
