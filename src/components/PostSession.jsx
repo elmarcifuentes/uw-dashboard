@@ -21,6 +21,14 @@ export default function PostSession() {
   const [storyLoading, setStoryLoading] = useState(false)
   const [copied, setCopied]           = useState(false)
   const [noSessions, setNoSessions]   = useState(false)
+  const [nqRatio, setNqRatio]         = useState(null)
+
+  useEffect(() => {
+    fetch(`${API}/latest`)
+      .then(r => r.json())
+      .then(d => { if (d?.nq_ratio) setNqRatio(Number(d.nq_ratio)) })
+      .catch(() => {})
+  }, [])
 
   // Load session list on mount
   useEffect(() => {
@@ -110,11 +118,28 @@ export default function PostSession() {
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
               <div className="text-xs text-gray-500 mb-1">Price Range</div>
-              <div className="text-white font-mono text-sm">
-                ${story.session.session_low?.toFixed(2)} — ${story.session.session_high?.toFixed(2)}
+              <div className="font-mono text-sm">
+                <span className="text-white">${story.session.session_low?.toFixed(2)}</span>
+                {nqRatio && story.session.session_low && (
+                  <span className="text-gray-400"> / NQ {Math.round(story.session.session_low * nqRatio).toLocaleString()}</span>
+                )}
+                <span className="text-gray-500 mx-1">—</span>
+                <span className="text-white">${story.session.session_high?.toFixed(2)}</span>
+                {nqRatio && story.session.session_high && (
+                  <span className="text-gray-400"> / NQ {Math.round(story.session.session_high * nqRatio).toLocaleString()}</span>
+                )}
               </div>
-              <div className="text-gray-500 text-xs mt-1">
-                Open ${story.session.open_price?.toFixed(2)} → Close ${story.session.close_price?.toFixed(2) ?? '—'}
+              <div className="text-xs mt-1 font-mono">
+                <span className="text-gray-500">Open </span>
+                <span className="text-white">${story.session.open_price?.toFixed(2)}</span>
+                {nqRatio && story.session.open_price && (
+                  <span className="text-gray-400"> / NQ {Math.round(story.session.open_price * nqRatio).toLocaleString()}</span>
+                )}
+                <span className="text-gray-500 mx-1">→ Close </span>
+                <span className="text-white">{story.session.close_price != null ? `$${story.session.close_price.toFixed(2)}` : '—'}</span>
+                {nqRatio && story.session.close_price && (
+                  <span className="text-gray-400"> / NQ {Math.round(story.session.close_price * nqRatio).toLocaleString()}</span>
+                )}
               </div>
             </div>
 

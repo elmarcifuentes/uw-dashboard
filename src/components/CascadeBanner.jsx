@@ -1,9 +1,10 @@
-export default function CascadeBanner({ cascade }) {
+export default function CascadeBanner({ cascade, midPrice, nqRatio }) {
   if (!cascade) return null
 
   const active     = cascade.active
   const midDp      = cascade.mid_dp ?? null
   const conditions = cascade.conditions ?? [false, false, false]
+  const midNq      = nqRatio && midPrice ? Math.round(midPrice * nqRatio).toLocaleString() : null
 
   if (!active) {
     return (
@@ -24,7 +25,9 @@ export default function CascadeBanner({ cascade }) {
         <span className="text-red-200 font-bold text-sm">⚠ CASCADE ACTIVE</span>
       </div>
       <p className="text-red-300 text-xs mb-3 leading-relaxed">
-        If price breaks below MID there is no institutional support at S1 or S2.
+        If price breaks below MID
+        {midPrice && <> <span className="text-white">${midPrice.toFixed(2)}</span>{midNq && <span className="text-gray-400"> / NQ {midNq}</span>}</>}
+        {' '}there is no institutional support at S1 or S2.
         GEX provides mechanical friction only.
         Do not hold longs through a MID break in this configuration.
       </p>

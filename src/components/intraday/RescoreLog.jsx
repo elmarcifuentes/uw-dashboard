@@ -62,16 +62,19 @@ export default function RescoreLog({ history, compact }) {
               const time = new Date(event.timestamp).toLocaleTimeString('en-US', {
                 hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
               })
-              const cascade = event.result?.cascade?.active
-              const brk     = event.result?.structure_break?.active
+              const cascade  = event.result?.cascade?.active
+              const brk      = event.result?.structure_break?.active
+              const nqRatio  = event.result?.nq_ratio ? Number(event.result.nq_ratio) : null
+              const nqPrice  = nqRatio && event.price != null ? Math.round(Number(event.price) * nqRatio).toLocaleString() : null
               return (
                 <tr key={i} className="border-b border-gray-800/60 hover:bg-gray-800/40">
                   <td className="py-1 pr-3 text-gray-500">{time}</td>
                   <td title={event.trigger || ''} className={`py-1 pr-3 cursor-help ${triggerColor(event.trigger)}`}>
                     {friendlyTrigger(event.trigger)}
                   </td>
-                  <td className="py-1 pr-3 text-white tabular-nums">
-                    {event.price != null ? `$${Number(event.price).toFixed(2)}` : '—'}
+                  <td className="py-1 pr-3 tabular-nums">
+                    <div className="text-white">{event.price != null ? `$${Number(event.price).toFixed(2)}` : '—'}</div>
+                    {nqPrice && <div className="text-gray-400 text-xs">NQ {nqPrice}</div>}
                   </td>
                   <td className="py-1 space-x-1">
                     {cascade && <span className="text-red-400">⚠ CASCADE</span>}

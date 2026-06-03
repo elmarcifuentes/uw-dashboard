@@ -23,40 +23,66 @@ const ETF_DESCRIPTION = {
   'no data': 'No ETF tide data available for this session.',
 }
 
-function StructureBreakBar({ sb }) {
-  const toR2 = sb?.distance_to_r2 ?? null
-  const toS2 = sb?.distance_to_s2 ?? null
+function StructureBreakBar({ sb, nqRatio }) {
+  const toR2   = sb?.distance_to_r2 ?? null
+  const toS2   = sb?.distance_to_s2 ?? null
   const active = sb?.active ?? false
   const isImminent = !active && (
     (toR2 !== null && toR2 <= 0.50) || (toS2 !== null && toS2 <= 0.50)
   )
 
-  let cls  = 'bg-gray-800 border-gray-700 text-gray-400'
-  let text = `R2 $${toR2?.toFixed(2) ?? '—'} away  |  S2 $${toS2?.toFixed(2) ?? '—'} away`
+  const r2NqDist = nqRatio && toR2 != null ? Math.round(toR2 * nqRatio) : null
+  const s2NqDist = nqRatio && toS2 != null ? Math.round(toS2 * nqRatio) : null
+
+  if (active) {
+    const dir  = sb.direction === 'upside' ? '▲' : '▼'
+    const r3nq = nqRatio && sb.r3 ? Math.round(sb.r3 * nqRatio).toLocaleString() : null
+    return (
+      <div className="px-3 py-2 rounded border bg-red-900/50 border-red-600">
+        <div className="text-sm font-medium text-red-300">
+          ⚠ STRUCTURE BREAK {dir} {sb.direction?.toUpperCase() ?? ''}
+          {sb.r3 && (
+            <> — {sb.direction === 'upside' ? 'R3' : 'S3'}:{' '}
+              <span className="text-white">${sb.r3}</span>
+              {r3nq && <span className="text-gray-400"> / NQ {r3nq}</span>}
+            </>
+          )}
+        </div>
+        <div className="text-xs mt-0.5 text-red-300/70">
+          Price has moved outside the defined structure — GEX extension scanning for next level
+        </div>
+      </div>
+    )
+  }
 
   if (isImminent) {
     const imminentR2 = toR2 !== null && toR2 <= 0.50
-    cls  = 'bg-amber-900/50 border-amber-600 text-amber-300'
-    text = imminentR2
-      ? `⚠ R2 $${toR2.toFixed(2)} — BREAK IMMINENT`
-      : `⚠ S2 $${toS2.toFixed(2)} — BREAK IMMINENT`
-  }
-
-  if (active) {
-    const dir = sb.direction === 'upside' ? '▲' : '▼'
-    const ext = sb.r3 ? ` — ${sb.direction === 'upside' ? 'R3' : 'S3'}: $${sb.r3}` : ''
-    cls  = 'bg-red-900/50 border-red-600 text-red-300'
-    text = `⚠ STRUCTURE BREAK ${dir} ${sb.direction?.toUpperCase() ?? ''}${ext}`
+    const dist = imminentR2 ? toR2 : toS2
+    const nqD  = imminentR2 ? r2NqDist : s2NqDist
+    const label = imminentR2 ? 'R2' : 'S2'
+    return (
+      <div className="px-3 py-2 rounded border bg-amber-900/50 border-amber-600">
+        <div className="text-sm font-medium text-amber-300">
+          ⚠ {label} <span className="text-white">${dist?.toFixed(2)}</span>
+          {nqD && <span className="text-gray-400"> / {nqD} NQ</span>}
+          {' '}— BREAK IMMINENT
+        </div>
+        <div className="text-xs mt-0.5 text-amber-300/70">Price is within the defined structure range</div>
+      </div>
+    )
   }
 
   return (
-    <div className={`px-3 py-2 rounded border ${cls}`}>
-      <div className="text-sm font-medium">{text}</div>
-      <div className="text-xs mt-0.5 opacity-70">
-        {active
-          ? 'Price has moved outside the defined structure — GEX extension scanning for next level'
-          : 'Price is within the defined structure range'}
+    <div className="px-3 py-2 rounded border bg-gray-800 border-gray-700">
+      <div className="text-sm font-medium text-gray-400">
+        R2 <span className="text-white">${toR2?.toFixed(2) ?? '—'}</span>
+        {r2NqDist && <span className="text-gray-400"> / {r2NqDist} NQ</span>}
+        <span className="text-gray-600 mx-2">|</span>
+        S2 <span className="text-white">${toS2?.toFixed(2) ?? '—'}</span>
+        {s2NqDist && <span className="text-gray-400"> / {s2NqDist} NQ</span>}
+        <span className="text-gray-500 ml-1">away</span>
       </div>
+      <div className="text-xs mt-0.5 text-gray-600">Price is within the defined structure range</div>
     </div>
   )
 }
@@ -322,10 +348,14 @@ export default function PreSession() {
       </div>
 
       {/* Structure break bar */}
-      <StructureBreakBar sb={data.structure_break} />
+      <StructureBreakBar sb={data.structure_break} nqRatio={nqRatio} />
 
       {/* Cascade banner */}
-      <CascadeBanner cascade={data.cascade} />
+      <CascadeBanner
+        cascade={data.cascade}
+        midPrice={levels.find(l => l.id === 'MID')?.price ?? null}
+        nqRatio={nqRatio}
+      />
 
       {/* Level cards */}
       <div className="space-y-2">

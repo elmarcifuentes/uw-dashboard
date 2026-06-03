@@ -133,10 +133,19 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
 
       {/* Row 4: Passive target */}
       {level.passive_target && level.passive_target_from && (
-        <div className={`text-xs font-medium ${level.classification === 'buy_support' ? 'text-green-400' : 'text-red-400'}`}>
-          → TARGET {level.passive_target_from}
-          {level._target_delta !== undefined && (
-            <span> {level._target_delta >= 0 ? '+' : ''}{level._target_delta.toFixed(2)}</span>
+        <div className={`text-xs font-medium flex items-center gap-1 ${level.classification === 'buy_support' ? 'text-green-400' : 'text-red-400'}`}>
+          <span>→ TARGET {level.passive_target_from}</span>
+          {level._target_delta !== undefined && level._target_delta !== null && (
+            <>
+              <span className="text-white font-mono">
+                {level._target_delta >= 0 ? '+' : ''}{level._target_delta.toFixed(2)}
+              </span>
+              {nqRatio && (
+                <span className="text-gray-400 font-mono">
+                  / {level._target_delta >= 0 ? '+' : '-'}{Math.round(Math.abs(level._target_delta) * nqRatio)} NQ
+                </span>
+              )}
+            </>
           )}
         </div>
       )}
