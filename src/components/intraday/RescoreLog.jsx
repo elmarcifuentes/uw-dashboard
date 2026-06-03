@@ -7,6 +7,19 @@ const TRIGGER_COLORS = {
   'initial':       'text-gray-600',
   'update':        'text-gray-500',
   'overnight-prep':'text-gray-500',
+  'auto-rescore':  'text-gray-500',
+}
+
+const TRIGGER_DESCRIPTIONS = {
+  'price near':    'Price tested a key level',
+  'price moved':   'Price moved significantly from last read',
+  'time-based':    'Scheduled refresh (15-min interval)',
+  'cascade':       'Cascade conditions changed',
+  'manual':        'Manually triggered from dashboard',
+  'initial':       'Dashboard connected — loaded last known data',
+  'update':        'Scoring engine posted new data',
+  'overnight-prep':'Overnight preparation run',
+  'auto-rescore':  'Auto-rescore from polling engine',
 }
 
 function triggerColor(trigger) {
@@ -15,6 +28,14 @@ function triggerColor(trigger) {
     if (t.includes(key)) return color
   }
   return 'text-gray-400'
+}
+
+function friendlyTrigger(trigger) {
+  const t = (trigger || '').toLowerCase()
+  for (const [key, desc] of Object.entries(TRIGGER_DESCRIPTIONS)) {
+    if (t.includes(key)) return desc
+  }
+  return trigger || '—'
 }
 
 export default function RescoreLog({ history, compact }) {
@@ -46,8 +67,8 @@ export default function RescoreLog({ history, compact }) {
               return (
                 <tr key={i} className="border-b border-gray-800/60 hover:bg-gray-800/40">
                   <td className="py-1 pr-3 text-gray-500">{time}</td>
-                  <td className={`py-1 pr-3 ${triggerColor(event.trigger)}`}>
-                    {event.trigger || '—'}
+                  <td title={event.trigger || ''} className={`py-1 pr-3 cursor-help ${triggerColor(event.trigger)}`}>
+                    {friendlyTrigger(event.trigger)}
                   </td>
                   <td className="py-1 pr-3 text-white tabular-nums">
                     {event.price != null ? `$${Number(event.price).toFixed(2)}` : '—'}

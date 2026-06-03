@@ -16,6 +16,12 @@ function msToLabel(ms) {
 
 const ETF_LABEL = { bullish: 'BULLISH', bearish: 'BEARISH', neutral: 'NEUTRAL', 'no data': 'NO DATA' }
 const ETF_COLOR = { bullish: 'text-green-400 bg-green-900/40 border-green-700', bearish: 'text-red-400 bg-red-900/40 border-red-700', neutral: 'text-gray-400 bg-gray-800 border-gray-600', 'no data': 'text-gray-500 bg-gray-800 border-gray-700' }
+const ETF_DESCRIPTION = {
+  bullish:  'Institutions buying calls — bullish session tone. Confirms long setups.',
+  bearish:  'Institutions selling calls or buying puts — bearish tone. Fades long setups.',
+  neutral:  'Mixed flow — no strong directional bias from ETF tide.',
+  'no data': 'No ETF tide data available for this session.',
+}
 
 function StructureBreakBar({ sb }) {
   const toR2 = sb?.distance_to_r2 ?? null
@@ -44,8 +50,13 @@ function StructureBreakBar({ sb }) {
   }
 
   return (
-    <div className={`px-3 py-2 rounded border text-sm font-medium ${cls}`}>
-      {text}
+    <div className={`px-3 py-2 rounded border ${cls}`}>
+      <div className="text-sm font-medium">{text}</div>
+      <div className="text-xs mt-0.5 opacity-70">
+        {active
+          ? 'Price has moved outside the defined structure — GEX extension scanning for next level'
+          : 'Price is within the defined structure range'}
+      </div>
     </div>
   )
 }
@@ -352,6 +363,9 @@ export default function PreSession() {
           <div className="text-xs text-gray-400 space-y-0.5">
             <div>Call: <span className="text-green-400">{fmt(netCall)}</span></div>
             <div>Put: <span className="text-red-400">{fmt(netPut)}</span></div>
+          </div>
+          <div className="text-xs text-gray-500 mt-1 italic">
+            {ETF_DESCRIPTION[etfDir] || ETF_DESCRIPTION.neutral}
           </div>
           {data.run_type?.includes('overnight') && (
             <div className="text-xs text-gray-600 mt-1">carry-forward</div>

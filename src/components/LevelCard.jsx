@@ -2,6 +2,27 @@ import SignalBadge from './SignalBadge'
 import DpBar from './DpBar'
 import GexBar from './GexBar'
 
+const LEVEL_DESCRIPTIONS = {
+  buy_support:     'Institutional buying below this level — price expected to be drawn upward',
+  sell_resistance: 'Institutional supply above this level — price expected to struggle or reject',
+  no_edge:         'Insufficient signal — no directional read at this level',
+  mid:             'Midpoint — watching for dark pool direction to develop',
+}
+
+const CONFIDENCE_TOOLTIPS = {
+  high:   'High: Score ≥70, flow ≥8 matches — two signals agree — full conviction',
+  medium: 'Medium: Score 65–69, flow ≥4 matches — one strong signal confirmed',
+  low:    'Low: Score ≥65, flow <4 matches — sparse data, use caution',
+  none:   'None: Score below threshold — no actionable read',
+}
+
+const FLAG_TOOLTIPS = {
+  full_stack: 'FULL STACK ★: Resistance magnet + High confidence + ETF confirmed — maximum conviction. Never fade on first approach.',
+  conflict:   'CONFLICT ⚠: Level type contradicts classification — this IS the resistance magnet pattern. 16/16 sessions confirmed.',
+  boundary:   'BOUNDARY ⚡: Score exactly 65 — minimum threshold. Verify: dark pool ≥ +0.700 AND flow ≥ 4 matches before trading.',
+  lower_high: 'LOWER HIGH ↙: Second approach below prior touch — momentum exhausting. Tighten stop, reduce size.',
+}
+
 const BORDER_COLOR = {
   buy_support:     'border-[#1A7A4A]',
   sell_resistance: 'border-[#C0392B]',
@@ -59,12 +80,17 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
           <span className="text-xs text-gray-400">NQ {nqPrice}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          {level.full_stack  && <SignalBadge type="full_stack" />}
-          {level.conflict    && !level.full_stack && <SignalBadge type="conflict" />}
-          {level.boundary    && <SignalBadge type="boundary" />}
-          {level.lower_high  && <SignalBadge type="lower_high" />}
+          {level.full_stack  && <span title={FLAG_TOOLTIPS.full_stack}  className="cursor-help"><SignalBadge type="full_stack" /></span>}
+          {level.conflict    && !level.full_stack && <span title={FLAG_TOOLTIPS.conflict} className="cursor-help"><SignalBadge type="conflict" /></span>}
+          {level.boundary    && <span title={FLAG_TOOLTIPS.boundary}    className="cursor-help"><SignalBadge type="boundary" /></span>}
+          {level.lower_high  && <span title={FLAG_TOOLTIPS.lower_high}  className="cursor-help"><SignalBadge type="lower_high" /></span>}
         </div>
       </div>
+
+      {/* Description */}
+      <p className="text-xs text-gray-500 italic leading-snug">
+        {LEVEL_DESCRIPTIONS[classKey]}
+      </p>
 
       {/* Row 2: Classification + score + confidence */}
       <div className="flex items-center gap-2 text-xs">
@@ -72,7 +98,10 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
           {CLASS_LABEL[classKey] || level.classification}
         </span>
         <span className="text-gray-300 font-medium">{level.score}</span>
-        <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${confStyle}`}>
+        <span
+          title={CONFIDENCE_TOOLTIPS[level.confidence] || ''}
+          className={`px-1.5 py-0.5 rounded text-xs font-bold cursor-help ${confStyle}`}
+        >
           {(level.confidence || 'none').toUpperCase()}
         </span>
       </div>

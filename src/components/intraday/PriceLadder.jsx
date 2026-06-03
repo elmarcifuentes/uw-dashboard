@@ -1,3 +1,10 @@
+const LEVEL_DESCRIPTIONS = {
+  buy_support:     'Institutional buying below — price expected to be drawn upward',
+  sell_resistance: 'Institutional supply above — price expected to struggle or reject',
+  no_edge:         'Insufficient signal — no directional read',
+  continuation:    'Momentum continuation — weak opposing data at level',
+}
+
 const CLASS_COLORS = {
   buy_support:     { border: '#1A7A4A', bg: '#0a2418', text: '#4ade80' },
   sell_resistance: { border: '#C0392B', bg: '#2a0a0a', text: '#f87171' },
@@ -96,6 +103,12 @@ export default function PriceLadder({ result, currentPrice, compact }) {
                 )}
               </div>
             </div>
+
+            {!compact && (
+              <p className="text-xs text-gray-500 italic mt-1">
+                {LEVEL_DESCRIPTIONS[level.classification] || ''}
+              </p>
+            )}
 
             {!compact && (
               <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">

@@ -3,10 +3,11 @@ import TabNav from './components/TabNav'
 import PreSession from './components/PreSession'
 import Intraday from './components/Intraday'
 import PostSession from './components/PostSession'
+import Guide from './components/Guide'
 import { LayoutProvider } from './context/LayoutContext'
 import './index.css'
 
-const TABS = ['Pre-Session', 'Intraday', 'Post-Session']
+const TABS = ['Pre-Session', 'Intraday', 'Post-Session', 'Guide']
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -34,6 +35,7 @@ export default function App() {
             {activeTab === 'Pre-Session'  && <PreSession />}
             {activeTab === 'Intraday'     && <Intraday />}
             {activeTab === 'Post-Session' && <PostSession />}
+            {activeTab === 'Guide'        && <Guide />}
           </div>
         </div>
       </div>
