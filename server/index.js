@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import { EventEmitter } from 'events'
 import SmartDataProvider from './dataProvider/SmartDataProvider.js'
 import pollingConfig from './dataProvider/pollingConfig.js'
 import { runFullScore } from './scorer/index.js'
@@ -17,6 +18,10 @@ let latest = null
 const history = []
 const MAX_HISTORY = 20
 
+// SSE event bus
+const sseEmitter = new EventEmitter()
+sseEmitter.setMaxListeners(100)
+
 // ── DataProvider ──────────────────────────────────────────────────────────────
 const provider = new SmartDataProvider(
   process.env.UW_API_KEY,
@@ -24,7 +29,7 @@ const provider = new SmartDataProvider(
   pollingConfig
 )
 
-// On rescore trigger — run full scoring, update store
+// On rescore trigger — run full scoring, update store, broadcast SSE
 provider.onRescore(async ({ price, reason }) => {
   console.log(`[server] Auto-rescore triggered: ${reason} at $${price}`)
   try {
@@ -33,12 +38,30 @@ provider.onRescore(async ({ price, reason }) => {
     latest = result
     history.unshift(result)
     if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
-    // Update DataProvider with fresh level prices for adaptive polling
     provider.setLevels(result.levels)
     console.log(`[server] Auto-rescore complete — ${result.levels.length} levels scored`)
+    sseEmitter.emit('event', {
+      type: 'rescore',
+      result,
+      trigger: reason,
+      price,
+      timestamp: new Date().toISOString(),
+    })
   } catch (err) {
     console.error('[server] Auto-rescore failed:', err.message)
   }
+})
+
+// Broadcast every price tick
+provider.onPriceUpdate((price) => {
+  const s = provider.getStatus()
+  sseEmitter.emit('event', {
+    type: 'price',
+    price,
+    interval: s.currentInterval,
+    isMarketHours: s.isMarketHours,
+    timestamp: new Date().toISOString(),
+  })
 })
 
 // Start adaptive polling if enabled
@@ -51,7 +74,39 @@ if (process.env.POLLING_ENABLED === 'true') {
   }
 }
 
-// ── Existing endpoints ────────────────────────────────────────────────────────
+// ── SSE stream ────────────────────────────────────────────────────────────────
+app.get('/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.flushHeaders()
+
+  // Send current data immediately on connect
+  if (latest) {
+    res.write(`data: ${JSON.stringify({
+      type: 'rescore',
+      result: latest,
+      trigger: 'initial',
+      timestamp: new Date().toISOString(),
+    })}\n\n`)
+  }
+
+  // Heartbeat every 30s to prevent proxy timeouts
+  const heartbeat = setInterval(() => {
+    res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`)
+  }, 30000)
+
+  const onEvent = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+  sseEmitter.on('event', onEvent)
+
+  req.on('close', () => {
+    clearInterval(heartbeat)
+    sseEmitter.off('event', onEvent)
+  })
+})
+
+// ── Endpoints ─────────────────────────────────────────────────────────────────
 app.post('/update', (req, res) => {
   const result = req.body
   if (!result || typeof result !== 'object') {
@@ -64,6 +119,13 @@ app.post('/update', (req, res) => {
   if (result.levels) provider.setLevels(result.levels)
   if (result.current_price) provider.rest.lastPrice = Number(result.current_price)
   console.log(`[update] session=${result.session} run_type=${result.run_type}`)
+  sseEmitter.emit('event', {
+    type: 'rescore',
+    result,
+    trigger: result.run_type || 'update',
+    price: result.current_price,
+    timestamp: new Date().toISOString(),
+  })
   res.json({ ok: true })
 })
 
@@ -77,14 +139,9 @@ app.get('/history', (req, res) => {
 })
 
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    last_update: latest?._received_at || null,
-    version: '4a',
-  })
+  res.json({ status: 'ok', last_update: latest?._received_at || null, version: '4b' })
 })
 
-// ── New DataProvider endpoints ────────────────────────────────────────────────
 app.get('/status', (req, res) => {
   res.json(provider.getStatus())
 })
@@ -108,6 +165,29 @@ app.get('/budget', (req, res) => {
     percentUsed:   (pct * 100).toFixed(1),
     status:        pct >= 0.80 ? 'red' : pct >= 0.50 ? 'amber' : 'green',
   })
+})
+
+app.post('/rescore', async (req, res) => {
+  console.log('[server] Manual rescore triggered from dashboard')
+  try {
+    const result = await runFullScore({ trigger: 'manual' })
+    result._received_at = new Date().toISOString()
+    latest = result
+    history.unshift(result)
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
+    provider.setLevels(result.levels)
+    sseEmitter.emit('event', {
+      type: 'rescore',
+      result,
+      trigger: 'manual — dashboard button',
+      price: result.current_price,
+      timestamp: new Date().toISOString(),
+    })
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[server] Manual rescore failed:', err.message)
+    res.status(500).json({ error: err.message })
+  }
 })
 
 app.listen(PORT, () => {
