@@ -23,4 +23,12 @@ export default {
     amberAlert:    0.80,
     pauseAt:       14000,
   },
+
+  marketHours: {
+    open:  { hour: 8, minute: 30 },
+    close: { hour: 16, minute: 30 },
+    timezone: 'America/New_York',
+    overnightInterval: 5 * 60 * 1000,
+    overnightRescores: false,
+  },
 }

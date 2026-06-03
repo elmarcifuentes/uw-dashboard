@@ -85,7 +85,20 @@ export default class RestDataProvider extends DataProvider {
     return this._uwGet(`/api/market/${symbol}/etf-tide`)
   }
 
+  _isMarketHours() {
+    const now = new Date()
+    const et  = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+    const isWeekday = et.getDay() >= 1 && et.getDay() <= 5
+    const timeVal   = et.getHours() * 60 + et.getMinutes()
+    const open  = 8  * 60 + 30
+    const close = 16 * 60 + 30
+    return isWeekday && timeVal >= open && timeVal <= close
+  }
+
   _getInterval(currentPrice) {
+    if (!this._isMarketHours()) {
+      return this.config.marketHours.overnightInterval
+    }
     if (!currentPrice) return this.config.intervals.quiet
     const classified = this.levels.filter(l => l.classification && l.classification !== 'no_edge')
     if (!classified.length) return this.config.intervals.quiet
@@ -103,6 +116,9 @@ export default class RestDataProvider extends DataProvider {
   }
 
   _shouldRescore(currentPrice) {
+    if (!this._isMarketHours() && !this.config.marketHours.overnightRescores) {
+      return { trigger: false, reason: 'outside market hours' }
+    }
     const t = this.config.triggers
     for (const level of this.levels) {
       if (Math.abs(currentPrice - level.price) <= t.levelCrossThreshold) {
@@ -202,6 +218,8 @@ export default class RestDataProvider extends DataProvider {
       currentInterval: this._getInterval(this.lastPrice || 0),
       levelsLoaded: this.levels.length,
       pollingActive: !this.paused && !!this.pollingTimer,
+      isMarketHours: this._isMarketHours(),
+      overnightMode: !this._isMarketHours(),
     }
   }
 }
