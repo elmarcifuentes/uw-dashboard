@@ -1,3 +1,5 @@
+import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
+
 const LEVEL_DESCRIPTIONS = {
   buy_support:     'Institutional buying below — price expected to be drawn upward',
   sell_resistance: 'Institutional supply above — price expected to struggle or reject',
@@ -198,6 +200,22 @@ export default function PriceLadder({ result, currentPrice, nqRatio, compact, dp
             )}
 
             <DpTrend levelId={level.id} history={dpHistory[level.id]} compact={compact} />
+
+            {(() => {
+              const dc = dpConditionLabel(level.dark_pool, level.type, level.classification)
+              const mw = level.id === 'MID' ? midDpWarning(level.dark_pool) : { show: false }
+              return (
+                <div className={`text-xs font-bold ${dc.color} mt-0.5`}>
+                  {dc.label}
+                  {!compact && (
+                    <span className="text-gray-600 font-normal ml-1">— {dc.sublabel}</span>
+                  )}
+                  {mw.show && (
+                    <span className={`ml-1 ${mw.color}`}>⚠ {mw.text}</span>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         )
       })}

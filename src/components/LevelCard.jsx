@@ -1,6 +1,7 @@
 import SignalBadge from './SignalBadge'
 import DpBar from './DpBar'
 import GexBar from './GexBar'
+import { dpConditionLabel, midDpWarning } from '../utils/dpLabels'
 
 const LEVEL_DESCRIPTIONS = {
   buy_support:     'Institutional buying below this level — price expected to be drawn upward',
@@ -65,10 +66,10 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
   const etfArrow = ETF_ARROW[level.etf_direction] || '—'
   const confStyle = CONFIDENCE_STYLE[level.confidence] || CONFIDENCE_STYLE.none
 
-  const targetLevel = level.passive_target_from
-  const targetPrice = targetLevel
-    ? null  // looked up in parent for exact price
-    : null
+  const targetLevel  = level.passive_target_from
+  const targetPrice  = targetLevel ? null : null
+  const dpCondition  = dpConditionLabel(level.dark_pool, level.type, level.classification)
+  const midWarning   = level.id === 'MID' ? midDpWarning(level.dark_pool) : { show: false }
 
   return (
     <div style={{ borderColor }} className="rounded border bg-gray-900/60 p-3 space-y-2">
@@ -162,6 +163,14 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
             </div>
           )
         })()}
+        {/* DP condition label */}
+        <div className={`rounded px-2 py-1 ${dpCondition.bg}`}>
+          <div className={`text-xs font-bold ${dpCondition.color}`}>{dpCondition.label}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{dpCondition.sublabel}</div>
+          {midWarning.show && (
+            <div className={`text-xs font-bold mt-0.5 ${midWarning.color}`}>⚠ {midWarning.text}</div>
+          )}
+        </div>
         {(() => {
           const netGex = level.net_gex ?? level.gex?.net_gex
           if (netGex == null) return null
