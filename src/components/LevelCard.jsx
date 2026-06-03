@@ -120,6 +120,22 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
             {etfArrow}
           </span>
         </div>
+        {level.last_dp_print && (() => {
+          const ts      = new Date(level.last_dp_print)
+          const timeStr = ts.toLocaleTimeString('en-US', {
+            hour: '2-digit', minute: '2-digit', hour12: true,
+            timeZone: 'America/New_York',
+          }) + ' ET'
+          const isRecent = (Date.now() - ts.getTime()) < 2 * 60 * 60 * 1000
+          return (
+            <div className="flex items-center gap-1 pl-8">
+              <span className="text-gray-600 text-xs">Last print:</span>
+              <span className={`text-xs font-mono ${isRecent ? 'text-gray-400' : 'text-gray-600'}`}>
+                {timeStr}
+              </span>
+            </div>
+          )
+        })()}
         {level.gex !== undefined && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 w-6">GEX</span>
