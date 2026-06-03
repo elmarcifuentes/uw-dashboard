@@ -4,7 +4,15 @@ import LevelCard from './LevelCard'
 import CascadeBanner from './CascadeBanner'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-const POLL_MS = 30_000
+const POLL_MS        = 30_000
+const STATUS_POLL_MS = 10_000
+const BUDGET_POLL_MS = 60_000
+
+function msToLabel(ms) {
+  if (!ms) return '—'
+  if (ms >= 60000) return `${ms / 1000 / 60}m`
+  return `${ms / 1000}s`
+}
 
 const ETF_LABEL = { bullish: 'BULLISH', bearish: 'BEARISH', neutral: 'NEUTRAL', 'no data': 'NO DATA' }
 const ETF_COLOR = { bullish: 'text-green-400 bg-green-900/40 border-green-700', bearish: 'text-red-400 bg-red-900/40 border-red-700', neutral: 'text-gray-400 bg-gray-800 border-gray-600', 'no data': 'text-gray-500 bg-gray-800 border-gray-700' }
@@ -83,10 +91,13 @@ function GexCageSummary({ levels }) {
 }
 
 export default function PreSession() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [data, setData]           = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState(null)
   const [lastPolled, setLastPolled] = useState(null)
+  const [providerStatus, setProviderStatus] = useState(null)
+  const [budget, setBudget]       = useState(null)
+  const [mode, setMode]           = useState('REST')
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -106,11 +117,48 @@ export default function PreSession() {
     }
   }, [])
 
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/status`)
+      setProviderStatus(res.data)
+      setMode(res.data.activeMode || 'REST')
+    } catch { /* status endpoint optional */ }
+  }, [])
+
+  const fetchBudget = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/budget`)
+      setBudget(res.data)
+    } catch { /* budget endpoint optional */ }
+  }, [])
+
+  const toggleMode = useCallback(async () => {
+    const useWebSocket = mode === 'REST'
+    try {
+      await axios.post(`${API}/mode`, { useWebSocket })
+      setMode(useWebSocket ? 'WebSocket' : 'REST')
+    } catch (err) {
+      console.warn('[mode toggle]', err.message)
+    }
+  }, [mode])
+
   useEffect(() => {
     fetchLatest()
-    const interval = setInterval(fetchLatest, POLL_MS)
-    return () => clearInterval(interval)
+    const t1 = setInterval(fetchLatest, POLL_MS)
+    return () => clearInterval(t1)
   }, [fetchLatest])
+
+  useEffect(() => {
+    fetchStatus()
+    const t2 = setInterval(fetchStatus, STATUS_POLL_MS)
+    return () => clearInterval(t2)
+  }, [fetchStatus])
+
+  useEffect(() => {
+    fetchBudget()
+    const t3 = setInterval(fetchBudget, BUDGET_POLL_MS)
+    return () => clearInterval(t3)
+  }, [fetchBudget])
 
   if (loading) {
     return (
@@ -189,16 +237,76 @@ export default function PreSession() {
               {!nqRatio && <span className="text-xs text-gray-600">ratio —</span>}
             </div>
           </div>
-          <button
-            onClick={fetchLatest}
-            className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded border border-gray-600 text-gray-300 transition-colors shrink-0"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={toggleMode}
+              className={`px-2 py-1 rounded text-xs font-mono font-bold transition-colors ${
+                mode === 'REST'
+                  ? 'bg-green-800 text-green-200 border border-green-600'
+                  : 'bg-blue-800 text-blue-200 border border-blue-600'
+              }`}
+            >
+              {mode === 'REST' ? '● REST' : '○ WS'}
+            </button>
+            <button
+              onClick={fetchLatest}
+              className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded border border-gray-600 text-gray-300 transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
+
+        {/* Budget bar */}
+        {budget && (
+          <div className="mt-2 space-y-0.5">
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>API Budget</span>
+              <span className={
+                budget.status === 'red' ? 'text-red-400' :
+                budget.status === 'amber' ? 'text-amber-400' : 'text-green-400'
+              }>
+                {budget.callsToday.toLocaleString()} / {budget.workingBudget.toLocaleString()} ({budget.percentUsed}%)
+              </span>
+            </div>
+            <div className="h-1 bg-gray-800 rounded overflow-hidden">
+              <div
+                className={`h-full rounded transition-all ${
+                  budget.status === 'red' ? 'bg-red-500' :
+                  budget.status === 'amber' ? 'bg-amber-500' : 'bg-green-500'
+                }`}
+                style={{ width: `${Math.min(100, parseFloat(budget.percentUsed))}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Polling status */}
+        {providerStatus && (
+          <div className="mt-2 pt-2 border-t border-gray-800 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-gray-600">
+            <span>
+              <span className={providerStatus.pollingActive ? 'text-green-500' : 'text-gray-500'}>
+                {providerStatus.pollingActive ? '▸' : '■'}
+              </span>
+              {' '}{providerStatus.mode} · interval {msToLabel(providerStatus.currentInterval)}
+            </span>
+            <span>
+              {providerStatus.lastPriceCheck
+                ? `price checked ${new Date(providerStatus.lastPriceCheck).toLocaleTimeString()}`
+                : 'no price check yet'}
+            </span>
+            {providerStatus.lastRescore && (
+              <span className="col-span-2 text-gray-700">
+                last rescore {new Date(providerStatus.lastRescore).toLocaleTimeString()}
+                {providerStatus.lastRescoreReason ? ` — ${providerStatus.lastRescoreReason}` : ''}
+              </span>
+            )}
+          </div>
+        )}
+
         {lastPolled && (
-          <div className="text-xs text-gray-600 mt-2">
-            Polled {lastPolled.toLocaleTimeString()} · auto every 30s
+          <div className="text-xs text-gray-700 mt-1">
+            data polled {lastPolled.toLocaleTimeString()} · auto every 30s
           </div>
         )}
       </div>

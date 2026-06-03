@@ -1,0 +1,14 @@
+{
+  "symbol": "QQQ",
+  "session": "2026-06-02",
+  "run_type": "overnight-prep",
+  "force_fresh": true,
+  "qqq_price": 0,
+  "levels": [
+    { "level_id": "R2",  "price": 749.52, "type": "resistance" },
+    { "level_id": "R1",  "price": 747.82, "type": "resistance" },
+    { "level_id": "MID", "price": 746.13, "type": "mid" },
+    { "level_id": "S1",  "price": 744.44, "type": "support" },
+    { "level_id": "S2",  "price": 742.74, "type": "support" }
+  ]
+}
