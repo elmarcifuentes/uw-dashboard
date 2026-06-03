@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: uw-dashboard-api
+    env: node
+    buildCommand: npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: PORT
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: "*"

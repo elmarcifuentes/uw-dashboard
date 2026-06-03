@@ -1,0 +1,116 @@
+import SignalBadge from './SignalBadge'
+import DpBar from './DpBar'
+import GexBar from './GexBar'
+
+const BORDER_COLOR = {
+  buy_support:     'border-[#1A7A4A]',
+  sell_resistance: 'border-[#C0392B]',
+  no_edge:         'border-[#6B7280]',
+  mid:             'border-[#1B8CA6]',
+}
+
+const CLASS_LABEL = {
+  buy_support:     'BUY SUP',
+  sell_resistance: 'SELL RES',
+  no_edge:         'NO EDGE',
+  mid:             'MID',
+}
+
+const CLASS_COLOR = {
+  buy_support:     'text-green-400',
+  sell_resistance: 'text-red-400',
+  no_edge:         'text-gray-400',
+  mid:             'text-cyan-400',
+}
+
+const CONFIDENCE_STYLE = {
+  high:   'bg-green-600 text-white',
+  medium: 'bg-amber-500 text-black',
+  low:    'border border-red-500 text-red-400',
+  none:   'border border-gray-500 text-gray-400',
+}
+
+const ETF_ARROW = {
+  bullish: '↑',
+  bearish: '↓',
+  neutral: '—',
+  'no data': '?',
+}
+
+export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
+  const classKey = level.classification === 'mid' ? 'mid' : level.classification
+  const border   = BORDER_COLOR[classKey] || 'border-gray-600'
+  const nqPrice  = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : '—'
+  const etfArrow = ETF_ARROW[level.etf_direction] || '—'
+  const confStyle = CONFIDENCE_STYLE[level.confidence] || CONFIDENCE_STYLE.none
+
+  const targetLevel = level.passive_target_from
+  const targetPrice = targetLevel
+    ? null  // looked up in parent for exact price
+    : null
+
+  return (
+    <div className={`rounded border-l-4 ${border} bg-gray-900/60 p-3 space-y-2`}>
+      {/* Row 1: Level ID + prices */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-base font-bold text-white w-10">{level.id}</span>
+          <span className="text-sm font-medium text-white">${level.price.toFixed(2)}</span>
+          <span className="text-xs text-gray-400">NQ {nqPrice}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {level.full_stack  && <SignalBadge type="full_stack" />}
+          {level.conflict    && !level.full_stack && <SignalBadge type="conflict" />}
+          {level.boundary    && <SignalBadge type="boundary" />}
+          {level.lower_high  && <SignalBadge type="lower_high" />}
+        </div>
+      </div>
+
+      {/* Row 2: Classification + score + confidence */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className={`font-bold ${CLASS_COLOR[classKey] || 'text-gray-400'}`}>
+          {CLASS_LABEL[classKey] || level.classification}
+        </span>
+        <span className="text-gray-300 font-medium">{level.score}</span>
+        <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${confStyle}`}>
+          {(level.confidence || 'none').toUpperCase()}
+        </span>
+      </div>
+
+      {/* Row 3: DP bar + ETF + GEX */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 w-6">DP</span>
+          <div className="flex-1">
+            <DpBar value={level.dark_pool} />
+          </div>
+          <span className="text-xs text-gray-300 w-14 text-right">
+            {typeof level.dark_pool === 'number' ? level.dark_pool.toFixed(3) : '—'}
+          </span>
+          <span className={`text-sm w-4 ${level.etf_direction === 'bullish' ? 'text-green-400' : level.etf_direction === 'bearish' ? 'text-red-400' : 'text-gray-500'}`}>
+            {etfArrow}
+          </span>
+        </div>
+        {level.gex !== undefined && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 w-6">GEX</span>
+            <GexBar value={level.gex?.net_gex ?? 0} sessionMax={sessionMaxGex} />
+            <span className="text-xs text-gray-400">
+              {typeof level.gex?.net_gex === 'number' ? level.gex.net_gex.toLocaleString() : '—'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Row 4: Passive target */}
+      {level.passive_target && level.passive_target_from && (
+        <div className={`text-xs font-medium ${level.classification === 'buy_support' ? 'text-green-400' : 'text-red-400'}`}>
+          → TARGET {level.passive_target_from}
+          {level._target_delta !== undefined && (
+            <span> {level._target_delta >= 0 ? '+' : ''}{level._target_delta.toFixed(2)}</span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
