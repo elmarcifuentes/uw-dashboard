@@ -144,8 +144,10 @@ export default function PreSession() {
 
   const levels   = data.levels || []
   const etfDir   = levels[0]?.etf_direction || 'neutral'
-  const nqRatio  = data.nq_ratio || null
-  const nqPrice  = nqRatio && data.current_price ? Math.round(data.current_price * nqRatio).toLocaleString() : '—'
+  const nqRatio  = data.nq_ratio ? Number(data.nq_ratio) : null
+  const nqPrice  = nqRatio && data.current_price
+    ? Math.round(Number(data.current_price) * nqRatio).toLocaleString()
+    : '—'
   const sessionMaxGex = Math.max(...levels.map(l => Math.abs(l.gex?.net_gex ?? 0)), 1)
 
   // Compute passive target deltas
@@ -184,6 +186,7 @@ export default function PreSession() {
               <span className="text-gray-600">|</span>
               <span>NQ <span className="text-white font-medium">{nqPrice}</span></span>
               {nqRatio && <span className="text-xs text-gray-500">ratio {nqRatio.toFixed(3)}</span>}
+              {!nqRatio && <span className="text-xs text-gray-600">ratio —</span>}
             </div>
           </div>
           <button
