@@ -14,7 +14,7 @@ const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log', 'Ctrl']
 
 export default function Intraday() {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-  const { lastEvent, connected, history, levelAlert, clearLevelAlert, chartStale, staleChanges, expansionGex, pinningSessions, midDpHistory } = useSSE(`${API_URL}/stream`)
+  const { lastEvent, connected, history, levelAlert, clearLevelAlert, chartStale, staleChanges, expansionGex, pinningSessions, midDpHistory, dpHistory } = useSSE(`${API_URL}/stream`)
   const { compact, toggle } = useLayout()
   const [subTab, setSubTab] = useState(0)
 
@@ -123,7 +123,7 @@ export default function Intraday() {
 
       {/* Sub-tab content */}
       <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
-        {subTab === 0 && <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} />}
+        {subTab === 0 && <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} />}
         {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
         {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
         {subTab === 3 && <RescoreLog history={history} compact={compact} />}

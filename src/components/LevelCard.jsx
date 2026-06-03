@@ -58,7 +58,7 @@ const ETF_ARROW = {
   'no data': '?',
 }
 
-export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
+export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [] }) {
   const classKey    = level.classification === 'mid' ? 'mid' : level.classification
   const borderColor = BORDER_COLOR[classKey] || '#6B7280'
   const nqPrice  = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : '—'
@@ -133,6 +133,32 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio }) {
               <span className={`text-xs font-mono ${isRecent ? 'text-gray-400' : 'text-gray-600'}`}>
                 {timeStr}
               </span>
+            </div>
+          )
+        })()}
+        {dpHistory.length >= 2 && (() => {
+          const last  = dpHistory[dpHistory.length - 1].value
+          const prev  = dpHistory[dpHistory.length - 2].value
+          const diff  = last - prev
+          const trend = Math.abs(diff) < 0.050 ? 'stable' : diff < 0 ? 'declining' : 'improving'
+          return (
+            <div className="flex items-center gap-1 pl-8 flex-wrap">
+              <div className="flex items-center gap-0.5 text-xs font-mono">
+                {dpHistory.map((h, i) => (
+                  <span key={i}>
+                    <span className={
+                      h.value <= -0.700 ? 'text-red-400' :
+                      h.value <= -0.300 ? 'text-amber-400' :
+                      h.value >= 0.300  ? 'text-green-400' :
+                      'text-gray-500'
+                    }>{h.value.toFixed(2)}</span>
+                    {i < dpHistory.length - 1 && <span className="text-gray-700"> → </span>}
+                  </span>
+                ))}
+              </div>
+              <span className={`text-xs font-bold ${
+                trend === 'declining' ? 'text-red-400' : trend === 'improving' ? 'text-green-400' : 'text-gray-500'
+              }`}>{trend === 'declining' ? '↓' : trend === 'improving' ? '↑' : '→'}</span>
             </div>
           )
         })()}

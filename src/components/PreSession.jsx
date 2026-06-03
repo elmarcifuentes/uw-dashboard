@@ -369,6 +369,7 @@ export default function PreSession() {
               level={level}
               sessionMaxGex={sessionMaxGex}
               nqRatio={nqRatio}
+              dpHistory={providerStatus?.dpHistory?.[level.id] || []}
             />
           ))
         })()}

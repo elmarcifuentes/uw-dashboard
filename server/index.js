@@ -23,8 +23,20 @@ const history         = []
 const MAX_HISTORY     = 20
 
 // Expansion GEX tracking
-let expansionGexHistory  = []   // levels currently showing expansion
-let allPinningSessions   = 0    // consecutive sessions with all-pinning GEX
+let expansionGexHistory  = []
+let allPinningSessions   = 0
+
+// DP history — last 3 readings per level
+const dpHistory = { R2: [], R1: [], MID: [], S1: [], S2: [] }
+
+function updateDpHistory(result) {
+  if (!result?.levels) return
+  for (const level of result.levels) {
+    if (!dpHistory[level.id]) dpHistory[level.id] = []
+    dpHistory[level.id].push({ value: level.dark_pool, time: new Date().toISOString() })
+    if (dpHistory[level.id].length > 3) dpHistory[level.id].shift()
+  }
+}
 
 function detectExpansionGex(result) {
   if (!result?.levels) return []
@@ -127,12 +139,14 @@ provider.onRescore(async ({ price, reason }) => {
     console.log(`[server] Auto-rescore complete — ${result.levels.length} levels scored`)
     emitStaleIfChanged(result)
     checkExpansionGex(result)
+    updateDpHistory(result)
     sseEmitter.emit('event', {
       type:        'rescore',
       result,
       trigger:     reason,
       price,
       expansionGex: detectExpansionGex(result),
+      dpHistory:   { ...dpHistory },
       timestamp:   new Date().toISOString(),
     })
   } catch (err) {
@@ -252,12 +266,14 @@ app.post('/update', (req, res) => {
   console.log(`[update] session=${result.session} run_type=${result.run_type}`)
   emitStaleIfChanged(result)
   checkExpansionGex(result)
+  updateDpHistory(result)
   sseEmitter.emit('event', {
     type:        'rescore',
     result,
     trigger:     result.run_type || 'update',
     price:       result.current_price,
     expansionGex: detectExpansionGex(result),
+    dpHistory:   { ...dpHistory },
     timestamp:   new Date().toISOString(),
   })
   res.json({ ok: true })
@@ -287,6 +303,7 @@ app.get('/status', (req, res) => {
     expansionGexActive: expansionGexHistory.length > 0,
     expansionGexLevels: expansionGexHistory,
     allPinningSessions,
+    dpHistory: { ...dpHistory },
   })
 })
 
@@ -369,12 +386,14 @@ app.post('/rescore', async (req, res) => {
     if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
     provider.setLevels(result.levels)
     checkExpansionGex(result)
+    updateDpHistory(result)
     sseEmitter.emit('event', {
       type:        'rescore',
       result,
       trigger:     'manual — dashboard button',
       price:       result.current_price,
       expansionGex: detectExpansionGex(result),
+      dpHistory:   { ...dpHistory },
       timestamp: new Date().toISOString(),
     })
     res.json({ success: true })

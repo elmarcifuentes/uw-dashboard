@@ -10,6 +10,7 @@ export function useSSE(url) {
   const [expansionGex, setExpansionGex]       = useState([])
   const [pinningSessions, setPinningSessions] = useState(0)
   const [midDpHistory, setMidDpHistory]       = useState([])
+  const [dpHistory, setDpHistory]             = useState({})
   const esRef = useRef(null)
 
   useEffect(() => {
@@ -57,6 +58,9 @@ export function useSSE(url) {
           if (data.expansionGex !== undefined) {
             setExpansionGex(data.expansionGex || [])
           }
+          if (data.dpHistory) {
+            setDpHistory(data.dpHistory)
+          }
           const midLevel = data.result?.levels?.find(l => l.id === 'MID')
           if (midLevel?.dark_pool !== undefined) {
             setMidDpHistory(prev =>
@@ -93,5 +97,6 @@ export function useSSE(url) {
     expansionGex,
     pinningSessions,
     midDpHistory,
+    dpHistory,
   }
 }

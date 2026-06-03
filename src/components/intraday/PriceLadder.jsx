@@ -42,7 +42,51 @@ function StructureBreakBar({ sb }) {
   )
 }
 
-export default function PriceLadder({ result, currentPrice, nqRatio, compact }) {
+function DpTrend({ levelId, history, compact }) {
+  if (!history || history.length < 2) return null
+  const last = history[history.length - 1].value
+  const prev = history[history.length - 2].value
+  const diff = last - prev
+  const trend = Math.abs(diff) < 0.050 ? 'stable' : diff < 0 ? 'declining' : 'improving'
+
+  if (compact) {
+    return (
+      <span className={`text-xs font-mono ml-1 ${
+        trend === 'declining' ? 'text-red-400' : trend === 'improving' ? 'text-green-400' : 'text-gray-500'
+      }`}>
+        {trend === 'declining' ? '↓' : trend === 'improving' ? '↑' : '→'}
+      </span>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+      <div className="flex items-center gap-0.5 text-xs font-mono">
+        {history.map((h, i) => (
+          <span key={i}>
+            <span className={
+              h.value <= -0.700 ? 'text-red-400' :
+              h.value <= -0.300 ? 'text-amber-400' :
+              h.value >= 0.300  ? 'text-green-400' :
+              'text-gray-500'
+            }>{h.value.toFixed(2)}</span>
+            {i < history.length - 1 && <span className="text-gray-700"> → </span>}
+          </span>
+        ))}
+      </div>
+      <span className={`text-xs font-bold ${
+        trend === 'declining' ? 'text-red-400' : trend === 'improving' ? 'text-green-400' : 'text-gray-500'
+      }`}>
+        {trend === 'declining' ? '↓' : trend === 'improving' ? '↑' : '→'}
+      </span>
+      {levelId === 'MID' && last <= -0.500 && trend === 'declining' && (
+        <span className="text-amber-400 text-xs">⚠ approaching cascade</span>
+      )}
+    </div>
+  )
+}
+
+export default function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {} }) {
   if (!result) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
@@ -152,6 +196,8 @@ export default function PriceLadder({ result, currentPrice, nqRatio, compact }) 
                 </span>
               </div>
             )}
+
+            <DpTrend levelId={level.id} history={dpHistory[level.id]} compact={compact} />
           </div>
         )
       })}
