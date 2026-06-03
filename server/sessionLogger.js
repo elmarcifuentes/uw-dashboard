@@ -24,8 +24,9 @@ const stmts = {
     VALUES (?, ?, 'rescore', ?, ?, ?, ?, ?)
   `),
 
-  getLevelOutcome: db.prepare(
-    'SELECT id FROM level_outcomes WHERE session_date = ? AND level_id = ?'
+  // Fix 1: read price + classification for change detection
+  getLevelOutcomeDetail: db.prepare(
+    'SELECT id, price, classification FROM level_outcomes WHERE session_date = ? AND level_id = ?'
   ),
   insertLevelOutcome: db.prepare(`
     INSERT INTO level_outcomes
@@ -34,14 +35,38 @@ const stmts = {
        boundary, continuation, passive_target, price_at_classification)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `),
-  updateLevelOutcome: db.prepare(`
+  // Full update when price or classification changes
+  updateLevelOutcomeFull: db.prepare(`
     UPDATE level_outcomes SET
-      classification = ?, confidence = ?, score = ?,
-      dark_pool = ?, etf_direction = ?, full_stack = ?,
-      conflict = ?, boundary = ?, continuation = ?,
-      updated_at = datetime('now')
+      price                = ?,
+      classification       = ?,
+      confidence           = ?,
+      score                = ?,
+      dark_pool            = ?,
+      etf_direction        = ?,
+      full_stack           = ?,
+      conflict             = ?,
+      boundary             = ?,
+      continuation         = ?,
+      price_at_classification = ?,
+      price_30min_later    = NULL,
+      price_move           = NULL,
+      outcome              = NULL,
+      outcome_auto         = 1,
+      updated_at           = datetime('now')
     WHERE session_date = ? AND level_id = ?
   `),
+  // Light update — same price/classification, just refresh dp/score
+  updateLevelOutcomeLight: db.prepare(`
+    UPDATE level_outcomes SET
+      dark_pool      = ?,
+      score          = ?,
+      confidence     = ?,
+      etf_direction  = ?,
+      updated_at     = datetime('now')
+    WHERE session_date = ? AND level_id = ?
+  `),
+
   setOutcome: db.prepare(`
     UPDATE level_outcomes SET
       price_30min_later = ?,
@@ -68,6 +93,13 @@ const stmts = {
     UPDATE cascade_events SET resolved_at = ?, price_at_resolve = ?
     WHERE session_date = ? AND resolved_at IS NULL
   `),
+  // Fix 3: mark S1/S2 reached during cascade
+  cascadeReachS1: db.prepare(
+    'UPDATE cascade_events SET reached_s1 = 1 WHERE session_date = ? AND resolved_at IS NULL'
+  ),
+  cascadeReachS2: db.prepare(
+    'UPDATE cascade_events SET reached_s2 = 1 WHERE session_date = ? AND resolved_at IS NULL'
+  ),
 
   getStorySession: db.prepare('SELECT * FROM sessions WHERE date = ?'),
   getStoryEvents:  db.prepare('SELECT * FROM events WHERE session_date = ? ORDER BY time ASC'),
@@ -81,9 +113,9 @@ const stmts = {
 
 export class SessionLogger {
   constructor() {
-    this.activeDate            = null
-    this.classificationTimestamps = new Map()  // key: "date-levelId" → {timestamp, price, level}
-    this.cascadeOpenTime       = null
+    this.activeDate               = null
+    this.classificationTimestamps = new Map()
+    this.cascadeOpenTime          = null
   }
 
   startSession(date, openPrice, runType) {
@@ -121,9 +153,11 @@ export class SessionLogger {
       )
     }
 
-    // Level outcomes — upsert
+    // Fix 1: Level outcomes — smart upsert with change detection
     for (const level of result.levels || []) {
-      const existing = stmts.getLevelOutcome.get(date, level.id)
+      const existing = stmts.getLevelOutcomeDetail.get(date, level.id)
+      const key = `${date}-${level.id}`
+
       if (!existing) {
         stmts.insertLevelOutcome.run(
           date, level.id, level.price, level.classification,
@@ -133,30 +167,53 @@ export class SessionLogger {
           level.boundary ? 1 : 0, level.continuation ?? null,
           level.passive_target ? 1 : 0, price
         )
-        this.classificationTimestamps.set(`${date}-${level.id}`, {
+        this.classificationTimestamps.set(key, {
           timestamp: new Date(timestamp), price, level,
         })
       } else {
-        stmts.updateLevelOutcome.run(
-          level.classification, level.confidence, level.score,
-          level.dark_pool, level.etf_direction,
-          level.full_stack ? 1 : 0, level.conflict ? 1 : 0,
-          level.boundary ? 1 : 0, level.continuation ?? null,
-          date, level.id
-        )
+        const priceChanged = Math.abs((existing.price ?? 0) - level.price) > 0.50
+        const classChanged = existing.classification !== level.classification
+
+        if (priceChanged || classChanged) {
+          // New level set or classification flip — reset outcome measurement
+          stmts.updateLevelOutcomeFull.run(
+            level.price, level.classification, level.confidence,
+            level.score, level.dark_pool, level.etf_direction,
+            level.full_stack ? 1 : 0, level.conflict ? 1 : 0,
+            level.boundary ? 1 : 0, level.continuation ?? null,
+            price, date, level.id
+          )
+          this.classificationTimestamps.set(key, {
+            timestamp: new Date(timestamp), price, level,
+          })
+          console.log(`[logger] Level updated: ${level.id} price=${level.price} class=${level.classification}`)
+        } else {
+          // Same level — just refresh dp/score
+          stmts.updateLevelOutcomeLight.run(
+            level.dark_pool, level.score, level.confidence, level.etf_direction,
+            date, level.id
+          )
+        }
       }
     }
 
-    // Cascade tracking
+    // Fix 3: Cascade tracking with S1/S2 reach detection
     if (result.cascade?.active) {
       this._openCascade(date, price, timestamp, result.cascade)
+      // Check if price reached S1 or S2
+      if (this.cascadeOpenTime) {
+        const s1Price = result.levels?.find(l => l.id === 'S1')?.price
+        const s2Price = result.levels?.find(l => l.id === 'S2')?.price
+        if (s1Price != null && price <= s1Price) stmts.cascadeReachS1.run(date)
+        if (s2Price != null && price <= s2Price) stmts.cascadeReachS2.run(date)
+      }
     } else if (this.cascadeOpenTime) {
       this._closeCascade(date, price, timestamp)
     }
 
-    if (result.magnet_streak != null) {
-      stmts.setMagnet.run(result.magnet_streak, date)
-    }
+    // Fix 2: Persist magnet streak from SQLite history
+    const streak = this._getMagnetStreak()
+    stmts.setMagnet.run(streak, date)
   }
 
   logPrice(price, timestamp) {
@@ -165,7 +222,7 @@ export class SessionLogger {
 
   _checkOutcomes(currentPrice, now) {
     for (const [key, data] of this.classificationTimestamps.entries()) {
-      const elapsed = (now - data.timestamp) / 60000  // minutes
+      const elapsed = (now - data.timestamp) / 60000
       if (elapsed < 30) continue
 
       const priceMove = currentPrice - data.price
@@ -179,7 +236,7 @@ export class SessionLogger {
         if (priceMove >= 0.50)  outcome = 'incorrect'
       }
 
-      const [date, levelId] = key.split(/-(.+)/)   // split on first hyphen only
+      const [date, levelId] = key.split(/-(.+)/)
       stmts.setOutcome.run(currentPrice, priceMove, outcome, date, levelId)
 
       if (outcome !== 'noise') {
@@ -202,6 +259,34 @@ export class SessionLogger {
     console.log(`[logger] Cascade resolved at $${price}`)
   }
 
+  // Fix 2: compute streak from SQLite level_outcomes history
+  _getMagnetStreak() {
+    try {
+      const rows = db.prepare(`
+        SELECT DISTINCT session_date FROM level_outcomes
+        WHERE level_id IN ('R1', 'R2')
+          AND classification = 'buy_support'
+          AND conflict = 1
+        ORDER BY session_date DESC
+      `).all()
+
+      // Also get all sessions that have R1/R2 data (regardless of classification)
+      const allDates = db.prepare(`
+        SELECT DISTINCT session_date FROM level_outcomes
+        WHERE level_id IN ('R1', 'R2')
+        ORDER BY session_date DESC
+      `).all().map(r => r.session_date)
+
+      const magnetDates = new Set(rows.map(r => r.session_date))
+      let streak = 0
+      for (const date of allDates) {
+        if (magnetDates.has(date)) streak++
+        else break
+      }
+      return streak
+    } catch { return 0 }
+  }
+
   getSessionStory(date) {
     const session = stmts.getStorySession.get(date)
     if (!session) return null
@@ -210,12 +295,38 @@ export class SessionLogger {
     const levelOutcomes = stmts.getStoryLevels.all(date)
     const cascadeEvents = stmts.getStoryCascade.all(date)
 
-    const classified    = levelOutcomes.filter(l => l.classification !== 'no_edge' && l.outcome != null)
-    const correct       = classified.filter(l => l.outcome === 'correct').length
-    const incorrect     = classified.filter(l => l.outcome === 'incorrect').length
-    const noise         = classified.filter(l => l.outcome === 'noise').length
-    const highConf      = levelOutcomes.filter(l => l.confidence === 'high' && l.outcome != null)
-    const highCorrect   = highConf.filter(l => l.outcome === 'correct').length
+    // Fix 4: enrich cascade events
+    const enrichedCascade = cascadeEvents.map(e => {
+      const drawdown = (e.price_at_fire != null && e.price_at_resolve != null)
+        ? +(e.price_at_fire - e.price_at_resolve).toFixed(2)
+        : null
+      let conditionsParsed = null
+      try { conditionsParsed = JSON.parse(e.conditions_met) } catch {}
+      return { ...e, drawdown, conditions_parsed: conditionsParsed }
+    })
+
+    const classified  = levelOutcomes.filter(l => l.classification !== 'no_edge' && l.outcome != null)
+    const correct     = classified.filter(l => l.outcome === 'correct').length
+    const incorrect   = classified.filter(l => l.outcome === 'incorrect').length
+    const noise       = classified.filter(l => l.outcome === 'noise').length
+    const highConf    = levelOutcomes.filter(l => l.confidence === 'high' && l.outcome != null)
+    const highCorrect = highConf.filter(l => l.outcome === 'correct').length
+
+    // Fix 4: session_notes summary
+    const maxDrawdown = enrichedCascade
+      .map(e => e.drawdown)
+      .filter(d => d != null && d > 0)
+      .sort((a, b) => b - a)[0] ?? null
+
+    const expansionGexFired = levelOutcomes.some(l => {
+      try {
+        const lastEvent = events.filter(e => e.data_json).pop()
+        if (!lastEvent) return false
+        const data = JSON.parse(lastEvent.data_json)
+        const lvl = data.levels?.find(x => x.id === l.level_id)
+        return (lvl?.net_gex ?? 0) < 0
+      } catch { return false }
+    })
 
     return {
       session: {
@@ -238,22 +349,22 @@ export class SessionLogger {
         structure_break_active: !!e.structure_break_active,
       })),
       level_outcomes: levelOutcomes.map(l => ({
-        level:                  l.level_id,
-        price:                  l.price,
-        classification:         l.classification,
-        confidence:             l.confidence,
-        score:                  l.score,
-        dark_pool:              l.dark_pool,
-        full_stack:             !!l.full_stack,
-        continuation:           l.continuation,
+        level:                   l.level_id,
+        price:                   l.price,
+        classification:          l.classification,
+        confidence:              l.confidence,
+        score:                   l.score,
+        dark_pool:               l.dark_pool,
+        full_stack:              !!l.full_stack,
+        continuation:            l.continuation,
         price_at_classification: l.price_at_classification,
-        price_30min_later:      l.price_30min_later,
-        price_move:             l.price_move,
-        outcome:                l.outcome,
-        outcome_auto:           !!l.outcome_auto,
-        notes:                  l.notes,
+        price_30min_later:       l.price_30min_later,
+        price_move:              l.price_move,
+        outcome:                 l.outcome,
+        outcome_auto:            !!l.outcome_auto,
+        notes:                   l.notes,
       })),
-      cascade_events: cascadeEvents,
+      cascade_events: enrichedCascade,
       accuracy: {
         total_classified:             classified.length,
         correct,
@@ -263,6 +374,11 @@ export class SessionLogger {
         high_confidence_calls:        highConf.length,
         high_confidence_correct:      highCorrect,
         high_confidence_accuracy_pct: highConf.length > 0 ? ((highCorrect / highConf.length) * 100).toFixed(1) : null,
+      },
+      session_notes: {
+        cascade_count:         enrichedCascade.length,
+        cascade_max_drawdown:  maxDrawdown,
+        expansion_gex_fired:   expansionGexFired,
       },
     }
   }
