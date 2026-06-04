@@ -51,17 +51,23 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
       </div>
 
       {/* Gauge bar */}
-      <div className="relative w-full h-3 bg-gray-700 rounded-full mb-1.5 overflow-visible">
+      <div className="relative w-full h-3 rounded-full mb-1.5 overflow-hidden">
+        {/* Color zone backgrounds: safe(75%) | approaching(10%) | danger(15%) */}
+        <div className="absolute inset-0 flex">
+          <div className="bg-green-950" style={{ width: '75%' }} />
+          <div className="bg-amber-950" style={{ width: '10%' }} />
+          <div className="bg-red-950"   style={{ width: '15%' }} />
+        </div>
+        {/* Fill bar on top */}
+        <div
+          className={`absolute inset-y-0 left-0 transition-all duration-500 opacity-80 ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
         {/* Threshold marker */}
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10 rounded"
+          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
           style={{ left: `${thresholdPct}%` }}
           title="-0.700 cascade threshold"
-        />
-        {/* Fill bar */}
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${pct}%` }}
         />
       </div>
 

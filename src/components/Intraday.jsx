@@ -75,6 +75,25 @@ export default function Intraday() {
   // Current price — from live price ticks OR most recent rescore
   const currentPrice = priceData?.price ?? result?.current_price
 
+  // Narrative fallback — show basic summary if server narrative not yet available
+  const displayNarrative = narrative?.length > 0
+    ? narrative
+    : result ? [
+        `Price $${result.current_price?.toFixed(2)} — last scored ${
+          rescoreData?.timestamp
+            ? new Date(rescoreData.timestamp).toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York'
+              }) + ' ET'
+            : '—'
+        }`,
+        result.cascade?.active
+          ? '⚠ CASCADE ACTIVE — no institutional floor below MID'
+          : result.structure_break?.active
+          ? `⚠ STRUCTURE BREAK ${result.structure_break.direction?.toUpperCase()} — GEX extension active`
+          : 'Structure intact — levels valid',
+      ]
+    : []
+
   return (
     <div className={`flex flex-col ${compact ? 'gap-2' : 'gap-4'}`}>
 
@@ -163,7 +182,7 @@ export default function Intraday() {
       <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
 
       {/* Auto narrative — memo'd */}
-      <NarrativeBlock narrative={narrative} lastUpdate={lastUpdate} compact={compact} />
+      <NarrativeBlock narrative={displayNarrative} lastUpdate={lastUpdate} compact={compact} />
 
       {/* Sub-tab navigation */}
       <div className="flex gap-1 flex-wrap">

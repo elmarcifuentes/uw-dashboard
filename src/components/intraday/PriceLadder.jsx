@@ -15,7 +15,7 @@ const CLASS_COLORS = {
   continuation:    { border: '#7C3AED', bg: '#1a1040', text: '#a78bfa' },
 }
 
-function StructureBreakBar({ sb }) {
+function StructureBreakBar({ sb, currentPrice }) {
   if (!sb) return null
   const toR2 = sb.distance_to_r2
   const toS2 = sb.distance_to_s2
@@ -41,6 +41,11 @@ function StructureBreakBar({ sb }) {
   return (
     <div className={`px-3 py-1.5 rounded border text-sm font-medium mb-1 ${cls}`}>
       {text}
+      {active && sb.r3 && currentPrice != null && (
+        <span className="text-red-300 text-xs ml-2">
+          · ${Math.abs(Number(currentPrice) - sb.r3).toFixed(2)} to S3
+        </span>
+      )}
     </div>
   )
 }
@@ -117,7 +122,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         </div>
       )}
 
-      <StructureBreakBar sb={result.structure_break} />
+      <StructureBreakBar sb={result.structure_break} currentPrice={currentPrice} />
 
       {levels.map(level => {
         const colors   = CLASS_COLORS[level.classification] || CLASS_COLORS.no_edge
@@ -192,7 +197,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                 {level.net_gex != null && (() => {
                   const isExp = level.net_gex < 0
                   return (
-                    <span className={`text-xs font-mono ${isExp ? 'text-red-400 font-bold' : 'text-gray-500'}`}>
+                    <span className={`text-xs font-mono px-1 rounded ${isExp ? 'bg-red-950 text-red-400 font-bold' : 'text-gray-500'}`}>
                       GEX {isExp ? '⚠ ' : ''}{(level.net_gex / 1000).toFixed(0)}K{isExp ? ' EXP' : ' pin'}
                     </span>
                   )
@@ -234,18 +239,31 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         )
       })}
 
-      {currentPrice != null && (
-        <div className="border border-yellow-500/60 rounded px-3 py-1.5 text-sm text-center mt-1 flex items-center justify-center gap-2">
-          <span className="text-yellow-400 font-mono font-bold">
-            ▶ QQQ ${Number(currentPrice).toFixed(2)}
-          </span>
-          {nqRatio && (
-            <span className="text-yellow-300 font-mono font-bold">
-              / NQ {Math.round(Number(currentPrice) * nqRatio).toLocaleString()}
-            </span>
-          )}
-        </div>
-      )}
+      {currentPrice != null && (() => {
+        const cp = Number(currentPrice)
+        const nearest = levels.length > 0
+          ? levels.reduce((a, b) => Math.abs(cp - a.price) < Math.abs(cp - b.price) ? a : b)
+          : null
+        const nearDist = nearest ? (cp - nearest.price).toFixed(2) : null
+        const nqPrice  = nqRatio ? Math.round(cp * nqRatio).toLocaleString() : null
+        return (
+          <div className="border-2 border-yellow-400 rounded px-3 py-2 bg-yellow-950 mt-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-yellow-400 font-mono font-bold text-sm">
+                ▶ QQQ ${cp.toFixed(2)}
+                {nqPrice && <span className="text-yellow-300 ml-2">/ NQ {nqPrice}</span>}
+              </span>
+              {nearest && nearDist !== null && (
+                <span className="text-yellow-300 text-xs font-mono">
+                  {parseFloat(nearDist) >= 0 ? '+' : ''}{nearDist}
+                  {nqRatio ? ` / ${Math.round(Math.abs(parseFloat(nearDist)) * nqRatio)} NQ` : ''}
+                  {' '}from {nearest.id}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 })
