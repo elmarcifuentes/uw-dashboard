@@ -1,5 +1,5 @@
 import { memo } from 'react'
-export default memo(function NarrativeBlock({ narrative, lastUpdate, compact }) {
+export default memo(function NarrativeBlock({ narrative, lastUpdate, compact, narrativeMode }) {
   if (!narrative || narrative.length === 0) return null
 
   const time = lastUpdate
@@ -13,7 +13,12 @@ export default memo(function NarrativeBlock({ narrative, lastUpdate, compact }) 
     <div className="bg-gray-900/80 border border-gray-700 rounded p-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-gray-500 uppercase tracking-wide">Session Read</span>
-        {time && <span className="text-xs text-gray-600 font-mono">{time}</span>}
+        <div className="flex items-center gap-2">
+          {narrativeMode === 'claude' && (
+            <span className="text-xs text-purple-400 font-medium">🤖 Claude+MCP</span>
+          )}
+          {time && <span className="text-xs text-gray-600 font-mono">{time}</span>}
+        </div>
       </div>
       <div className="flex flex-col gap-1.5">
         {narrative.map((line, i) => {

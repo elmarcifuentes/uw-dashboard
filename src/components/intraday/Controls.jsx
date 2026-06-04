@@ -4,10 +4,11 @@ import { useAuth } from '../../context/AuthContext'
 export default function Controls({ compact }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
   const { unlocked, authPost } = useAuth()
-  const [status, setStatus]   = useState(null)
-  const [budget, setBudget]   = useState(null)
-  const [mode, setMode]       = useState('REST')
-  const [rescoring, setRescoring] = useState(false)
+  const [status, setStatus]           = useState(null)
+  const [budget, setBudget]           = useState(null)
+  const [mode, setMode]               = useState('REST')
+  const [rescoring, setRescoring]     = useState(false)
+  const [narrativeMode, setNarrativeMode] = useState('template')
 
   const fetchAll = async () => {
     try {
@@ -18,7 +19,19 @@ export default function Controls({ compact }) {
       setStatus(s)
       setBudget(b)
       setMode(s.activeMode === 'WebSocket' ? 'WebSocket' : 'REST')
+      if (s.narrativeMode) setNarrativeMode(s.narrativeMode)
     } catch { /* server may be down */ }
+  }
+
+  const switchNarrativeMode = async (m) => {
+    try {
+      await fetch(`${API_URL}/narrative-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: m }),
+      })
+      setNarrativeMode(m)
+    } catch { /* ignore */ }
   }
 
   useEffect(() => {
@@ -73,6 +86,38 @@ export default function Controls({ compact }) {
             {!unlocked ? '🔒 Mode' : mode === 'REST' ? '● REST POLLING' : '○ WEBSOCKET'}
           </button>
         </div>
+      </div>
+
+      {/* Narrative mode */}
+      <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Session Narrative</div>
+        <div className="flex gap-1">
+          {[
+            { key: 'template', label: '📋 Template', desc: 'Fast — rule based' },
+            { key: 'claude',   label: '🤖 Claude+MCP', desc: 'Smart — uses live UW data' },
+            { key: 'off',      label: '○ Off', desc: 'No narrative' },
+          ].map(({ key, label, desc }) => (
+            <button
+              key={key}
+              onClick={() => switchNarrativeMode(key)}
+              title={desc}
+              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                narrativeMode === key
+                  ? key === 'claude' ? 'bg-purple-700 text-white'
+                  : key === 'off'    ? 'bg-gray-600 text-gray-300'
+                  :                    'bg-teal-700 text-white'
+                  : 'bg-gray-700 text-gray-400 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-600 mt-1.5">
+          {narrativeMode === 'template' && 'Rule-based — instant, always available'}
+          {narrativeMode === 'claude'   && '🤖 Claude + UW MCP — requires draw relay running'}
+          {narrativeMode === 'off'      && 'Narrative disabled'}
+        </p>
       </div>
 
       {/* Polling status */}

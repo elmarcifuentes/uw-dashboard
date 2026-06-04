@@ -24,12 +24,12 @@ export default function Intraday() {
     history, levelAlert, clearLevelAlert,
     chartStale, staleChanges,
     expansionGex, pinningSessions,
-    midDpHistory, dpHistory, narrative,
+    midDpHistory, dpHistory, narrative, narrativeMode,
   } = useSSE(`${API_URL}/stream`)
 
   const { compact, toggle } = useLayout()
   const { unlocked, authPost } = useAuth()
-  const sentiment = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
+  const sentiment     = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
   const [subTab, setSubTab]   = useState(0)
   const [drawing, setDrawing] = useState(null)    // null | 'qqq' | 'both'
   const [drawResult, setDrawResult] = useState(null) // null | 'success' | 'error'
@@ -183,7 +183,7 @@ export default function Intraday() {
       <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
 
       {/* Auto narrative — memo'd */}
-      <NarrativeBlock narrative={displayNarrative} lastUpdate={lastUpdate} compact={compact} />
+      <NarrativeBlock narrative={displayNarrative} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} />
 
       {/* Sub-tab navigation */}
       <div className="flex gap-1 flex-wrap">

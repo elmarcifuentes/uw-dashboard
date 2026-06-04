@@ -27,6 +27,40 @@ const MAX_HISTORY     = 20
 let expansionGexHistory  = []
 let allPinningSessions   = 0
 
+// Narrative mode: 'template' | 'claude' | 'off'
+let narrativeMode = process.env.NARRATIVE_MODE || 'template'
+
+async function generateNarrativeForMode(result, dpHist) {
+  if (narrativeMode === 'off') return []
+  if (narrativeMode === 'template') return generateNarrative(result, dpHist)
+  // claude mode — forward to relay
+  const relayUrl = process.env.DRAW_RELAY_URL
+  if (!relayUrl) {
+    console.warn('[narrative] No relay URL — falling back to template')
+    return generateNarrative(result, dpHist)
+  }
+  try {
+    const { timestamp, signature } = signRelayRequest('narrative')
+    const r = await fetch(`${relayUrl}/narrative`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'narrative', pin: process.env.DASHBOARD_PIN,
+        timestamp, signature, result,
+      }),
+      signal: AbortSignal.timeout(50000),
+    })
+    const data = await r.json()
+    if (data.success && data.narrative) {
+      return data.narrative.split(/(?<=\.) /).filter(Boolean)
+        .map(s => s.trim()).filter(s => s.length > 0)
+    }
+  } catch (err) {
+    console.warn('[narrative] Claude relay failed — falling back to template:', err.message)
+  }
+  return generateNarrative(result, dpHist)
+}
+
 // DP history — last 3 readings per level
 const dpHistory = { R2: [], R1: [], MID: [], S1: [], S2: [] }
 
@@ -316,7 +350,7 @@ provider.onRescore(async ({ price, reason }) => {
       price,
       expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
-      narrative:   generateNarrative(result, dpHistory),
+      narrative:   await generateNarrativeForMode(result, dpHistory),
       sentiment,
       timestamp:   new Date().toISOString(),
     })
@@ -453,7 +487,7 @@ app.post('/update', (req, res) => {
     price:       result.current_price,
     expansionGex: detectExpansionGex(result),
     dpHistory:    { ...dpHistory },
-    narrative:    generateNarrative(result, dpHistory),
+    narrative:    await generateNarrativeForMode(result, dpHistory),
     sentiment:    _sentiment,
     timestamp:    new Date().toISOString(),
   })
@@ -485,6 +519,7 @@ app.get('/status', (req, res) => {
     expansionGexLevels: expansionGexHistory,
     allPinningSessions,
     dpHistory: { ...dpHistory },
+    narrativeMode,
   })
 })
 
@@ -504,6 +539,17 @@ app.post('/mode', (req, res) => {
   }
   provider.switchMode(useWebSocket)
   res.json({ mode: useWebSocket ? 'WebSocket' : 'REST' })
+})
+
+app.post('/narrative-mode', (req, res) => {
+  const { mode } = req.body
+  if (!['template', 'claude', 'off'].includes(mode)) {
+    return res.status(400).json({ error: 'Invalid mode — use template|claude|off' })
+  }
+  narrativeMode = mode
+  console.log(`[server] Narrative mode: ${mode}`)
+  sseEmitter.emit('event', { type: 'narrative_mode', mode, timestamp: new Date().toISOString() })
+  res.json({ success: true, mode })
 })
 
 app.get('/budget', (req, res) => {
@@ -586,7 +632,7 @@ app.post('/rescore', async (req, res) => {
       price:       result.current_price,
       expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
-      narrative:   generateNarrative(result, dpHistory),
+      narrative:   await generateNarrativeForMode(result, dpHistory),
       sentiment:   manualSentiment,
       timestamp: new Date().toISOString(),
     })

@@ -14,6 +14,7 @@ export function useSSE(url) {
   const [dpHistory, setDpHistory]             = useState({})
   const [narrative, setNarrative]             = useState([])
   const [sentiment, setSentiment]             = useState(null)
+  const [narrativeMode, setNarrativeMode]     = useState('template')
   const esRef = useRef(null)
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function useSSE(url) {
         if (data.type === 'level_update_alert') { setLevelAlert(data);                            return }
         if (data.type === 'chart_stale')        { setChartStale(true); setStaleChanges(data.changes || []); return }
         if (data.type === 'chart_synced')       { setChartStale(false); setStaleChanges([]);       return }
+        if (data.type === 'narrative_mode')     { setNarrativeMode(data.mode);                     return }
         if (data.type === 'expansion_gex') {
           setExpansionGex(data.levels || [])
           setPinningSessions(data.consecutivePinningSessions ?? 0)
@@ -94,5 +96,6 @@ export function useSSE(url) {
     dpHistory,
     narrative,
     sentiment,
+    narrativeMode,
   }
 }
