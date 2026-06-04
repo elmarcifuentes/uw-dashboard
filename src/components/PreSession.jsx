@@ -304,7 +304,7 @@ export default function PreSession() {
             <div className="flex items-center gap-3 text-sm mt-1">
               <span className="text-white font-medium">${data.current_price?.toFixed(2) ?? '—'}</span>
               <span className="text-gray-400 font-medium">/ NQ {nqPrice}</span>
-              {nqRatio && <span className="text-xs text-gray-500">ratio {nqRatio.toFixed(3)}</span>}
+              {nqRatio && <span className="text-xs text-gray-500">ratio {nqRatio?.toFixed(3)}</span>}
               {!nqRatio && <span className="text-xs text-gray-600">ratio —</span>}
             </div>
           </div>
@@ -461,7 +461,7 @@ export default function PreSession() {
                 />
               </div>
               <div className={`text-xs mt-1 ${apiPct < 0.5 ? 'text-green-400' : apiPct < 0.8 ? 'text-amber-400' : 'text-red-400'}`}>
-                {(apiPct * 100).toFixed(1)}% used
+                {((apiPct || 0) * 100).toFixed(1)}% used
               </div>
             </div>
           )}

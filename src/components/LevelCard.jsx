@@ -87,7 +87,7 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-base font-bold text-white w-10">{level.id}</span>
-          <span className="text-sm font-medium text-white">${level.price.toFixed(2)}</span>
+          <span className="text-sm font-medium text-white">${level.price?.toFixed(2) ?? '—'}</span>
           <span className="text-sm font-medium text-gray-400">/ NQ {nqPrice}</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -204,7 +204,7 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
           {level._target_delta !== undefined && level._target_delta !== null && (
             <>
               <span className="text-white font-mono">
-                {level._target_delta >= 0 ? '+' : ''}{level._target_delta.toFixed(2)}
+                {level._target_delta >= 0 ? '+' : ''}{level._target_delta?.toFixed(2) ?? '—'}
               </span>
               {nqRatio && (
                 <span className="text-gray-400 font-mono">

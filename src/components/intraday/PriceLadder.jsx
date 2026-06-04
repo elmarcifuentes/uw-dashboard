@@ -127,7 +127,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
       {levels.map(level => {
         const colors   = CLASS_COLORS[level.classification] || CLASS_COLORS.no_edge
         const dist       = currentPrice != null ? (currentPrice - level.price) : null
-        const distStr    = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
+        const distStr    = dist != null ? (dist >= 0 ? `+${dist?.toFixed(2) ?? '—'}` : dist?.toFixed(2)) : null
         const nqDist     = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio) : null
         const nqDistStr  = nqDist != null ? `${dist >= 0 ? '+' : '-'}${nqDist}` : null
         const isNear     = dist != null && Math.abs(dist) <= 0.50
@@ -145,7 +145,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                   {level.id}
                 </span>
                 <span className="text-white font-mono font-medium">
-                  ${level.price.toFixed(2)}
+                  ${level.price?.toFixed(2) ?? '—'}
                 </span>
                 {result.nq_ratio && (
                   <span className="text-gray-400 font-mono font-medium">
@@ -198,7 +198,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                   const isExp = level.net_gex < 0
                   return (
                     <span className={`text-xs font-mono px-1 rounded ${isExp ? 'bg-red-950 text-red-400 font-bold' : 'text-gray-500'}`}>
-                      GEX {isExp ? '⚠ ' : ''}{(level.net_gex / 1000).toFixed(0)}K{isExp ? ' EXP' : ' pin'}
+                      GEX {isExp ? '⚠ ' : ''}{((level.net_gex ?? 0) / 1000).toFixed(0)}K{isExp ? ' EXP' : ' pin'}
                     </span>
                   )
                 })()}
@@ -241,6 +241,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
 
       {currentPrice != null && (() => {
         const cp = Number(currentPrice)
+        if (isNaN(cp)) return null
         const nearest = levels.length > 0
           ? levels.reduce((a, b) => Math.abs(cp - a.price) < Math.abs(cp - b.price) ? a : b)
           : null
@@ -250,7 +251,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           <div className="border-2 border-yellow-400 rounded px-3 py-2 bg-yellow-950 mt-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-yellow-400 font-mono font-bold text-sm">
-                ▶ QQQ ${cp.toFixed(2)}
+                ▶ QQQ ${cp?.toFixed(2) ?? '—'}
                 {nqPrice && <span className="text-yellow-300 ml-2">/ NQ {nqPrice}</span>}
               </span>
               {nearest && nearDist !== null && (

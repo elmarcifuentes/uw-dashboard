@@ -132,11 +132,11 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
         ) : gap !== null ? (
           gap < 0 ? (
             <span className="text-amber-400">
-              ⚠ {Math.abs(gap).toFixed(3)} past threshold — conditions 2 or 3 blocking
+              ⚠ {Math.abs(gap ?? 0).toFixed(3)} past threshold — conditions 2 or 3 blocking
             </span>
           ) : (
             <span className="text-gray-600">
-              {gap.toFixed(3)} remaining to cascade threshold
+              {gap?.toFixed(3) ?? '—'} remaining to cascade threshold
             </span>
           )
         ) : null}

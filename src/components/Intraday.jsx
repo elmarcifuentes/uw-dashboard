@@ -95,6 +95,14 @@ export default function Intraday() {
       ]
     : []
 
+  if (!connected && !rescoreData && !priceData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500 text-sm animate-pulse">Connecting to live data…</div>
+      </div>
+    )
+  }
+
   return (
     <div className={`flex flex-col ${compact ? 'gap-2' : 'gap-4'}`}>
 
