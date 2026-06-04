@@ -343,6 +343,7 @@ provider.onRescore(async ({ price, reason }) => {
     updateDpHistory(result)
     const sentiment = computeSentiment(result)
     result._sentiment = sentiment
+    // Emit rescore immediately — no narrative wait
     sseEmitter.emit('event', {
       type:        'rescore',
       result,
@@ -350,10 +351,17 @@ provider.onRescore(async ({ price, reason }) => {
       price,
       expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
-      narrative:   await generateNarrativeForMode(result, dpHistory),
       sentiment,
       timestamp:   new Date().toISOString(),
     })
+    // Narrative fire-and-forget — pushes separate SSE when ready
+    generateNarrativeForMode(result, dpHistory)
+      .then(narrative => {
+        if (narrative?.length > 0) {
+          sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+        }
+      })
+      .catch(err => console.warn('[narrative] async failed:', err.message))
   } catch (err) {
     console.error('[server] Auto-rescore failed:', err.message)
   }
@@ -487,11 +495,18 @@ app.post("/update", async (req, res) => {
     price:       result.current_price,
     expansionGex: detectExpansionGex(result),
     dpHistory:    { ...dpHistory },
-    narrative:    await generateNarrativeForMode(result, dpHistory),
     sentiment:    _sentiment,
     timestamp:    new Date().toISOString(),
   })
   res.json({ ok: true })
+  // Narrative fire-and-forget after responding
+  generateNarrativeForMode(result, dpHistory)
+    .then(narrative => {
+      if (narrative?.length > 0) {
+        sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+      }
+    })
+    .catch(err => console.warn('[narrative] async failed:', err.message))
 })
 
 app.get('/latest', (req, res) => {
@@ -632,11 +647,18 @@ app.post('/rescore', async (req, res) => {
       price:       result.current_price,
       expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
-      narrative:   await generateNarrativeForMode(result, dpHistory),
       sentiment:   manualSentiment,
-      timestamp: new Date().toISOString(),
+      timestamp:   new Date().toISOString(),
     })
+    // Respond immediately — narrative generates in background
     res.json({ success: true })
+    generateNarrativeForMode(result, dpHistory)
+      .then(narrative => {
+        if (narrative?.length > 0) {
+          sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+        }
+      })
+      .catch(err => console.warn('[narrative] async failed:', err.message))
   } catch (err) {
     console.error('[server] Manual rescore failed:', err.message)
     res.status(500).json({ error: err.message })
