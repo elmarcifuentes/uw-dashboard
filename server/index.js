@@ -611,6 +611,26 @@ app.get('/api-data/top-net-impact', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+app.get('/api-data/gex-expiry', async (req, res) => {
+  try {
+    const r = await fetch(
+      `${process.env.UW_API_BASE || 'https://api.unusualwhales.com'}/api/stock/QQQ/greek-exposure/expiry`,
+      { headers: UW_HEADERS() }
+    )
+    res.json(await r.json())
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/api-data/flow-expiry', async (req, res) => {
+  try {
+    const r = await fetch(
+      `${process.env.UW_API_BASE || 'https://api.unusualwhales.com'}/api/stock/QQQ/flow-per-expiry`,
+      { headers: UW_HEADERS() }
+    )
+    res.json(await r.json())
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 app.listen(PORT, () => {
   console.log(`[server] UW Dashboard API listening on port ${PORT}`)
 })
