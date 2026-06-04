@@ -1,78 +1,98 @@
 import { useState, useEffect } from 'react'
 
-const fmt = v => {
-  const abs = Math.abs(v)
-  if (abs >= 1e9) return `$${(abs / 1e9).toFixed(1)}B`
-  if (abs >= 1e6) return `$${(abs / 1e6).toFixed(0)}M`
-  return `$${(abs / 1e3).toFixed(0)}K`
+const fmtM = n => '$' + (n / 1e6).toFixed(1) + 'M'
+const fmtK = n => (n / 1e3).toFixed(0) + 'K'
+const ratioColor = r => r > 1.2 ? 'text-green-400' : r < 0.83 ? 'text-red-400' : 'text-gray-400'
+
+const BIAS_COLORS = {
+  bullish: { bg: 'bg-green-950', border: 'border-green-700', text: 'text-green-400', badge: 'bg-green-800 text-green-300' },
+  bearish: { bg: 'bg-red-950',   border: 'border-red-700',   text: 'text-red-400',   badge: 'bg-red-800 text-red-300'   },
+  mixed:   { bg: 'bg-gray-800',  border: 'border-gray-600',  text: 'text-gray-400',  badge: 'bg-gray-700 text-gray-300' },
 }
 
 export default function ZeroDteFlow({ apiUrl }) {
-  const [zdte, setZdte] = useState(null)
+  const [data, setData]     = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch(`${apiUrl}/api-data/flow-expiry`)
       .then(r => r.json())
-      .then(d => {
+      .then(json => {
+        const rows  = json.data || []
         const today = new Date().toISOString().split('T')[0]
-        const entry = (d.data || []).find(e => e.expiry === today)
-        setZdte(entry || null)
+        const zdte  = rows.find(r => r.expiry === today || r.expiry === rows[0]?.date)
+
+        if (!zdte) { setData({ noZdte: true }); setLoading(false); return }
+
+        const callPrem    = parseFloat(zdte.call_premium)
+        const putPrem     = parseFloat(zdte.put_premium)
+        const callAggPrem = parseFloat(zdte.call_premium_ask_side)
+        const putAggPrem  = parseFloat(zdte.put_premium_ask_side)
+        const callOtmPrem = parseFloat(zdte.call_otm_premium)
+        const putOtmPrem  = parseFloat(zdte.put_otm_premium)
+        const callVol     = parseInt(zdte.call_volume)
+        const putVol      = parseInt(zdte.put_volume)
+        const callAggVol  = parseInt(zdte.call_volume_ask_side)
+        const putAggVol   = parseInt(zdte.put_volume_ask_side)
+
+        const premRatio = putPrem  > 0 ? callPrem    / putPrem    : 0
+        const aggRatio  = putAggPrem > 0 ? callAggPrem / putAggPrem : 0
+        const otmRatio  = putOtmPrem > 0 ? callOtmPrem / putOtmPrem : 0
+
+        const bullishSignals = [premRatio > 1.2, aggRatio > 1.2, otmRatio > 1.2].filter(Boolean).length
+        const bearishSignals = [premRatio < 0.83, aggRatio < 0.83, otmRatio < 0.83].filter(Boolean).length
+        const bias = bullishSignals >= 2 ? 'bullish' : bearishSignals >= 2 ? 'bearish' : 'mixed'
+
+        const context = {
+          bullish: 'Aggressive call buying dominant — 0DTE flow favors upside',
+          bearish: 'Aggressive put buying dominant — 0DTE flow favors downside',
+          mixed:   'Mixed 0DTE positioning — no strong directional conviction',
+        }[bias]
+
+        setData({ expiry: zdte.expiry, callPrem, putPrem, premRatio, callAggPrem, putAggPrem, aggRatio, callOtmPrem, putOtmPrem, otmRatio, callVol, putVol, callAggVol, putAggVol, bullishSignals, bearishSignals, bias, context, noZdte: false })
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [apiUrl])
 
-  if (loading) return null
+  if (loading || !data) return null
 
-  if (!zdte) {
-    return (
-      <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">0DTE Flow</div>
-        <div className="text-xs text-gray-600">No 0DTE expiry today</div>
-      </div>
-    )
-  }
+  if (data.noZdte) return (
+    <div className="bg-gray-800 border border-gray-700 rounded p-3">
+      <span className="text-xs text-gray-500">No 0DTE expiry today</span>
+    </div>
+  )
 
-  const callPrem = parseFloat(zdte.call_premium || 0)
-  const putPrem  = parseFloat(zdte.put_premium  || 0)
-  const total    = callPrem + putPrem || 1
-  const callPct  = (callPrem / total) * 100
-  const putPct   = (putPrem  / total) * 100
-  const ratio    = putPrem > 0 ? callPrem / putPrem : 0
-
-  let context    = 'Mixed 0DTE flow — no strong directional read'
-  let ctxColor   = 'text-gray-500'
-  if (ratio > 1.5)  { context = 'Strong 0DTE call buying — intraday bullish conviction';  ctxColor = 'text-green-400' }
-  else if (ratio < 0.67) { context = 'Strong 0DTE put buying — intraday bearish conviction'; ctxColor = 'text-red-400' }
-
-  const barCall = Math.max(2, Math.round(callPct))
-  const barPut  = Math.max(2, Math.round(putPct))
+  const c = BIAS_COLORS[data.bias]
 
   return (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">0DTE Flow — Today</div>
-      <div className="flex flex-col gap-1.5 mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-green-400 w-10 shrink-0">Calls</span>
-          <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
-            <div className="h-full rounded-full bg-green-500" style={{ width: `${barCall}%` }} />
-          </div>
-          <span className="text-xs font-mono text-green-400 w-16 text-right">{fmt(callPrem)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-red-400 w-10 shrink-0">Puts</span>
-          <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
-            <div className="h-full rounded-full bg-red-500" style={{ width: `${barPut}%` }} />
-          </div>
-          <span className="text-xs font-mono text-red-400 w-16 text-right">{fmt(putPrem)}</span>
-        </div>
+    <div className={`border rounded p-3 ${c.bg} ${c.border}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-gray-400 uppercase tracking-wide">0DTE Flow — {data.expiry}</span>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded ${c.badge}`}>{data.bias.toUpperCase()}</span>
       </div>
-      <div className="text-xs text-gray-500 mb-1 font-mono">
-        Ratio: {ratio.toFixed(2)}:1 call/put
-        {' · '}vol {(zdte.call_volume + zdte.put_volume).toLocaleString()}
+
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        {[
+          { label: 'Total Premium', ratio: data.premRatio, call: data.callPrem, put: data.putPrem },
+          { label: 'Aggressive Buy', ratio: data.aggRatio, call: data.callAggPrem, put: data.putAggPrem },
+          { label: 'OTM Speculative', ratio: data.otmRatio, call: data.callOtmPrem, put: data.putOtmPrem },
+        ].map(({ label, ratio, call, put }) => (
+          <div key={label} className="text-center">
+            <div className="text-xs text-gray-500 mb-1">{label}</div>
+            <div className={`text-xs font-mono font-bold ${ratioColor(ratio)}`}>{ratio.toFixed(2)}:1</div>
+            <div className="text-xs text-gray-600">C {fmtM(call)} / P {fmtM(put)}</div>
+          </div>
+        ))}
       </div>
-      <div className={`text-xs italic ${ctxColor}`}>{context}</div>
+
+      <div className="flex items-center gap-4 mb-2 text-xs text-gray-500">
+        <span>Vol: C {fmtK(data.callVol)} / P {fmtK(data.putVol)}</span>
+        <span>Aggr: C {fmtK(data.callAggVol)} / P {fmtK(data.putAggVol)}</span>
+      </div>
+
+      <p className={`text-xs ${c.text}`}>{data.context}</p>
+      <p className="text-xs text-gray-600 mt-0.5">{data.bullishSignals}/3 bullish · {data.bearishSignals}/3 bearish signals</p>
     </div>
   )
 }
