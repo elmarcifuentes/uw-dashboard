@@ -79,15 +79,23 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
       </div>
 
       {/* Condition dots */}
-      <div className="flex gap-4 flex-wrap">
-        {['MID dp ≤ −0.700', 'S1 zero/artifact', 'S2 structural void'].map((label, i) => (
-          <div key={i} className="flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${
-              cascade.conditions?.[i] ? 'bg-red-500' : 'bg-gray-600'
+      <div className="flex flex-col gap-1.5 mt-2">
+        {['MID dp ≤ −0.700', 'S1 zero/artifact', 'S2 structural void'].map((label, i) => {
+          const met = cascade.conditions?.[i]
+          return (
+          <div key={i} className="flex items-center gap-2">
+            <span className={`w-3 h-3 rounded-full shrink-0 ${
+              met ? 'bg-red-500 ring-2 ring-red-400' : 'bg-gray-600'
             }`} />
-            <span className="text-xs text-gray-500">{label}</span>
+            <span className={`text-xs ${met ? 'text-red-300 font-medium' : 'text-gray-500'}`}>
+              {label}
+            </span>
+            <span className={`text-xs ml-auto ${met ? 'text-red-400 font-bold' : 'text-gray-600'}`}>
+              {met ? '✓ MET' : '✗'}
+            </span>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* MID dp trajectory */}
