@@ -520,6 +520,32 @@ app.post('/rescore', async (req, res) => {
   }
 })
 
+// ── UW API proxy endpoints (avoids exposing key to frontend) ─────────────────
+const UW_HEADERS = () => ({
+  Authorization: `Bearer ${process.env.UW_API_KEY}`,
+  'Content-Type': 'application/json',
+})
+
+app.get('/api-data/economic-calendar', async (req, res) => {
+  try {
+    const r = await fetch(
+      `${process.env.UW_API_BASE || 'https://api.unusualwhales.com'}/api/market/economic-calendar`,
+      { headers: UW_HEADERS() }
+    )
+    res.json(await r.json())
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/api-data/earnings-premarket', async (req, res) => {
+  try {
+    const r = await fetch(
+      `${process.env.UW_API_BASE || 'https://api.unusualwhales.com'}/api/earnings/premarket`,
+      { headers: UW_HEADERS() }
+    )
+    res.json(await r.json())
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 app.listen(PORT, () => {
   console.log(`[server] UW Dashboard API listening on port ${PORT}`)
 })

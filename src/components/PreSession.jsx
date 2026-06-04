@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import LevelCard from './LevelCard'
 import CascadeBanner from './CascadeBanner'
+import EarningsWarning from './EarningsWarning'
+import EconomicCalendar from './EconomicCalendar'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -346,6 +348,10 @@ export default function PreSession() {
           </div>
         )}
       </div>
+
+      {/* Earnings warning + Economic calendar */}
+      <EarningsWarning apiUrl={API} />
+      <EconomicCalendar apiUrl={API} />
 
       {/* Structure break bar */}
       <StructureBreakBar sb={data.structure_break} nqRatio={nqRatio} />
