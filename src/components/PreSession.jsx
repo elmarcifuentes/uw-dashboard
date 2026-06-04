@@ -8,6 +8,7 @@ import SectorETF from './SectorETF'
 import TopNetImpact from './TopNetImpact'
 import GexByExpiry from './GexByExpiry'
 import ZeroDteFlow from './ZeroDteFlow'
+import GreekFlow from './GreekFlow'
 import SentimentBadge from './SentimentBadge'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -469,11 +470,12 @@ export default function PreSession() {
         </div>
       </div>
 
-      {/* Sector flow + top movers + 0DTE */}
+      {/* Sector flow + top movers + 0DTE + Greek flow */}
       <div className="grid grid-cols-2 gap-3">
         <SectorETF apiUrl={API} />
         <TopNetImpact apiUrl={API} />
         <ZeroDteFlow apiUrl={API} />
+        <GreekFlow apiUrl={API} />
       </div>
     </div>
   )
