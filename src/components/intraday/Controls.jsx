@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../../context/AuthContext'
 
 export default function Controls({ compact }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+  const { unlocked, authPost } = useAuth()
   const [status, setStatus]   = useState(null)
   const [budget, setBudget]   = useState(null)
   const [mode, setMode]       = useState('REST')
@@ -26,21 +28,17 @@ export default function Controls({ compact }) {
   }, [])
 
   const forceRescore = async () => {
+    if (!unlocked) return
     setRescoring(true)
-    try {
-      await fetch(`${API_URL}/rescore`, { method: 'POST' })
-    } catch { /* ignore */ }
+    try { await authPost(`${API_URL}/rescore`) } catch { /* ignore */ }
     setTimeout(() => setRescoring(false), 2000)
   }
 
   const toggleMode = async () => {
+    if (!unlocked) return
     const useWS = mode === 'REST'
     try {
-      await fetch(`${API_URL}/mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ useWebSocket: useWS }),
-      })
+      await authPost(`${API_URL}/mode`, { useWebSocket: useWS })
       setMode(useWS ? 'WebSocket' : 'REST')
     } catch { /* ignore */ }
   }
@@ -57,18 +55,22 @@ export default function Controls({ compact }) {
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={forceRescore}
-            disabled={rescoring}
-            className="px-3 py-2 bg-teal-700 hover:bg-teal-600 disabled:opacity-50 text-white text-sm rounded transition-colors"
+            disabled={!unlocked || rescoring}
+            className={`px-3 py-2 text-white text-sm rounded transition-colors ${
+              !unlocked ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-teal-700 hover:bg-teal-600 disabled:opacity-50'
+            }`}
           >
-            {rescoring ? '⟳ Rescoring…' : '⟳ Force Rescore Now'}
+            {!unlocked ? '🔒 Rescore' : rescoring ? '⟳ Rescoring…' : '⟳ Force Rescore Now'}
           </button>
           <button
             onClick={toggleMode}
+            disabled={!unlocked}
             className={`px-3 py-2 text-white text-sm rounded transition-colors ${
+              !unlocked ? 'bg-gray-800 text-gray-600 cursor-not-allowed' :
               mode === 'REST' ? 'bg-green-800 hover:bg-green-700' : 'bg-blue-800 hover:bg-blue-700'
             }`}
           >
-            {mode === 'REST' ? '● REST POLLING' : '○ WEBSOCKET'}
+            {!unlocked ? '🔒 Mode' : mode === 'REST' ? '● REST POLLING' : '○ WEBSOCKET'}
           </button>
         </div>
       </div>

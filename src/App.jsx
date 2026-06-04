@@ -4,41 +4,65 @@ import PreSession from './components/PreSession'
 import Intraday from './components/Intraday'
 import PostSession from './components/PostSession'
 import Guide from './components/Guide'
+import LockModal from './components/LockModal'
 import { LayoutProvider } from './context/LayoutContext'
+import { AuthProvider } from './context/AuthContext'
+import { useAuth } from './context/AuthContext'
 import './index.css'
 
 const TABS = ['Pre-Session', 'Intraday', 'Post-Session', 'Guide']
 
-export default function App() {
+function AppInner() {
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('uw-active-tab') || 'Pre-Session'
   })
+  const [showModal, setShowModal] = useState(false)
+  const { unlocked } = useAuth()
 
   useEffect(() => {
     localStorage.setItem('uw-active-tab', activeTab)
   }, [activeTab])
 
   return (
-    <LayoutProvider>
-      <div className="min-h-screen bg-[#0D1B2A] text-gray-100 font-mono">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-lg font-bold text-white tracking-wider">
-              UW LEVEL SCORING
-            </h1>
+    <div className="min-h-screen bg-[#0D1B2A] text-gray-100 font-mono">
+      <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-lg font-bold text-white tracking-wider">
+            UW LEVEL SCORING
+          </h1>
+          <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">Phase 4b</span>
-          </div>
-
-          <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
-
-          <div className="mt-4">
-            {activeTab === 'Pre-Session'  && <PreSession />}
-            {activeTab === 'Intraday'     && <Intraday />}
-            {activeTab === 'Post-Session' && <PostSession />}
-            {activeTab === 'Guide'        && <Guide />}
+            <button
+              onClick={() => setShowModal(true)}
+              title={unlocked ? 'Actions unlocked — click to lock' : 'Click to unlock actions'}
+              className="text-lg leading-none hover:opacity-80 transition-opacity"
+            >
+              {unlocked ? '🔓' : '🔒'}
+            </button>
           </div>
         </div>
+
+        <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
+
+        <div className="mt-4">
+          {activeTab === 'Pre-Session'  && <PreSession />}
+          {activeTab === 'Intraday'     && <Intraday />}
+          {activeTab === 'Post-Session' && <PostSession />}
+          {activeTab === 'Guide'        && <Guide />}
+        </div>
       </div>
-    </LayoutProvider>
+
+      {showModal && <LockModal onClose={() => setShowModal(false)} />}
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <LayoutProvider>
+        <AppInner />
+      </LayoutProvider>
+    </AuthProvider>
   )
 }

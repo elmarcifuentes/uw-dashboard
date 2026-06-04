@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useSSE } from '../hooks/useSSE'
 import { useLayout } from '../context/LayoutContext'
+import { useAuth } from '../context/AuthContext'
 import PriceLadder from './intraday/PriceLadder'
 import DarkPoolChart from './intraday/DarkPoolChart'
 import EtfTideChart from './intraday/EtfTideChart'
@@ -25,7 +26,43 @@ export default function Intraday() {
   } = useSSE(`${API_URL}/stream`)
 
   const { compact, toggle } = useLayout()
-  const [subTab, setSubTab] = useState(0)
+  const { unlocked, authPost } = useAuth()
+  const [subTab, setSubTab]   = useState(0)
+  const [drawing, setDrawing] = useState(null)    // null | 'qqq' | 'both'
+  const [drawResult, setDrawResult] = useState(null) // null | 'success' | 'error'
+
+  const triggerDraw = async (type) => {
+    if (!unlocked || drawing) return
+    setDrawing(type)
+    setDrawResult(null)
+    try {
+      const endpoint = type === 'both' ? '/draw' : '/draw-qqq'
+      await authPost(`${API_URL}${endpoint}`)
+      setDrawResult('success')
+    } catch {
+      setDrawResult('error')
+    } finally {
+      setDrawing(null)
+      setTimeout(() => setDrawResult(null), 3000)
+    }
+  }
+
+  const drawBtnClass = (type) => {
+    const base = 'px-2 py-1 rounded text-xs font-medium transition-colors'
+    if (!unlocked)                return `${base} bg-gray-800 text-gray-600 cursor-not-allowed`
+    if (drawing === type)         return `${base} bg-gray-700 text-gray-400 cursor-wait`
+    if (drawResult === 'success') return `${base} bg-green-800 text-green-300`
+    if (drawResult === 'error')   return `${base} bg-red-800 text-red-300`
+    return `${base} bg-gray-700 text-gray-300 hover:bg-gray-600`
+  }
+
+  const drawLabel = (type, base) => {
+    if (!unlocked)                return `🔒 ${base}`
+    if (drawing === type)         return '⟳ Drawing…'
+    if (drawResult === 'success') return '✓ Done'
+    if (drawResult === 'error')   return '✗ Failed'
+    return base
+  }
 
   // Rescore-derived values — only recompute when rescoreData changes (not on price ticks)
   const result     = useMemo(() => rescoreData?.result ?? null, [rescoreData])
@@ -49,12 +86,30 @@ export default function Intraday() {
           {/* LivePrice is memo'd — only re-renders when priceData or nqRatio changes */}
           <LivePrice priceData={priceData} nqRatio={nqRatio} />
         </div>
-        <button
-          onClick={toggle}
-          className="text-xs text-gray-400 border border-gray-600 px-2 py-1 rounded hover:text-white transition-colors"
-        >
-          {compact ? '⛶ Full' : '⊡ Compact'}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => triggerDraw('qqq')}
+            disabled={!unlocked || !!drawing}
+            className={drawBtnClass('qqq')}
+            title={unlocked ? 'Draw QQQ chart' : 'Unlock to draw'}
+          >
+            {drawLabel('qqq', '📊 QQQ')}
+          </button>
+          <button
+            onClick={() => triggerDraw('both')}
+            disabled={!unlocked || !!drawing}
+            className={drawBtnClass('both')}
+            title={unlocked ? 'Draw both charts' : 'Unlock to draw'}
+          >
+            {drawLabel('both', '📊 Both')}
+          </button>
+          <button
+            onClick={toggle}
+            className="text-xs text-gray-400 border border-gray-600 px-2 py-1 rounded hover:text-white transition-colors"
+          >
+            {compact ? '⛶ Full' : '⊡ Compact'}
+          </button>
+        </div>
       </div>
 
       {/* Chart stale badge */}
