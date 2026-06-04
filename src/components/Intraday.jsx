@@ -43,7 +43,7 @@ export default function Intraday() {
       setDrawResult('error')
     } finally {
       setDrawing(null)
-      setTimeout(() => setDrawResult(null), 3000)
+      setTimeout(() => setDrawResult(null), 5000)
     }
   }
 
@@ -56,12 +56,12 @@ export default function Intraday() {
     return `${base} bg-gray-700 text-gray-300 hover:bg-gray-600`
   }
 
-  const drawLabel = (type, base) => {
-    if (!unlocked)                return `🔒 ${base}`
-    if (drawing === type)         return '⟳ Drawing…'
-    if (drawResult === 'success') return '✓ Done'
+  const drawLabel = (type) => {
+    if (!unlocked)                return type === 'qqq' ? '🔒 Rescore + QQQ' : '🔒 Rescore + Both'
+    if (drawing === type)         return '⟳ Rescoring…'
+    if (drawResult === 'success') return type === 'qqq' ? '✓ Done — run /draw-qqq' : '✓ Done — run /draw'
     if (drawResult === 'error')   return '✗ Failed'
-    return base
+    return type === 'qqq' ? '🔄 Rescore + QQQ' : '🔄 Rescore + Both'
   }
 
   // Rescore-derived values — only recompute when rescoreData changes (not on price ticks)
@@ -91,17 +91,17 @@ export default function Intraday() {
             onClick={() => triggerDraw('qqq')}
             disabled={!unlocked || !!drawing}
             className={drawBtnClass('qqq')}
-            title={unlocked ? 'Draw QQQ chart' : 'Unlock to draw'}
+            title="Triggers fresh scoring and dashboard update. Run /draw-qqq in Claude Code to update chart labels."
           >
-            {drawLabel('qqq', '📊 QQQ')}
+            {drawLabel('qqq')}
           </button>
           <button
             onClick={() => triggerDraw('both')}
             disabled={!unlocked || !!drawing}
             className={drawBtnClass('both')}
-            title={unlocked ? 'Draw both charts' : 'Unlock to draw'}
+            title="Triggers fresh scoring and dashboard update. Run /draw in Claude Code to update both chart labels."
           >
-            {drawLabel('both', '📊 Both')}
+            {drawLabel('both')}
           </button>
           <button
             onClick={toggle}
