@@ -263,6 +263,15 @@ export default function PreSession() {
     return { ...l, _target_delta: delta }
   })
 
+  // Last fetch time — priority: lastPriceCheck > _received_at > scored_at
+  const fmtET = iso => {
+    if (!iso) return null
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return null
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }) + ' ET'
+  }
+  const lastFetch = fmtET(providerStatus?.lastPriceCheck || data?._received_at || data?.scored_at)
+
   // Fix 3: use /budget endpoint callsToday, fall back to 0 not null
   const apiUsed  = budget?.callsToday ?? 0
   const apiMax   = 14000
@@ -290,7 +299,7 @@ export default function PreSession() {
               <span className="text-xs text-gray-500 uppercase">{data.run_type}</span>
             </div>
             <div className="text-xs text-gray-500">
-              Last fetch: {data.fetched_at || '—'}
+              Last fetch: {lastFetch || data.fetched_at || '—'}
             </div>
             <div className="flex items-center gap-3 text-sm mt-1">
               <span className="text-white font-medium">${data.current_price?.toFixed(2) ?? '—'}</span>
