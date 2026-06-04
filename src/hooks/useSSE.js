@@ -13,6 +13,7 @@ export function useSSE(url) {
   const [midDpHistory, setMidDpHistory]       = useState([])
   const [dpHistory, setDpHistory]             = useState({})
   const [narrative, setNarrative]             = useState([])
+  const [sentiment, setSentiment]             = useState(null)
   const esRef = useRef(null)
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export function useSSE(url) {
           if (data.expansionGex !== undefined) setExpansionGex(data.expansionGex || [])
           if (data.dpHistory)  setDpHistory(data.dpHistory)
           if (data.narrative)  setNarrative(data.narrative)
+          if (data.sentiment)  setSentiment(data.sentiment)
           const midLevel = data.result?.levels?.find(l => l.id === 'MID')
           if (midLevel?.dark_pool !== undefined) {
             setMidDpHistory(prev =>
@@ -91,5 +93,6 @@ export function useSSE(url) {
     midDpHistory,
     dpHistory,
     narrative,
+    sentiment,
   }
 }

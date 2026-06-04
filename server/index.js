@@ -138,6 +138,64 @@ function generateNarrative(result, dpHist) {
   return lines.length > 0 ? lines : null
 }
 
+function computeSentiment(result) {
+  if (!result?.levels) return null
+
+  const signals  = []
+  const cascade  = result.cascade
+  const levels   = result.levels
+
+  // Signal 1: ETF tide direction (from level etf_direction field)
+  const etfDir = levels[0]?.etf_direction
+  if (etfDir === 'bullish')      signals.push({ name: 'ETF', bull: true })
+  else if (etfDir === 'bearish') signals.push({ name: 'ETF', bull: false })
+
+  // Signal 2: MID dark pool direction
+  const mid = levels.find(l => l.id === 'MID')
+  if (mid?.dark_pool != null)    signals.push({ name: 'MID dp', bull: mid.dark_pool > 0 })
+
+  // Signal 3: Dominant level classification
+  const classified = levels.filter(l => l.classification !== 'no_edge')
+  const buyCount   = classified.filter(l => l.classification === 'buy_support').length
+  const sellCount  = classified.filter(l => l.classification === 'sell_resistance').length
+  if (buyCount > sellCount)      signals.push({ name: 'Levels', bull: true })
+  else if (sellCount > buyCount) signals.push({ name: 'Levels', bull: false })
+
+  // Signal 4: FULL STACK presence
+  const fssBull = levels.some(l => l.full_stack && l.classification === 'buy_support')
+  const fssBear = levels.some(l => l.full_stack && l.classification === 'sell_resistance')
+  if (fssBull)      signals.push({ name: 'FULL STACK', bull: true })
+  else if (fssBear) signals.push({ name: 'FULL STACK', bull: false })
+
+  const bullCount = signals.filter(s => s.bull).length
+  const bearCount = signals.filter(s => !s.bull).length
+  const total     = signals.length || 1
+
+  const cascadeActive = cascade?.active || false
+  const cascadeArmed  = cascade?.conditions?.[0] || false
+  const hasFullStack  = levels.some(l => l.full_stack)
+
+  let state, label, color, description
+  if (cascadeActive) {
+    state = 'HIGH_RISK'; label = 'HIGH RISK'; color = 'red'
+    description = 'Cascade active — no institutional floor below MID'
+  } else if (cascadeArmed && bearCount > bullCount) {
+    state = 'CAUTION'; label = 'CAUTION'; color = 'amber'
+    description = 'Cascade armed + bearish signals — elevated risk'
+  } else if (bullCount >= Math.ceil(total * 0.67)) {
+    state = 'BULLISH'; label = 'BULLISH'; color = 'green'
+    description = `${bullCount}/${total} signals bullish — setups confirmed`
+  } else if (bearCount >= Math.ceil(total * 0.67)) {
+    state = 'BEARISH'; label = 'BEARISH'; color = 'red'
+    description = `${bearCount}/${total} signals bearish — avoid long setups`
+  } else {
+    state = 'MIXED'; label = 'MIXED'; color = 'amber'
+    description = 'Signals conflicting — trade with reduced size'
+  }
+
+  return { state, label, color, description, bullCount, bearCount, total, signals, cascadeActive, cascadeArmed, hasFullStack }
+}
+
 function updateDpHistory(result) {
   if (!result?.levels) return
   for (const level of result.levels) {
@@ -249,6 +307,8 @@ provider.onRescore(async ({ price, reason }) => {
     emitStaleIfChanged(result)
     checkExpansionGex(result)
     updateDpHistory(result)
+    const sentiment = computeSentiment(result)
+    result._sentiment = sentiment
     sseEmitter.emit('event', {
       type:        'rescore',
       result,
@@ -257,6 +317,7 @@ provider.onRescore(async ({ price, reason }) => {
       expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
       narrative:   generateNarrative(result, dpHistory),
+      sentiment,
       timestamp:   new Date().toISOString(),
     })
   } catch (err) {
@@ -383,6 +444,8 @@ app.post('/update', (req, res) => {
   emitStaleIfChanged(result)
   checkExpansionGex(result)
   updateDpHistory(result)
+  const _sentiment = computeSentiment(result)
+  result._sentiment = _sentiment
   sseEmitter.emit('event', {
     type:        'rescore',
     result,
@@ -391,6 +454,7 @@ app.post('/update', (req, res) => {
     expansionGex: detectExpansionGex(result),
     dpHistory:    { ...dpHistory },
     narrative:    generateNarrative(result, dpHistory),
+    sentiment:    _sentiment,
     timestamp:    new Date().toISOString(),
   })
   res.json({ ok: true })
@@ -513,6 +577,8 @@ app.post('/rescore', async (req, res) => {
     provider.setLevels(result.levels)
     checkExpansionGex(result)
     updateDpHistory(result)
+    const manualSentiment = computeSentiment(result)
+    result._sentiment = manualSentiment
     sseEmitter.emit('event', {
       type:        'rescore',
       result,
@@ -521,6 +587,7 @@ app.post('/rescore', async (req, res) => {
       expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
       narrative:   generateNarrative(result, dpHistory),
+      sentiment:   manualSentiment,
       timestamp: new Date().toISOString(),
     })
     res.json({ success: true })

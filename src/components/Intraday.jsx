@@ -11,6 +11,7 @@ import ExpansionGexAlert from './intraday/ExpansionGexAlert'
 import CascadeProximityGauge from './intraday/CascadeProximityGauge'
 import NarrativeBlock from './intraday/NarrativeBlock'
 import LivePrice from './intraday/LivePrice'
+import SentimentBadge from './SentimentBadge'
 
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log', 'Controls']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log', 'Ctrl']
@@ -27,6 +28,7 @@ export default function Intraday() {
 
   const { compact, toggle } = useLayout()
   const { unlocked, authPost } = useAuth()
+  const sentiment = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
   const [subTab, setSubTab]   = useState(0)
   const [drawing, setDrawing] = useState(null)    // null | 'qqq' | 'both'
   const [drawResult, setDrawResult] = useState(null) // null | 'success' | 'error'
@@ -85,6 +87,7 @@ export default function Intraday() {
           </span>
           {/* LivePrice is memo'd — only re-renders when priceData or nqRatio changes */}
           <LivePrice priceData={priceData} nqRatio={nqRatio} />
+          <SentimentBadge sentiment={sentiment} compact={true} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button

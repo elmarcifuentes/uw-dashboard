@@ -8,6 +8,7 @@ import SectorETF from './SectorETF'
 import TopNetImpact from './TopNetImpact'
 import GexByExpiry from './GexByExpiry'
 import ZeroDteFlow from './ZeroDteFlow'
+import SentimentBadge from './SentimentBadge'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -258,9 +259,13 @@ export default function PreSession() {
   const netCall = tide.net_call_premium
   const netPut  = tide.net_put_premium
   const fmt = v => v != null ? `$${(Math.abs(v) / 1e6).toFixed(2)}M` : '—'
+  const sentiment = data?._sentiment || null
 
   return (
     <div className="space-y-4">
+      {/* Sentiment badge — first element */}
+      <SentimentBadge sentiment={sentiment} compact={false} />
+
       {/* Session header */}
       <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
         <div className="flex items-start justify-between gap-4">
