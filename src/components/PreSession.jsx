@@ -6,6 +6,8 @@ import EarningsWarning from './EarningsWarning'
 import EconomicCalendar from './EconomicCalendar'
 import SectorETF from './SectorETF'
 import TopNetImpact from './TopNetImpact'
+import GexByExpiry from './GexByExpiry'
+import ZeroDteFlow from './ZeroDteFlow'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -387,6 +389,9 @@ export default function PreSession() {
       {/* GEX cage */}
       <GexCageSummary levels={levels} />
 
+      {/* GEX by expiry */}
+      <GexByExpiry apiUrl={API} />
+
       {/* Stat boxes */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {/* Resistance magnet streak */}
@@ -459,10 +464,11 @@ export default function PreSession() {
         </div>
       </div>
 
-      {/* Sector flow + top movers */}
+      {/* Sector flow + top movers + 0DTE */}
       <div className="grid grid-cols-2 gap-3">
         <SectorETF apiUrl={API} />
         <TopNetImpact apiUrl={API} />
+        <ZeroDteFlow apiUrl={API} />
       </div>
     </div>
   )
