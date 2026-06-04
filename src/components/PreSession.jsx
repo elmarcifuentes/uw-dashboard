@@ -4,6 +4,8 @@ import LevelCard from './LevelCard'
 import CascadeBanner from './CascadeBanner'
 import EarningsWarning from './EarningsWarning'
 import EconomicCalendar from './EconomicCalendar'
+import SectorETF from './SectorETF'
+import TopNetImpact from './TopNetImpact'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -455,6 +457,12 @@ export default function PreSession() {
             </>
           )}
         </div>
+      </div>
+
+      {/* Sector flow + top movers */}
+      <div className="grid grid-cols-2 gap-3">
+        <SectorETF apiUrl={API} />
+        <TopNetImpact apiUrl={API} />
       </div>
     </div>
   )
