@@ -403,7 +403,7 @@ export default function PreSession() {
         {/* Resistance magnet streak */}
         <div className="bg-gray-900/60 rounded border border-gray-700 p-3 text-center">
           <div className="text-3xl font-bold text-white">
-            {data.resistance_magnet_streak ?? '—'}
+            {providerStatus?.allPinningSessions ?? data?.magnet_streak ?? 0}
           </div>
           <div className="text-xs text-gray-400 mt-1">Consecutive Sessions</div>
           <div className="text-xs text-gray-600 mt-0.5">Zero failures</div>
@@ -470,10 +470,14 @@ export default function PreSession() {
         </div>
       </div>
 
-      {/* Sector flow + top movers + 0DTE + Greek flow */}
+      {/* Sector flow + top movers */}
       <div className="grid grid-cols-2 gap-3">
         <SectorETF apiUrl={API} />
         <TopNetImpact apiUrl={API} />
+      </div>
+
+      {/* 0DTE + Greek flow */}
+      <div className="grid grid-cols-2 gap-3">
         <ZeroDteFlow apiUrl={API} />
         <GreekFlow apiUrl={API} />
       </div>

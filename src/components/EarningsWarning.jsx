@@ -23,7 +23,16 @@ export default function EarningsWarning({ apiUrl }) {
       .catch(() => setLoading(false))
   }, [apiUrl])
 
-  if (loading || earnings.length === 0) return null
+  const skeleton = (
+    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
+      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
+      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
+      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    </div>
+  )
+
+  if (loading) return skeleton
+  if (earnings.length === 0) return null
 
   return (
     <div className="bg-amber-950 border border-amber-500 rounded p-3">

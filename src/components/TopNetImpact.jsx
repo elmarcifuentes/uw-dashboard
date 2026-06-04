@@ -26,7 +26,15 @@ export default function TopNetImpact({ apiUrl }) {
       .catch(() => setLoading(false))
   }, [apiUrl])
 
-  if (loading || impacts.length === 0) return null
+  const skeleton = (
+    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
+      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
+      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
+      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    </div>
+  )
+
+  if (loading) return skeleton
 
   const bullish = impacts.filter(s => s.net_premium > 0).length
   const bearish  = impacts.filter(s => s.net_premium < 0).length

@@ -40,7 +40,15 @@ export default function GreekFlow({ apiUrl }) {
       .catch(() => setLoading(false))
   }, [apiUrl])
 
-  if (loading || !data) return null
+  const skeleton = (
+    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
+      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
+      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
+      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    </div>
+  )
+
+  if (loading) return skeleton
 
   const { totals } = data
   const maxAbs = Math.max(Math.abs(totals.dirDelta), Math.abs(totals.dirVega), Math.abs(totals.otmDirDelta)) || 1
