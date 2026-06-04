@@ -591,6 +591,26 @@ app.get('/api-data/earnings-premarket', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+app.get('/api-data/sector-etfs', async (req, res) => {
+  try {
+    const r = await fetch(
+      `${process.env.UW_API_BASE || 'https://api.unusualwhales.com'}/api/market/sector-etfs`,
+      { headers: UW_HEADERS() }
+    )
+    res.json(await r.json())
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/api-data/top-net-impact', async (req, res) => {
+  try {
+    const r = await fetch(
+      `${process.env.UW_API_BASE || 'https://api.unusualwhales.com'}/api/market/top-net-impact`,
+      { headers: UW_HEADERS() }
+    )
+    res.json(await r.json())
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 app.listen(PORT, () => {
   console.log(`[server] UW Dashboard API listening on port ${PORT}`)
 })
