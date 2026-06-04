@@ -57,11 +57,11 @@ export default function Intraday() {
   }
 
   const drawLabel = (type) => {
-    if (!unlocked)                return type === 'qqq' ? '🔒 Rescore + QQQ' : '🔒 Rescore + Both'
-    if (drawing === type)         return '⟳ Rescoring…'
-    if (drawResult === 'success') return type === 'qqq' ? '✓ Done — run /draw-qqq' : '✓ Done — run /draw'
+    if (!unlocked)                return type === 'qqq' ? '🔒 Draw QQQ' : '🔒 Draw Both'
+    if (drawing === type)         return '⟳ Drawing…'
+    if (drawResult === 'success') return '✓ Done'
     if (drawResult === 'error')   return '✗ Failed'
-    return type === 'qqq' ? '🔄 Rescore + QQQ' : '🔄 Rescore + Both'
+    return type === 'qqq' ? '📊 Draw QQQ' : '📊 Draw Both'
   }
 
   // Rescore-derived values — only recompute when rescoreData changes (not on price ticks)
