@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ReferenceLine, ResponsiveContainer, Legend
@@ -5,7 +6,7 @@ import {
 
 const fmt = v => `$${(Math.abs(v) / 1e6).toFixed(2)}M`
 
-export default function EtfTideChart({ history, compact }) {
+export default memo(function EtfTideChart({ history, compact }) {
   const rescores = history.filter(e => e.type === 'rescore')
 
   const chartData = [...rescores].reverse().map(e => {
@@ -57,4 +58,4 @@ export default function EtfTideChart({ history, compact }) {
       </div>
     </div>
   )
-}
+})

@@ -264,9 +264,10 @@ provider.onRescore(async ({ price, reason }) => {
 })
 
 // Session open price tracking
-let sessionOpenPrice = null
-let sessionDate      = null
-let alertFired       = false  // fire once per session crossing
+let sessionOpenPrice  = null
+let sessionDate       = null
+let alertFired        = false
+let lastEmittedPrice  = null  // throttle: only emit when price moves ≥ $0.05
 
 provider.onPriceUpdate((price) => {
   const s     = provider.getStatus()
@@ -302,6 +303,11 @@ provider.onPriceUpdate((price) => {
       })
     }
   }
+
+  // Throttle: skip if price hasn't moved ≥ $0.05 since last emit
+  const priceMoved = !lastEmittedPrice || Math.abs(price - lastEmittedPrice) >= 0.05
+  if (!priceMoved) return
+  lastEmittedPrice = price
 
   sseEmitter.emit('event', {
     type:         'price',

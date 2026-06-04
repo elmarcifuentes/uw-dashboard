@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSSE } from '../hooks/useSSE'
 import { useLayout } from '../context/LayoutContext'
 import PriceLadder from './intraday/PriceLadder'
@@ -9,20 +9,32 @@ import Controls from './intraday/Controls'
 import ExpansionGexAlert from './intraday/ExpansionGexAlert'
 import CascadeProximityGauge from './intraday/CascadeProximityGauge'
 import NarrativeBlock from './intraday/NarrativeBlock'
+import LivePrice from './intraday/LivePrice'
 
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log', 'Controls']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log', 'Ctrl']
 
 export default function Intraday() {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-  const { lastEvent, connected, history, levelAlert, clearLevelAlert, chartStale, staleChanges, expansionGex, pinningSessions, midDpHistory, dpHistory, narrative } = useSSE(`${API_URL}/stream`)
+  const {
+    rescoreData, priceData, connected,
+    history, levelAlert, clearLevelAlert,
+    chartStale, staleChanges,
+    expansionGex, pinningSessions,
+    midDpHistory, dpHistory, narrative,
+  } = useSSE(`${API_URL}/stream`)
+
   const { compact, toggle } = useLayout()
   const [subTab, setSubTab] = useState(0)
 
-  const result       = lastEvent?.type === 'rescore' ? lastEvent.result : null
-  const currentPrice = lastEvent?.price ?? result?.current_price
-  const nqRatio      = result?.nq_ratio ? Number(result.nq_ratio) : null
-  const cascade      = result?.cascade ?? lastEvent?.cascade ?? null
+  // Rescore-derived values — only recompute when rescoreData changes (not on price ticks)
+  const result     = useMemo(() => rescoreData?.result ?? null, [rescoreData])
+  const nqRatio    = useMemo(() => result?.nq_ratio ? Number(result.nq_ratio) : null, [result])
+  const cascade    = useMemo(() => result?.cascade ?? rescoreData?.cascade ?? null, [rescoreData, result])
+  const lastUpdate = useMemo(() => rescoreData?.timestamp ?? null, [rescoreData])
+
+  // Current price — from live price ticks OR most recent rescore
+  const currentPrice = priceData?.price ?? result?.current_price
 
   return (
     <div className={`flex flex-col ${compact ? 'gap-2' : 'gap-4'}`}>
@@ -34,11 +46,8 @@ export default function Intraday() {
           <span className="text-sm text-gray-400">
             {connected ? 'LIVE' : 'RECONNECTING...'}
           </span>
-          {currentPrice != null && (
-            <span className="text-white font-mono font-bold">
-              QQQ ${Number(currentPrice).toFixed(2)}
-            </span>
-          )}
+          {/* LivePrice is memo'd — only re-renders when priceData or nqRatio changes */}
+          <LivePrice priceData={priceData} nqRatio={nqRatio} />
         </div>
         <button
           onClick={toggle}
@@ -53,9 +62,7 @@ export default function Intraday() {
         const isCritical = staleChanges.some(c => c.type === 'cascade')
         return (
           <div className={`flex items-center gap-2 border rounded px-3 py-1.5 ${
-            isCritical
-              ? 'bg-red-900/80 border-red-500 animate-pulse'
-              : 'bg-amber-900/80 border-amber-500'
+            isCritical ? 'bg-red-900/80 border-red-500 animate-pulse' : 'bg-amber-900/80 border-amber-500'
           }`}>
             <span className={`text-sm font-bold shrink-0 ${isCritical ? 'text-red-400' : 'text-amber-400'}`}>
               🔄 CHART STALE
@@ -70,14 +77,12 @@ export default function Intraday() {
                 </span>
               ))}
             </span>
-            <span className={`text-xs ml-1 shrink-0 ${isCritical ? 'text-red-600' : 'text-amber-600'}`}>
-              — run /draw
-            </span>
+            <span className={`text-xs ml-1 shrink-0 ${isCritical ? 'text-red-600' : 'text-amber-600'}`}>— run /draw</span>
           </div>
         )
       })()}
 
-      {/* $2.50 move alert banner */}
+      {/* $2.50 move alert */}
       {levelAlert && (
         <div className="bg-amber-900/80 border border-amber-500 rounded px-3 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
@@ -88,25 +93,19 @@ export default function Intraday() {
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-amber-500 text-xs hidden sm:block">Re-read indicator → update levels → npm start</span>
-            <button
-              onClick={clearLevelAlert}
-              className="text-amber-600 hover:text-amber-300 text-sm leading-none"
-              aria-label="Dismiss"
-            >
-              ✕
-            </button>
+            <button onClick={clearLevelAlert} className="text-amber-600 hover:text-amber-300 text-sm leading-none" aria-label="Dismiss">✕</button>
           </div>
         </div>
       )}
 
-      {/* Expansion GEX alert */}
+      {/* Expansion GEX alert — memo'd, stable on price ticks */}
       <ExpansionGexAlert expansionGex={expansionGex} pinningSessions={pinningSessions} />
 
-      {/* Cascade proximity gauge */}
+      {/* Cascade proximity gauge — memo'd */}
       <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
 
-      {/* Auto narrative */}
-      <NarrativeBlock narrative={narrative} lastUpdate={lastEvent?.timestamp} compact={compact} />
+      {/* Auto narrative — memo'd */}
+      <NarrativeBlock narrative={narrative} lastUpdate={lastUpdate} compact={compact} />
 
       {/* Sub-tab navigation */}
       <div className="flex gap-1 flex-wrap">
@@ -115,9 +114,7 @@ export default function Intraday() {
             key={i}
             onClick={() => setSubTab(i)}
             className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              subTab === i
-                ? 'bg-teal-700 text-white'
-                : 'bg-gray-800 text-gray-400 hover:text-white'
+              subTab === i ? 'bg-teal-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
             }`}
           >
             {tab}

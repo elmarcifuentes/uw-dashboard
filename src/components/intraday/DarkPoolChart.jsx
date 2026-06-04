@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, ReferenceLine,
   Tooltip, Legend, ResponsiveContainer
@@ -9,7 +10,7 @@ const LEVEL_COLORS = {
   S1: '#f87171', S2: '#C0392B',
 }
 
-export default function DarkPoolChart({ history, compact }) {
+export default memo(function DarkPoolChart({ history, compact }) {
   const rescores = history.filter(e => e.type === 'rescore')
 
   const chartData = [...rescores].reverse().map(e => ({
@@ -59,4 +60,4 @@ export default function DarkPoolChart({ history, compact }) {
       </div>
     </div>
   )
-}
+})

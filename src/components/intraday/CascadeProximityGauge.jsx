@@ -1,4 +1,5 @@
-export default function CascadeProximityGauge({ cascade, midDpHistory }) {
+import { memo } from 'react'
+export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
   if (!cascade || cascade.mid_dp === null || cascade.mid_dp === undefined) return null
 
   const midDp    = cascade.mid_dp
@@ -128,4 +129,4 @@ export default function CascadeProximityGauge({ cascade, midDpHistory }) {
       </div>
     </div>
   )
-}
+})

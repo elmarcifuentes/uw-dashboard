@@ -1,4 +1,5 @@
-export default function ExpansionGexAlert({ expansionGex, pinningSessions }) {
+import { memo } from 'react'
+export default memo(function ExpansionGexAlert({ expansionGex, pinningSessions }) {
   if (!expansionGex || expansionGex.length === 0) return null
 
   return (
@@ -30,4 +31,4 @@ export default function ExpansionGexAlert({ expansionGex, pinningSessions }) {
       </p>
     </div>
   )
-}
+})

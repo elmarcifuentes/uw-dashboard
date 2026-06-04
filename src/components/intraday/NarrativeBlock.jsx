@@ -1,4 +1,5 @@
-export default function NarrativeBlock({ narrative, lastUpdate, compact }) {
+import { memo } from 'react'
+export default memo(function NarrativeBlock({ narrative, lastUpdate, compact }) {
   if (!narrative || narrative.length === 0) return null
 
   const time = lastUpdate
@@ -33,4 +34,4 @@ export default function NarrativeBlock({ narrative, lastUpdate, compact }) {
       </div>
     </div>
   )
-}
+})

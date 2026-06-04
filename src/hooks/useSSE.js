@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 
 export function useSSE(url) {
-  const [lastEvent, setLastEvent]         = useState(null)
-  const [connected, setConnected]         = useState(false)
-  const [history, setHistory]             = useState([])
-  const [levelAlert, setLevelAlert]       = useState(null)
-  const [chartStale, setChartStale]       = useState(false)
-  const [staleChanges, setStaleChanges]   = useState([])
+  const [rescoreData, setRescoreData]         = useState(null)
+  const [priceData, setPriceData]             = useState(null)
+  const [connected, setConnected]             = useState(false)
+  const [history, setHistory]                 = useState([])
+  const [levelAlert, setLevelAlert]           = useState(null)
+  const [chartStale, setChartStale]           = useState(false)
+  const [staleChanges, setStaleChanges]       = useState([])
   const [expansionGex, setExpansionGex]       = useState([])
   const [pinningSessions, setPinningSessions] = useState(0)
   const [midDpHistory, setMidDpHistory]       = useState([])
@@ -29,48 +30,38 @@ export function useSSE(url) {
         const data = JSON.parse(event.data)
         if (data.type === 'heartbeat') return
 
-        if (data.type === 'level_update_alert') {
-          setLevelAlert(data)
-          return
-        }
-
-        if (data.type === 'chart_stale') {
-          setChartStale(true)
-          setStaleChanges(data.changes || [])
-          return
-        }
-
-        if (data.type === 'chart_synced') {
-          setChartStale(false)
-          setStaleChanges([])
-          return
-        }
-
-        if (data.type === 'expansion_gex') {
-          setExpansionGex(data.levels || [])
-          setPinningSessions(data.consecutivePinningSessions ?? 0)
-          return
-        }
-
-        setLastEvent(data)
-
         if (data.type === 'rescore') {
+          setRescoreData(data)
           setHistory(prev => [data, ...prev].slice(0, 50))
-          if (data.expansionGex !== undefined) {
-            setExpansionGex(data.expansionGex || [])
-          }
-          if (data.dpHistory) {
-            setDpHistory(data.dpHistory)
-          }
-          if (data.narrative) {
-            setNarrative(data.narrative)
-          }
+          if (data.expansionGex !== undefined) setExpansionGex(data.expansionGex || [])
+          if (data.dpHistory)  setDpHistory(data.dpHistory)
+          if (data.narrative)  setNarrative(data.narrative)
           const midLevel = data.result?.levels?.find(l => l.id === 'MID')
           if (midLevel?.dark_pool !== undefined) {
             setMidDpHistory(prev =>
               [...prev, { value: midLevel.dark_pool, time: data.timestamp }].slice(-5)
             )
           }
+          // Also update priceData from rescore so price shows immediately
+          if (data.result?.current_price != null) {
+            setPriceData({ price: data.result.current_price, timestamp: data.timestamp, interval: null })
+          }
+          return
+        }
+
+        if (data.type === 'price') {
+          // Update price only — does NOT trigger rescore re-renders
+          setPriceData({ price: data.price, timestamp: data.timestamp, interval: data.interval, isMarketHours: data.isMarketHours })
+          return
+        }
+
+        if (data.type === 'level_update_alert') { setLevelAlert(data);                            return }
+        if (data.type === 'chart_stale')        { setChartStale(true); setStaleChanges(data.changes || []); return }
+        if (data.type === 'chart_synced')       { setChartStale(false); setStaleChanges([]);       return }
+        if (data.type === 'expansion_gex') {
+          setExpansionGex(data.levels || [])
+          setPinningSessions(data.consecutivePinningSessions ?? 0)
+          return
         }
       }
 
@@ -83,15 +74,12 @@ export function useSSE(url) {
     }
 
     connect()
-
-    return () => {
-      destroyed = true
-      esRef.current?.close()
-    }
+    return () => { destroyed = true; esRef.current?.close() }
   }, [url])
 
   return {
-    lastEvent,
+    rescoreData,
+    priceData,
     connected,
     history,
     levelAlert,

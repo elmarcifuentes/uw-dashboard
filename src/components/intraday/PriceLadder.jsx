@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
 
 const LEVEL_DESCRIPTIONS = {
@@ -88,7 +89,7 @@ function DpTrend({ levelId, history, compact }) {
   )
 }
 
-export default function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {} }) {
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {} }) {
   if (!result) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
@@ -234,4 +235,4 @@ export default function PriceLadder({ result, currentPrice, nqRatio, compact, dp
       )}
     </div>
   )
-}
+})
