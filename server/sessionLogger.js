@@ -197,11 +197,30 @@ export class SessionLogger {
       }
     }
 
-    // Fix 2: Cascade tracking with DB-recovery close + S1/S2 reach detection
+    // S1/S2 reach flags — run FIRST, independently, on most recent cascade event
+    // Uses id-based update so it fires even after cascade resolves or server restart
+    if (result.levels && price != null) {
+      const recentCascade = db.prepare(`
+        SELECT id FROM cascade_events
+        WHERE session_date = ?
+        ORDER BY fired_at DESC LIMIT 1
+      `).get(date)
+      if (recentCascade) {
+        const s1Level = result.levels.find(l => l.id === 'S1')
+        const s2Level = result.levels.find(l => l.id === 'S2')
+        if (s1Level && price <= s1Level.price) {
+          db.prepare('UPDATE cascade_events SET reached_s1 = 1 WHERE id = ?').run(recentCascade.id)
+        }
+        if (s2Level && price <= s2Level.price) {
+          db.prepare('UPDATE cascade_events SET reached_s2 = 1 WHERE id = ?').run(recentCascade.id)
+        }
+      }
+    }
+
+    // Cascade open / close with DB-recovery
     if (result.cascade?.active) {
       this._openCascade(date, price, timestamp, result.cascade)
     } else {
-      // Resolve any open cascade — check DB directly to survive server restarts
       const openCascade = db.prepare(
         'SELECT id FROM cascade_events WHERE session_date = ? AND resolved_at IS NULL'
       ).get(date)
@@ -215,17 +234,6 @@ export class SessionLogger {
       } else if (this.cascadeOpenTime) {
         this._closeCascade(date, price, timestamp)
       }
-    }
-
-    // S1/S2 reach flags — check against any currently open cascade
-    const openCascadeNow = db.prepare(
-      'SELECT id FROM cascade_events WHERE session_date = ? AND resolved_at IS NULL'
-    ).get(date)
-    if (openCascadeNow && result.levels && price != null) {
-      const s1Price = result.levels.find(l => l.id === 'S1')?.price
-      const s2Price = result.levels.find(l => l.id === 'S2')?.price
-      if (s1Price != null && price <= s1Price) stmts.cascadeReachS1.run(date)
-      if (s2Price != null && price <= s2Price) stmts.cascadeReachS2.run(date)
     }
 
     // Fix 2: Persist magnet streak from SQLite history
