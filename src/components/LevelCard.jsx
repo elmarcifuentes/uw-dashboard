@@ -61,7 +61,9 @@ const ETF_ARROW = {
 
 const formatTime = (iso) => {
   if (!iso) return null
-  return new Date(iso).toLocaleTimeString('en-US', {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleTimeString('en-US', {
     hour: '2-digit', minute: '2-digit', second: '2-digit',
     hour12: false, timeZone: 'America/New_York',
   }) + ' ET'

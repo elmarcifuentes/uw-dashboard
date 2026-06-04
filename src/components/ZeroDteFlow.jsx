@@ -18,9 +18,10 @@ export default function ZeroDteFlow({ apiUrl }) {
     fetch(`${apiUrl}/api-data/flow-expiry`)
       .then(r => r.json())
       .then(json => {
-        const rows  = json.data || []
-        const today = new Date().toISOString().split('T')[0]
-        const zdte  = rows.find(r => r.expiry === today || r.expiry === rows[0]?.date)
+        const rows   = json.data || []
+        // Use ET timezone date — markets trade on ET date, not UTC
+        const todayET = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+        const zdte  = rows.find(r => r.expiry === todayET) || rows.find(r => r.expiry === rows[0]?.date)
 
         if (!zdte) { setData({ noZdte: true }); setLoading(false); return }
 

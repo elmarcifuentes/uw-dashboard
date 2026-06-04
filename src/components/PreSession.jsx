@@ -143,6 +143,7 @@ export default function PreSession() {
   const [providerStatus, setProviderStatus] = useState(null)
   const [budget, setBudget]       = useState(null)
   const [mode, setMode]           = useState('REST')
+  const [magnetStreak, setMagnetStreak] = useState(null)
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -205,6 +206,17 @@ export default function PreSession() {
     return () => clearInterval(t3)
   }, [fetchBudget])
 
+  useEffect(() => {
+    fetch(`${API}/sessions`)
+      .then(r => r.json())
+      .then(sessions => {
+        if (Array.isArray(sessions) && sessions.length > 0) {
+          setMagnetStreak(sessions[0].magnet_streak ?? 0)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
@@ -251,14 +263,16 @@ export default function PreSession() {
     return { ...l, _target_delta: delta }
   })
 
-  const apiUsed  = data.api_calls_used ?? null
+  // Fix 3: use /budget endpoint callsToday, fall back to 0 not null
+  const apiUsed  = budget?.callsToday ?? 0
   const apiMax   = 14000
-  const apiPct   = apiUsed !== null ? apiUsed / apiMax : null
+  const apiPct   = apiUsed / apiMax
 
-  // ETF data
-  const tide = data.etf_tide || {}
-  const netCall = tide.net_call_premium
-  const netPut  = tide.net_put_premium
+  // Fix 4: etf_tide not in payload — direction is in levels[0].etf_direction
+  // net premiums come from the scoring engine's ETF tide calculation stored separately
+  const tide = {}
+  const netCall = null  // not available in /latest payload
+  const netPut  = null
   const fmt = v => v != null ? `$${(Math.abs(v) / 1e6).toFixed(2)}M` : '—'
   const sentiment = data?._sentiment || null
 
@@ -386,7 +400,7 @@ export default function PreSession() {
               sessionMaxGex={sessionMaxGex}
               nqRatio={nqRatio}
               dpHistory={providerStatus?.dpHistory?.[level.id] || []}
-              scoredAt={data?.scored_at || data?.fetched_at}
+              scoredAt={data?.scored_at || data?._received_at}
             />
           ))
         })()}
@@ -403,7 +417,7 @@ export default function PreSession() {
         {/* Resistance magnet streak */}
         <div className="bg-gray-900/60 rounded border border-gray-700 p-3 text-center">
           <div className="text-3xl font-bold text-white">
-            {providerStatus?.allPinningSessions ?? data?.magnet_streak ?? 0}
+            {magnetStreak ?? providerStatus?.allPinningSessions ?? 0}
           </div>
           <div className="text-xs text-gray-400 mt-1">Consecutive Sessions</div>
           <div className="text-xs text-gray-600 mt-0.5">Zero failures</div>
@@ -414,10 +428,6 @@ export default function PreSession() {
           <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">ETF Tide</div>
           <div className={`inline-block px-2 py-0.5 rounded border text-xs font-bold mb-2 ${ETF_COLOR[etfDir] || ETF_COLOR.neutral}`}>
             {ETF_LABEL[etfDir] || 'NEUTRAL'}
-          </div>
-          <div className="text-xs text-gray-400 space-y-0.5">
-            <div>Call: <span className="text-green-400">{fmt(netCall)}</span></div>
-            <div>Put: <span className="text-red-400">{fmt(netPut)}</span></div>
           </div>
           <div className="text-xs text-gray-500 mt-1 italic">
             {ETF_DESCRIPTION[etfDir] || ETF_DESCRIPTION.neutral}
@@ -431,9 +441,9 @@ export default function PreSession() {
         <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
           <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">API Budget</div>
           <div className="text-sm text-gray-300">
-            {apiUsed !== null ? apiUsed.toLocaleString() : '—'} / {apiMax.toLocaleString()}
+            {apiUsed.toLocaleString()} / {apiMax.toLocaleString()}
           </div>
-          {apiPct !== null && (
+          {(
             <div className="mt-2">
               <div className="h-1.5 bg-gray-800 rounded overflow-hidden">
                 <div
