@@ -678,6 +678,16 @@ app.get('/api-data/top-net-impact', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+app.get('/api-data/news', async (req, res) => {
+  try {
+    const r = await fetch(
+      `${process.env.UW_API_BASE || 'https://api.unusualwhales.com'}/api/news/headlines`,
+      { headers: UW_HEADERS() }
+    )
+    res.json(await r.json())
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 app.get('/api-data/greek-flow', async (req, res) => {
   try {
     const r = await fetch(
