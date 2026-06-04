@@ -8,6 +8,7 @@ export default function Controls({ compact }) {
   const [budget, setBudget]           = useState(null)
   const [mode, setMode]               = useState('REST')
   const [rescoring, setRescoring]     = useState(false)
+  const [rescoreMsg, setRescoreMsg]   = useState(null)
   const [narrativeMode, setNarrativeMode] = useState('template')
 
   const fetchAll = async () => {
@@ -43,7 +44,15 @@ export default function Controls({ compact }) {
   const forceRescore = async () => {
     if (!unlocked) return
     setRescoring(true)
-    try { await authPost(`${API_URL}/rescore`) } catch { /* ignore */ }
+    setRescoreMsg(null)
+    try {
+      const res = await fetch(`${API_URL}/rescore`, { method: 'POST' })
+      const data = await res.json()
+      if (res.status === 503) {
+        setRescoreMsg('⚠ Run npm start locally')
+        setTimeout(() => setRescoreMsg(null), 5000)
+      }
+    } catch { /* ignore */ }
     setTimeout(() => setRescoring(false), 2000)
   }
 
@@ -73,7 +82,7 @@ export default function Controls({ compact }) {
               !unlocked ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-teal-700 hover:bg-teal-600 disabled:opacity-50'
             }`}
           >
-            {!unlocked ? '🔒 Rescore' : rescoring ? '⟳ Rescoring…' : '⟳ Force Rescore Now'}
+            {!unlocked ? '🔒 Rescore' : rescoreMsg ? rescoreMsg : rescoring ? '⟳ Rescoring…' : '⟳ Force Rescore Now'}
           </button>
           <button
             onClick={toggleMode}

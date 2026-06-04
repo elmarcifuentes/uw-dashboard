@@ -5,7 +5,16 @@ import crypto from 'crypto'
 import { EventEmitter } from 'events'
 import SmartDataProvider from './dataProvider/SmartDataProvider.js'
 import pollingConfig from './dataProvider/pollingConfig.js'
-import { runFullScore } from './scorer/index.js'
+// Scoring engine optional — only available when uw-level-filter is present (local)
+let runFullScore = null
+try {
+  const scorer = await import('./scorer/index.js')
+  runFullScore = scorer.runFullScore
+  console.log('[server] Scoring engine loaded')
+} catch (err) {
+  console.warn('[server] Scoring engine not available:', err.message.split('\n')[0])
+  console.warn('[server] Force Rescore disabled — run npm start locally to score')
+}
 import db from './db.js'
 import { logger } from './sessionLogger.js'
 
@@ -329,6 +338,7 @@ const provider = new SmartDataProvider(
 
 // On rescore trigger — run full scoring, update store, broadcast SSE
 provider.onRescore(async ({ price, reason }) => {
+  if (!runFullScore) return  // scoring engine not available on Railway
   console.log(`[server] Auto-rescore triggered: ${reason} at $${price}`)
   try {
     const result = await runFullScore({ trigger: 'auto' })
@@ -628,6 +638,12 @@ app.post('/outcome', (req, res) => {
 })
 
 app.post('/rescore', async (req, res) => {
+  if (!runFullScore) {
+    return res.status(503).json({
+      error: 'Scoring engine not available on hosted server',
+      hint: 'Run npm start locally — it will POST fresh data automatically',
+    })
+  }
   console.log('[server] Manual rescore triggered from dashboard')
   try {
     const result = await runFullScore({ trigger: 'manual' })
