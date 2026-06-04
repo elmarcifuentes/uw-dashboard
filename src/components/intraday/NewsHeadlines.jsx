@@ -7,17 +7,18 @@ const RELEVANT_KEYWORDS = [
   'amzn', 'amazon', 'meta', 'googl', 'google', 'tsla', 'tesla',
   'semiconductor', 'earnings', 'market', 'economy', 'tsmc',
   'broadcom', 'avgo', 'amd', 'intel', 'tariff', 'trade',
+  'crowdstrike', 'crwd', 'openai', 'palantir',
 ]
 
 const SENTIMENT_COLOR = {
-  bullish: 'text-green-400',
-  bearish: 'text-red-400',
-  neutral: 'text-gray-400',
+  bullish: 'text-green-300',
+  bearish: 'text-red-300',
+  neutral: 'text-gray-200',
 }
 
 export default function NewsHeadlines({ apiUrl }) {
   const [headlines, setHeadlines] = useState([])
-  const [loading, setLoading]     = useState(true)
+  const [loading, setLoading]       = useState(true)
   const [lastUpdate, setLastUpdate] = useState(null)
 
   const fetchNews = useCallback(() => {
@@ -25,23 +26,22 @@ export default function NewsHeadlines({ apiUrl }) {
       .then(r => r.json())
       .then(json => {
         const items = json.data || []
-        const lower = items.map(item => ({
-          ...item,
-          _lower: (item.headline || '').toLowerCase(),
-        }))
 
-        // Filter relevant headlines
-        const relevant = lower.filter(item =>
-          RELEVANT_KEYWORDS.some(kw => item._lower.includes(kw)) || item.is_major
+        const isRelevant = item => {
+          const lower = (item.headline || '').toLowerCase()
+          return RELEVANT_KEYWORDS.some(kw => lower.includes(kw))
+        }
+
+        // Sort: is_major first, then relevant, then rest — within each group newest first
+        const withScore = items.map(item => ({
+          ...item,
+          _score: item.is_major ? 2 : isRelevant(item) ? 1 : 0,
+        }))
+        withScore.sort((a, b) =>
+          b._score - a._score || new Date(b.created_at) - new Date(a.created_at)
         )
 
-        // Sort: is_major first, then by created_at descending
-        const sorted = [...relevant].sort((a, b) => {
-          if (a.is_major !== b.is_major) return a.is_major ? -1 : 1
-          return new Date(b.created_at) - new Date(a.created_at)
-        })
-
-        setHeadlines(sorted.slice(0, 12))
+        setHeadlines(withScore.slice(0, 12))
         setLastUpdate(new Date())
         setLoading(false)
       })
@@ -54,9 +54,8 @@ export default function NewsHeadlines({ apiUrl }) {
     return () => clearInterval(t)
   }, [fetchNews])
 
-  const fmtTime = iso => {
-    if (!iso) return ''
-    const d = new Date(iso)
+  const fmtTime = item => {
+    const d = new Date(item.created_at)
     if (isNaN(d.getTime())) return ''
     return d.toLocaleTimeString('en-US', {
       hour: '2-digit', minute: '2-digit', hour12: true,
@@ -66,7 +65,7 @@ export default function NewsHeadlines({ apiUrl }) {
 
   if (loading) return (
     <div className="animate-pulse space-y-2">
-      {[1, 2, 3].map(i => <div key={i} className="h-8 bg-gray-700 rounded" />)}
+      {[1, 2, 3].map(i => <div key={i} className="h-10 bg-gray-700 rounded" />)}
     </div>
   )
 
@@ -76,39 +75,42 @@ export default function NewsHeadlines({ apiUrl }) {
         <span className="text-xs text-gray-400 uppercase tracking-wide">Market News</span>
         {lastUpdate && (
           <span className="text-xs text-gray-600">
-            {lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' })} ET
+            {lastUpdate.toLocaleTimeString('en-US', {
+              hour: '2-digit', minute: '2-digit', hour12: true,
+              timeZone: 'America/New_York',
+            })} ET
           </span>
         )}
       </div>
 
       {headlines.length === 0 ? (
-        <div className="text-xs text-gray-500">No relevant headlines at this time</div>
+        <div className="text-xs text-gray-500">No headlines available</div>
       ) : (
-        <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto">
+        <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
           {headlines.map((item, i) => (
-            <div key={i} className={`border rounded p-2 transition-colors ${
+            <div key={i} className={`rounded p-2.5 border transition-colors ${
               item.is_major
-                ? 'border-gray-600 bg-gray-800/60'
-                : 'border-gray-700 bg-gray-900/40'
+                ? 'border-gray-600 bg-gray-800'
+                : 'border-gray-700 bg-gray-900/50'
             }`}>
-              <p className="text-xs text-gray-200 leading-relaxed">
+              <p className={`text-xs leading-relaxed ${SENTIMENT_COLOR[item.sentiment] || 'text-gray-200'}`}>
+                {item.is_major && <span className="text-amber-400 font-bold mr-1">★</span>}
                 {item.headline}
               </p>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {item.tickers?.length > 0 && (
-                  <span className="text-xs text-blue-400 font-mono">
-                    {item.tickers.slice(0, 3).join(' ')}
-                  </span>
-                )}
-                {item.source && (
-                  <span className="text-xs text-gray-600">{item.source}</span>
-                )}
-                {item.sentiment && item.sentiment !== 'neutral' && (
-                  <span className={`text-xs font-bold ${SENTIMENT_COLOR[item.sentiment] || 'text-gray-400'}`}>
-                    {item.sentiment.toUpperCase()}
-                  </span>
-                )}
-                <span className="text-xs text-gray-600 ml-auto">{fmtTime(item.created_at)}</span>
+
+              {item.tickers?.length > 0 && (
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {item.tickers.map(t => (
+                    <span key={t} className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded font-mono">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-gray-600">{item.source}</span>
+                <span className="text-xs text-gray-600 ml-auto">{fmtTime(item)}</span>
               </div>
             </div>
           ))}
