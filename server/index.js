@@ -566,7 +566,7 @@ app.post('/mode', (req, res) => {
   res.json({ mode: useWebSocket ? 'WebSocket' : 'REST' })
 })
 
-app.post('/narrative-mode', (req, res) => {
+app.post('/narrative-mode', async (req, res) => {
   const { mode } = req.body
   if (!['template', 'claude', 'off'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid mode — use template|claude|off' })
@@ -575,6 +575,16 @@ app.post('/narrative-mode', (req, res) => {
   console.log(`[server] Narrative mode: ${mode}`)
   sseEmitter.emit('event', { type: 'narrative_mode', mode, timestamp: new Date().toISOString() })
   res.json({ success: true, mode })
+  // Immediately generate narrative with current data using new mode
+  if (latest && mode !== 'off') {
+    generateNarrativeForMode(latest, dpHistory)
+      .then(narrative => {
+        if (narrative?.length > 0) {
+          sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+        }
+      })
+      .catch(err => console.warn('[narrative] immediate generation failed:', err.message))
+  }
 })
 
 app.get('/budget', (req, res) => {
