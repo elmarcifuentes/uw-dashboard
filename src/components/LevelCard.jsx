@@ -59,7 +59,15 @@ const ETF_ARROW = {
   'no data': '?',
 }
 
-export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [] }) {
+const formatTime = (iso) => {
+  if (!iso) return null
+  return new Date(iso).toLocaleTimeString('en-US', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, timeZone: 'America/New_York',
+  }) + ' ET'
+}
+
+export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt }) {
   const classKey    = level.classification === 'mid' ? 'mid' : level.classification
   const borderColor = BORDER_COLOR[classKey] || '#6B7280'
   const nqPrice  = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : '—'
@@ -203,6 +211,11 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
               )}
             </>
           )}
+        </div>
+      )}
+      {scoredAt && (
+        <div className="flex justify-end mt-1">
+          <span className="text-gray-600 text-xs font-mono">{formatTime(scoredAt)}</span>
         </div>
       )}
     </div>

@@ -89,7 +89,15 @@ function DpTrend({ levelId, history, compact }) {
   )
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {} }) {
+const formatTime = (iso) => {
+  if (!iso) return null
+  return new Date(iso).toLocaleTimeString('en-US', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, timeZone: 'America/New_York',
+  }) + ' ET'
+}
+
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt }) {
   if (!result) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
@@ -217,6 +225,11 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                 </div>
               )
             })()}
+            {scoredAt && (
+              <div className="flex justify-end mt-1">
+                <span className="text-gray-600 text-xs font-mono">{formatTime(scoredAt)}</span>
+              </div>
+            )}
           </div>
         )
       })}

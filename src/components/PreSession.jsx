@@ -370,6 +370,7 @@ export default function PreSession() {
               sessionMaxGex={sessionMaxGex}
               nqRatio={nqRatio}
               dpHistory={providerStatus?.dpHistory?.[level.id] || []}
+              scoredAt={data?.scored_at || data?.fetched_at}
             />
           ))
         })()}
