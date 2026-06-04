@@ -549,7 +549,7 @@ async function forwardToRelay(action, pin, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, pin, timestamp, signature }),
-      signal: AbortSignal.timeout(action === 'draw' ? 65000 : 35000),
+      signal: AbortSignal.timeout(10000),  // relay returns immediately (async)
     })
     res.status(r.status).json(await r.json())
   } catch (err) {
