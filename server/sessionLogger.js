@@ -197,18 +197,35 @@ export class SessionLogger {
       }
     }
 
-    // Fix 3: Cascade tracking with S1/S2 reach detection
+    // Fix 2: Cascade tracking with DB-recovery close + S1/S2 reach detection
     if (result.cascade?.active) {
       this._openCascade(date, price, timestamp, result.cascade)
-      // Check if price reached S1 or S2
-      if (this.cascadeOpenTime) {
-        const s1Price = result.levels?.find(l => l.id === 'S1')?.price
-        const s2Price = result.levels?.find(l => l.id === 'S2')?.price
-        if (s1Price != null && price <= s1Price) stmts.cascadeReachS1.run(date)
-        if (s2Price != null && price <= s2Price) stmts.cascadeReachS2.run(date)
+    } else {
+      // Resolve any open cascade — check DB directly to survive server restarts
+      const openCascade = db.prepare(
+        'SELECT id FROM cascade_events WHERE session_date = ? AND resolved_at IS NULL'
+      ).get(date)
+      if (openCascade) {
+        db.prepare(`
+          UPDATE cascade_events SET resolved_at = ?, price_at_resolve = ?
+          WHERE session_date = ? AND resolved_at IS NULL
+        `).run(timestamp, price, date)
+        this.cascadeOpenTime = null
+        console.log(`[logger] Cascade resolved (DB recovery) at $${price}`)
+      } else if (this.cascadeOpenTime) {
+        this._closeCascade(date, price, timestamp)
       }
-    } else if (this.cascadeOpenTime) {
-      this._closeCascade(date, price, timestamp)
+    }
+
+    // S1/S2 reach flags — check against any currently open cascade
+    const openCascadeNow = db.prepare(
+      'SELECT id FROM cascade_events WHERE session_date = ? AND resolved_at IS NULL'
+    ).get(date)
+    if (openCascadeNow && result.levels && price != null) {
+      const s1Price = result.levels.find(l => l.id === 'S1')?.price
+      const s2Price = result.levels.find(l => l.id === 'S2')?.price
+      if (s1Price != null && price <= s1Price) stmts.cascadeReachS1.run(date)
+      if (s2Price != null && price <= s2Price) stmts.cascadeReachS2.run(date)
     }
 
     // Fix 2: Persist magnet streak from SQLite history
@@ -225,8 +242,15 @@ export class SessionLogger {
       const elapsed = (now - data.timestamp) / 60000
       if (elapsed < 30) continue
 
-      const priceMove = currentPrice - data.price
       const cl = data.level.classification
+
+      // Skip no_edge entirely — only track classified levels
+      if (!cl || cl === 'no_edge' || cl === 'continuation') {
+        this.classificationTimestamps.delete(key)
+        continue
+      }
+
+      const priceMove = currentPrice - data.price
       let outcome = 'noise'
       if (cl === 'buy_support') {
         if (priceMove >= 0.50)  outcome = 'correct'
@@ -237,10 +261,20 @@ export class SessionLogger {
       }
 
       const [date, levelId] = key.split(/-(.+)/)
-      stmts.setOutcome.run(currentPrice, priceMove, outcome, date, levelId)
+      db.prepare(`
+        UPDATE level_outcomes SET
+          price_30min_later = ?,
+          price_move        = ?,
+          outcome           = ?,
+          outcome_auto      = 1,
+          updated_at        = datetime('now')
+        WHERE session_date = ? AND level_id = ?
+          AND outcome IS NULL
+          AND classification NOT IN ('no_edge', 'continuation')
+      `).run(currentPrice, priceMove, outcome, date, levelId)
 
       if (outcome !== 'noise') {
-        console.log(`[logger] Outcome: ${levelId} ${cl} → ${outcome} (Δ${priceMove.toFixed(2)})`)
+        console.log(`[logger] Outcome: ${levelId} ${cl} → ${outcome} ($${priceMove >= 0 ? '+' : ''}${priceMove.toFixed(2)})`)
       }
       this.classificationTimestamps.delete(key)
     }
@@ -259,29 +293,35 @@ export class SessionLogger {
     console.log(`[logger] Cascade resolved at $${price}`)
   }
 
-  // Fix 2: compute streak from SQLite level_outcomes history
+  // Fix 1: compute streak from events table (survives mid-session level changes)
   _getMagnetStreak() {
     try {
-      const rows = db.prepare(`
-        SELECT DISTINCT session_date FROM level_outcomes
-        WHERE level_id IN ('R1', 'R2')
-          AND classification = 'buy_support'
-          AND conflict = 1
+      const sessionFirstEvents = db.prepare(`
+        SELECT session_date, MIN(time) as first_time
+        FROM events
+        WHERE event_type = 'rescore'
+        GROUP BY session_date
         ORDER BY session_date DESC
+        LIMIT 30
       `).all()
 
-      // Also get all sessions that have R1/R2 data (regardless of classification)
-      const allDates = db.prepare(`
-        SELECT DISTINCT session_date FROM level_outcomes
-        WHERE level_id IN ('R1', 'R2')
-        ORDER BY session_date DESC
-      `).all().map(r => r.session_date)
-
-      const magnetDates = new Set(rows.map(r => r.session_date))
       let streak = 0
-      for (const date of allDates) {
-        if (magnetDates.has(date)) streak++
-        else break
+      for (const session of sessionFirstEvents) {
+        const event = db.prepare(
+          'SELECT data_json FROM events WHERE session_date = ? AND time = ?'
+        ).get(session.session_date, session.first_time)
+
+        if (!event?.data_json) break
+        try {
+          const data = JSON.parse(event.data_json)
+          const hasResistanceMagnet = (data.levels || []).some(l =>
+            ['R1', 'R2'].includes(l.id) &&
+            l.classification === 'buy_support' &&
+            l.conflict === true
+          )
+          if (hasResistanceMagnet) streak++
+          else break
+        } catch { break }
       }
       return streak
     } catch { return 0 }
