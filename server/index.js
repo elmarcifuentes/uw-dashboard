@@ -463,7 +463,7 @@ app.get('/stream', (req, res) => {
 })
 
 // ── Endpoints ─────────────────────────────────────────────────────────────────
-app.post('/update', (req, res) => {
+app.post("/update", async (req, res) => {
   const result = req.body
   if (!result || typeof result !== 'object') {
     return res.status(400).json({ error: 'Invalid payload' })
