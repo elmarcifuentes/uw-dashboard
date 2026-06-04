@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import NewsHeadlines from './NewsHeadlines'
 
 export default function Controls({ compact }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -124,10 +123,6 @@ export default function Controls({ compact }) {
         </div>
       )}
 
-      {/* News headlines */}
-      <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-        <NewsHeadlines apiUrl={API_URL} />
-      </div>
     </div>
   )
 }

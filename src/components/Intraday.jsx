@@ -12,9 +12,10 @@ import CascadeProximityGauge from './intraday/CascadeProximityGauge'
 import NarrativeBlock from './intraday/NarrativeBlock'
 import LivePrice from './intraday/LivePrice'
 import SentimentBadge from './SentimentBadge'
+import NewsHeadlines from './intraday/NewsHeadlines'
 
-const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log', 'Controls']
-const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log', 'Ctrl']
+const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'News', 'Log', 'Controls']
+const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'News', 'Log', 'Ctrl']
 
 export default function Intraday() {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -204,8 +205,9 @@ export default function Intraday() {
         {subTab === 0 && <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} />}
         {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
         {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
-        {subTab === 3 && <RescoreLog history={history} compact={compact} />}
-        {subTab === 4 && <Controls compact={compact} />}
+        {subTab === 3 && <NewsHeadlines apiUrl={API_URL} />}
+        {subTab === 4 && <RescoreLog history={history} compact={compact} />}
+        {subTab === 5 && <Controls compact={compact} />}
       </div>
     </div>
   )
