@@ -23,6 +23,8 @@ export default function LevelsTab() {
   const [saveResult, setSaveResult] = useState(null)
   const [copied, setCopied]         = useState(false)
   const [history, setHistory]       = useState([])
+  const [rescoring, setRescoring]   = useState(false)
+  const [rescoreResult, setRescoreResult] = useState(null)
 
   useEffect(() => {
     fetch(`${API_URL}/levels`)
@@ -181,6 +183,33 @@ export default function LevelsTab() {
         <div className="bg-green-950 border border-green-700 rounded p-2 text-xs text-green-400">
           ✓ Levels saved — ratio {ratio.toFixed(4)} cached — scoring will use these levels
         </div>
+      )}
+
+      {/* Force Rescore — only shown after levels saved for today */}
+      {isToday && (
+        <button
+          onClick={async () => {
+            setRescoring(true); setRescoreResult(null)
+            try {
+              const res  = await fetch(`${API_URL}/rescore`, { method: 'POST' })
+              const data = await res.json()
+              setRescoreResult(data.success ? 'success' : 'error')
+            } catch { setRescoreResult('error') }
+            finally {
+              setRescoring(false)
+              setTimeout(() => setRescoreResult(null), 3000)
+            }
+          }}
+          disabled={rescoring}
+          className={`w-full py-2 rounded text-sm font-medium transition-colors ${
+            rescoring          ? 'bg-gray-700 text-gray-400 cursor-wait' :
+            rescoreResult === 'success' ? 'bg-green-700 text-white' :
+            rescoreResult === 'error'   ? 'bg-red-700 text-white'   :
+            'bg-teal-700 hover:bg-teal-600 text-white'
+          }`}
+        >
+          {rescoring ? '⟳ Scoring…' : rescoreResult === 'success' ? '✓ Scored' : rescoreResult === 'error' ? '✗ Failed' : '⟳ Score Now'}
+        </button>
       )}
 
       {/* History */}

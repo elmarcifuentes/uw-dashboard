@@ -5,15 +5,28 @@ import crypto from 'crypto'
 import { EventEmitter } from 'events'
 import SmartDataProvider from './dataProvider/SmartDataProvider.js'
 import pollingConfig from './dataProvider/pollingConfig.js'
-// Scoring engine optional — only available when uw-level-filter is present (local)
+// Scoring engine — always available (scorer lives in server/scorer/)
 let runFullScore = null
 try {
   const scorer = await import('./scorer/index.js')
   runFullScore = scorer.runFullScore
-  console.log('[server] Scoring engine loaded')
+  console.log('[server] Scoring engine loaded ✓')
 } catch (err) {
-  console.warn('[server] Scoring engine not available:', err.message.split('\n')[0])
-  console.warn('[server] Force Rescore disabled — run npm start locally to score')
+  console.warn('[server] Scoring engine failed to load:', err.message.split('\n')[0])
+}
+
+// Helper: load today's levels from SQLite for scoring
+function getLevelsForScoring(dbInstance) {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  const row = dbInstance.prepare('SELECT * FROM daily_levels WHERE date = ?').get(today)
+  if (!row) return null
+  return [
+    { level_id: 'R2',  price: row.r2_qqq,  type: 'resistance' },
+    { level_id: 'R1',  price: row.r1_qqq,  type: 'resistance' },
+    { level_id: 'MID', price: row.mid_qqq, type: 'mid'        },
+    { level_id: 'S1',  price: row.s1_qqq,  type: 'support'    },
+    { level_id: 'S2',  price: row.s2_qqq,  type: 'support'    },
+  ]
 }
 import db from './db.js'
 import { logger } from './sessionLogger.js'
@@ -353,9 +366,14 @@ provider.onRescore(async ({ price, reason }) => {
     })
     return
   }
+  const levelsForScoring = getLevelsForScoring(db)
+  if (!levelsForScoring) {
+    console.log('[server] Auto-rescore skipped — no levels in DB (enter levels in Tab 4)')
+    return
+  }
   console.log(`[server] Auto-rescore triggered: ${reason} at $${price}`)
   try {
-    const result = await runFullScore({ trigger: 'auto' })
+    const result = await runFullScore({ trigger: 'auto', levelsOverride: levelsForScoring })
     result._received_at = new Date().toISOString()
     latest = result
     history.unshift(result)
@@ -756,7 +774,7 @@ app.post('/rescore', async (req, res) => {
   }
   console.log('[server] Manual rescore triggered from dashboard')
   try {
-    const result = await runFullScore({ trigger: 'manual' })
+    const result = await runFullScore({ trigger: 'manual', levelsOverride: getLevelsForScoring(db) })
     result._received_at = new Date().toISOString()
     latest = result
     history.unshift(result)

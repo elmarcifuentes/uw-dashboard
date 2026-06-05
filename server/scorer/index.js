@@ -47,11 +47,25 @@ function findExtensionLevel(gexData, lo, hi) {
   return best
 }
 
-export async function runFullScore({ trigger = 'auto', session = null } = {}) {
-  const levelsPath = join(__dirname, 'levels.json')
-  const input      = JSON.parse(readFileSync(levelsPath, 'utf8'))
-  const { symbol, levels } = input
-  const sessionId = session || input.session
+export async function runFullScore({ trigger = 'auto', session = null, levelsOverride = null } = {}) {
+  // levelsOverride: array of {level_id, price, type} from SQLite — takes priority over levels.json
+  let input, levels, symbol, sessionId
+  if (levelsOverride) {
+    symbol    = 'QQQ'
+    levels    = levelsOverride
+    sessionId = session || new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+    input     = { symbol, levels, run_type: trigger, session: sessionId }
+  } else {
+    try {
+      const levelsPath = join(__dirname, 'levels.json')
+      input      = JSON.parse(readFileSync(levelsPath, 'utf8'))
+      symbol     = input.symbol
+      levels     = input.levels
+      sessionId  = session || input.session
+    } catch {
+      throw new Error('No levels available — enter levels in Tab 4 or provide levels.json')
+    }
+  }
 
   const delay = ms => new Promise(r => setTimeout(r, ms))
 
