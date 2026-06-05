@@ -932,8 +932,14 @@ app.get('/api-data/flow-expiry', async (req, res) => {
 })
 
 // POST /webhook/levels — TradingView webhook receiver
-app.post('/webhook/levels', (req, res) => {
-  const payload = req.body
+// TradingView sends content-type: text/plain, so parse manually
+app.post('/webhook/levels', express.text({ type: '*/*' }), (req, res) => {
+  let payload = {}
+  try {
+    payload = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
+  } catch {
+    payload = { _raw: req.body }
+  }
   const timestamp = new Date().toISOString()
 
   console.log('[webhook] Received payload:')
