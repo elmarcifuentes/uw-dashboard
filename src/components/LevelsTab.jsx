@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 const API_URL   = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const LEVEL_IDS = ['R2', 'R1', 'MID', 'S1', 'S2']
@@ -15,6 +16,9 @@ const emptyLevels = () => ({
 })
 
 export default function LevelsTab() {
+  const { unlocked, unlock }        = useAuth()
+  const [pinInput, setPinInput]     = useState('')
+  const [pinError, setPinError]     = useState(null)
   const [levels, setLevels]         = useState(emptyLevels())
   const [savedDate, setSavedDate]   = useState(null)
   const [isToday, setIsToday]       = useState(false)
@@ -134,6 +138,40 @@ export default function LevelsTab() {
   }
 
   const allValid = LEVEL_IDS.every(id => levels[id].nq && levels[id].qqq)
+
+  const handleUnlock = () => {
+    if (pinInput.length < 4) { setPinError('PIN must be at least 4 characters'); return }
+    unlock(pinInput)
+    setPinInput('')
+    setPinError(null)
+  }
+
+  if (!unlocked) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <div className="text-gray-400 text-sm uppercase tracking-wide">🔒 Levels — PIN Required</div>
+        <div className="flex gap-2">
+          <input
+            type="password"
+            placeholder="Enter PIN"
+            value={pinInput}
+            onChange={e => { setPinInput(e.target.value); setPinError(null) }}
+            onKeyDown={e => e.key === 'Enter' && handleUnlock()}
+            className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none w-32 text-center tracking-widest"
+            autoFocus
+          />
+          <button
+            onClick={handleUnlock}
+            className="bg-blue-600 hover:bg-blue-500 text-white rounded px-4 py-2 text-sm"
+          >
+            Unlock
+          </button>
+        </div>
+        {pinError && <div className="text-red-400 text-xs">{pinError}</div>}
+        <div className="text-gray-600 text-xs mt-2">Same PIN as draw controls</div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-4">
