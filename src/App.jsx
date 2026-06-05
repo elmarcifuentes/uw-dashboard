@@ -36,7 +36,7 @@ function AppInner() {
             TradesAlgo
           </h1>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">Phase 4b</span>
+            <span className="text-xs text-gray-500">v4b</span>
             <button
               onClick={() => setShowModal(true)}
               title={unlocked ? 'Actions unlocked — click to lock' : 'Click to unlock actions'}
