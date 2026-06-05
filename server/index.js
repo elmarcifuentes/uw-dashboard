@@ -52,6 +52,8 @@ let previousResult    = null
 let chartSynced       = true
 let lastWebhookPayload = null
 let lastNarrative     = []
+let lastNarrativeHash = null
+let lastNarrativeMode = null
 const history         = []
 const MAX_HISTORY     = 20
 
@@ -76,6 +78,23 @@ if (!process.env.NARRATIVE_MODE) {
 }
 console.log('[server] Narrative mode initialized:', narrativeMode, `(${narrativeModeSource})`)
 
+function hashScoringResult(result) {
+  if (!result) return null
+  const key = {
+    price:           result.current_price?.toFixed(2),
+    cascade:         result.cascade?.active,
+    structure_break: result.structure_break?.active,
+    levels:          result.levels?.map(l => ({
+      id:             l.id,
+      classification: l.classification,
+      dp:             l.dark_pool?.toFixed(3),
+      full_stack:     l.full_stack,
+      score:          l.score,
+    })),
+  }
+  return crypto.createHash('md5').update(JSON.stringify(key)).digest('hex')
+}
+
 async function generateNarrativeForMode(result, dpHist) {
   console.log('[narrative] mode:', narrativeMode)
 
@@ -87,7 +106,13 @@ async function generateNarrativeForMode(result, dpHist) {
     return lines
   }
 
-  // claude mode — direct Anthropic API call (no relay needed)
+  // claude mode — direct Anthropic API call with hash-based cache
+  const currentHash = hashScoringResult(result)
+  if (currentHash && currentHash === lastNarrativeHash && lastNarrativeMode === 'claude' && lastNarrative.length > 0) {
+    console.log('[narrative] cache hit — conditions unchanged, skipping API call')
+    return lastNarrative
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     console.warn('[narrative] ANTHROPIC_API_KEY not set — falling back to template')
@@ -117,7 +142,9 @@ Rules:
 Return ONLY the narrative text. No labels, no headers.`
 
   try {
-    console.log('[narrative] calling Anthropic API...')
+    console.log('[narrative] calling Anthropic API — hash changed')
+    console.log('[narrative] old hash:', lastNarrativeHash)
+    console.log('[narrative] new hash:', currentHash)
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -136,6 +163,8 @@ Return ONLY the narrative text. No labels, no headers.`
     const narrativeText = data.content?.[0]?.text
     if (!narrativeText) throw new Error(`No narrative in API response: ${JSON.stringify(data).slice(0, 200)}`)
     const lines = narrativeText.split('. ').filter(Boolean).map(s => s.endsWith('.') ? s : s + '.')
+    lastNarrativeHash = currentHash
+    lastNarrativeMode = 'claude'
     console.log('[narrative] claude generated:', lines.length, 'lines')
     console.log('[narrative] line 1:', lines[0])
     return lines
@@ -657,6 +686,8 @@ app.post('/narrative-mode', async (req, res) => {
   }
   narrativeMode       = mode
   narrativeModeSource = 'db'
+  // Reset hash so first narrative after mode switch always generates fresh
+  if (mode === 'claude') lastNarrativeHash = null
   // Persist so mode survives Railway restarts
   db.prepare(`
     INSERT INTO settings (key, value, updated_at)
