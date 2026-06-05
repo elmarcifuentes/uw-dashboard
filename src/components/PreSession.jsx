@@ -144,6 +144,7 @@ export default function PreSession() {
   const [budget, setBudget]       = useState(null)
   const [mode, setMode]           = useState('REST')
   const [magnetStreak, setMagnetStreak] = useState(null)
+  const [lastRescoreAt, setLastRescoreAt] = useState(null)
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -217,6 +218,18 @@ export default function PreSession() {
       .catch(() => {})
   }, [])
 
+  // SSE listener — update last fetch time on every rescore without re-polling
+  useEffect(() => {
+    const es = new EventSource(`${API}/stream`)
+    es.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        if (d.type === 'rescore') setLastRescoreAt(new Date().toISOString())
+      } catch {}
+    }
+    return () => es.close()
+  }, [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
@@ -276,14 +289,22 @@ export default function PreSession() {
     return { ...l, _target_delta: delta }
   })
 
-  // Last fetch time — priority: lastPriceCheck > _received_at > scored_at
+  // Last fetch time — SSE rescore timestamp takes priority, then polling fallbacks
   const fmtET = iso => {
     if (!iso) return null
     const d = new Date(iso)
     if (isNaN(d.getTime())) return null
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }) + ' ET'
   }
-  const lastFetch = fmtET(providerStatus?.lastPriceCheck || data?._received_at || data?.scored_at)
+  const lastFetch = fmtET(lastRescoreAt || providerStatus?.lastPriceCheck || data?._received_at || data?.scored_at)
+
+  // Session type label based on current ET hour
+  const sessionType = (() => {
+    const etHour = parseInt(new Date().toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/New_York' }))
+    if (etHour >= 9 && etHour < 16) return 'LIVE'
+    if (etHour >= 4 && etHour < 9)  return 'PRE-MARKET'
+    return 'AFTER-HOURS'
+  })()
 
   // Fix 3: use /budget endpoint callsToday, fall back to 0 not null
   const apiUsed  = budget?.callsToday ?? 0
@@ -309,7 +330,7 @@ export default function PreSession() {
           <div className="space-y-1 text-sm">
             <div className="flex items-center gap-3">
               <span className="text-gray-300 font-medium">{data.session}</span>
-              <span className="text-xs text-gray-500 uppercase">{data.run_type}</span>
+              <span className="text-xs text-gray-500 uppercase">{sessionType}</span>
             </div>
             <div className="text-xs text-gray-500">
               Last fetch: {lastFetch || data.fetched_at || '—'}
@@ -493,10 +514,12 @@ export default function PreSession() {
             </>
           ) : (
             <>
-              <div className="text-2xl font-bold text-green-400">
-                {providerStatus?.allPinningSessions ?? '—'}
+              <div className="text-lg font-bold text-green-400">
+                {data?.gex_regime?.label || 'PINNING'}
               </div>
-              <div className="text-xs text-gray-400 mt-1">Consecutive pinning sessions</div>
+              <div className="text-xs text-gray-400 mt-1">
+                {providerStatus?.allPinningSessions ?? '—'} consecutive sessions
+              </div>
             </>
           )}
         </div>

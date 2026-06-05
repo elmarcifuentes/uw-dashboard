@@ -28,6 +28,13 @@ function getLevelsForScoring(dbInstance) {
     { level_id: 'S2',  price: row.s2_qqq,  type: 'support'    },
   ]
 }
+
+// Helper: get today's nq_ratio from SQLite
+function getNqRatioFromDb(dbInstance) {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  const row = dbInstance.prepare('SELECT nq_ratio FROM daily_levels WHERE date = ?').get(today)
+  return row?.nq_ratio || null
+}
 import db from './db.js'
 import { logger } from './sessionLogger.js'
 
@@ -376,6 +383,8 @@ provider.onRescore(async ({ price, reason }) => {
   try {
     const result = await runFullScore({ trigger: 'auto', levelsOverride: levelsForScoring })
     result._received_at = new Date().toISOString()
+    const _autoRatio = getNqRatioFromDb(db)
+    if (_autoRatio) { result.nq_ratio = _autoRatio; console.log('[server] nq_ratio injected:', _autoRatio) }
     latest = result
     history.unshift(result)
     if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
@@ -520,6 +529,8 @@ app.post("/update", async (req, res) => {
     return res.status(400).json({ error: 'Invalid payload' })
   }
   result._received_at = new Date().toISOString()
+  const _updateRatio = getNqRatioFromDb(db)
+  if (_updateRatio && !result.nq_ratio) { result.nq_ratio = _updateRatio; console.log('[server] nq_ratio injected (update):', _updateRatio) }
   latest = result
   history.unshift(result)
   if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
@@ -777,6 +788,8 @@ app.post('/rescore', async (req, res) => {
   try {
     const result = await runFullScore({ trigger: 'manual', levelsOverride: getLevelsForScoring(db) })
     result._received_at = new Date().toISOString()
+    const _manualRatio = getNqRatioFromDb(db)
+    if (_manualRatio) { result.nq_ratio = _manualRatio; console.log('[server] nq_ratio injected:', _manualRatio) }
     latest = result
     history.unshift(result)
     if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
