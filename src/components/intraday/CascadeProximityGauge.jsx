@@ -2,19 +2,23 @@ import { memo } from 'react'
 export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
   if (!cascade || cascade.mid_dp === null || cascade.mid_dp === undefined) return null
 
-  const midDp    = cascade.mid_dp
-  const threshold = -0.700
-  const active   = cascade.active
-  const gap      = cascade.gap_to_trigger
+  const midDp        = cascade.mid_dp
+  const active       = cascade.active
+  const CASCADE_THRESHOLD = -0.700
 
-  // Gauge: map -1.0 to +1.0 range onto 0–100%
-  const pct          = Math.min(100, Math.max(0, ((midDp - 1.0) / (-2.0)) * 100))
-  const thresholdPct = ((threshold - 1.0) / (-2.0)) * 100  // = 85%
+  // Gauge: +1.0 (left=0%) to -1.0 (right=100%)
+  const pct          = Math.min(100, Math.max(0, ((1.0 - midDp) / 2.0) * 100))
+  const thresholdPct = ((1.0 - CASCADE_THRESHOLD) / 2.0) * 100  // = 85%
 
-  const barColor = active
+  // Gap to threshold — calculated locally, not from server
+  const gap = midDp > CASCADE_THRESHOLD
+    ? Math.abs(CASCADE_THRESHOLD - midDp)
+    : null
+
+  const barColor = midDp <= CASCADE_THRESHOLD
     ? 'bg-red-500'
-    : midDp <= -0.500 ? 'bg-amber-500'
-    : midDp <= -0.300 ? 'bg-yellow-500'
+    : midDp <= -0.500
+    ? 'bg-amber-500'
     : 'bg-green-500'
 
   const valueColor = active
@@ -130,16 +134,14 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
             All three conditions met — no institutional floor below MID
           </span>
         ) : gap !== null ? (
-          gap < 0 ? (
-            <span className="text-amber-400">
-              ⚠ {Math.abs(gap ?? 0).toFixed(3)} past threshold — conditions 2 or 3 blocking
-            </span>
-          ) : (
-            <span className="text-gray-600">
-              {gap?.toFixed(3) ?? '—'} remaining to cascade threshold
-            </span>
-          )
-        ) : null}
+          <span className="text-gray-600">
+            {gap.toFixed(3)} remaining to cascade threshold
+          </span>
+        ) : (
+          <span className="text-amber-400 animate-pulse">
+            ⚠ Past cascade threshold — waiting for S1/S2 conditions
+          </span>
+        )}
       </div>
     </div>
   )
