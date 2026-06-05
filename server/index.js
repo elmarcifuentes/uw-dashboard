@@ -339,7 +339,20 @@ const provider = new SmartDataProvider(
 
 // On rescore trigger — run full scoring, update store, broadcast SSE
 provider.onRescore(async ({ price, reason }) => {
-  if (!runFullScore) return  // scoring engine not available on Railway
+  if (!runFullScore) {
+    // Scorer unavailable (Railway hosted) — emit price tick only, never touch latest
+    console.log(`[server] Scorer unavailable — emitting price only (${reason} at $${price})`)
+    const s = provider.getStatus()
+    sseEmitter.emit('event', {
+      type:          'price',
+      price,
+      interval:      s.currentInterval,
+      isMarketHours: s.isMarketHours,
+      cascade:       latest?.cascade || null,
+      timestamp:     new Date().toISOString(),
+    })
+    return
+  }
   console.log(`[server] Auto-rescore triggered: ${reason} at $${price}`)
   try {
     const result = await runFullScore({ trigger: 'auto' })

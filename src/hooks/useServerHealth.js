@@ -6,10 +6,12 @@ export function useServerHealth(apiUrl) {
   const lastStartedAtRef            = useRef(null)
 
   useEffect(() => {
+    console.log('[health] Starting server health checks')
     const check = async () => {
       try {
         const res  = await fetch(`${apiUrl}/uptime`)
         const data = await res.json()
+        console.log('[health] uptime check:', data.uptime_seconds + 's | has_data:', data.has_data, '| started:', data.started_at?.slice(11, 19))
 
         // Detect restart: started_at changed from what we last saw
         if (lastStartedAtRef.current &&
