@@ -31,8 +31,18 @@ export function useSSE(url) {
         if (destroyed) return
         setConnected(true)
         console.log('[SSE] connected')
-        // Restore last narrative immediately — no waiting for next rescore
         const apiBase = url.replace(/\/stream$/, '')
+        // Restore narrative mode immediately — no waiting for SSE event
+        fetch(`${apiBase}/status`)
+          .then(r => r.json())
+          .then(data => {
+            if (data?.narrativeMode) {
+              console.log('[SSE] narrative mode restored from status:', data.narrativeMode)
+              setNarrativeMode(data.narrativeMode)
+            }
+          })
+          .catch(() => {})
+        // Restore last narrative content immediately
         fetch(`${apiBase}/narrative`)
           .then(r => r.json())
           .then(data => {
