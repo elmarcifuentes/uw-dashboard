@@ -103,7 +103,7 @@ export default function Controls({ compact }) {
         <div className="flex gap-1">
           {[
             { key: 'template', label: '📋 Template', desc: 'Fast — rule based' },
-            { key: 'claude',   label: '🤖 Claude+MCP', desc: 'Smart — uses live UW data' },
+            { key: 'claude',   label: '🤖 Claude', desc: 'AI narrative — Haiku via Anthropic API' },
             { key: 'off',      label: '○ Off', desc: 'No narrative' },
           ].map(({ key, label, desc }) => (
             <button
@@ -124,7 +124,7 @@ export default function Controls({ compact }) {
         </div>
         <p className="text-xs text-gray-600 mt-1.5">
           {narrativeMode === 'template' && 'Rule-based — instant, always available'}
-          {narrativeMode === 'claude'   && '🤖 Claude + UW MCP — requires draw relay running'}
+          {narrativeMode === 'claude'   && '🤖 Claude Haiku — AI narrative, always available'}
           {narrativeMode === 'off'      && 'Narrative disabled'}
         </p>
       </div>

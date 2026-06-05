@@ -73,43 +73,63 @@ async function generateNarrativeForMode(result, dpHist) {
     return lines
   }
 
-  // claude mode — forward to relay
-  const relayUrl = process.env.DRAW_RELAY_URL
-  console.log('[narrative] claude mode — relay URL:', relayUrl || 'NOT SET')
-
-  if (!relayUrl) {
-    console.warn('[narrative] DRAW_RELAY_URL not set — falling back to template')
+  // claude mode — direct Anthropic API call (no relay needed)
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    console.warn('[narrative] ANTHROPIC_API_KEY not set — falling back to template')
     return generateNarrative(result, dpHist)
   }
 
-  try {
-    console.log('[narrative] calling relay...')
-    const { timestamp, signature } = signRelayRequest('narrative')
-    const r = await fetch(`${relayUrl}/narrative`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'narrative', pin: process.env.DASHBOARD_PIN,
-        timestamp, signature, result,
-      }),
-      signal: AbortSignal.timeout(50000),
-    })
-    console.log('[narrative] relay response status:', r.status)
-    const data = await r.json()
-    console.log('[narrative] relay response:', JSON.stringify(data).slice(0, 200))
-    if (data.success && data.narrative) {
-      const lines = data.narrative.split(/(?<=\.) /).filter(Boolean).map(s => s.trim()).filter(s => s.length > 0)
-      console.log('[narrative] claude generated:', lines.length, 'lines')
-      return lines
-    } else {
-      console.warn('[narrative] relay returned no narrative:', JSON.stringify(data).slice(0, 200))
-    }
-  } catch (err) {
-    console.warn('[narrative] claude relay error:', err.message)
-  }
+  const prompt = `You are analyzing live QQQ institutional flow data.
 
-  console.log('[narrative] falling back to template')
-  return generateNarrative(result, dpHist)
+Current scoring result:
+${JSON.stringify(result, null, 2)}
+
+Write a 3-4 sentence trading narrative that covers:
+- Where price sits relative to key levels (R2, R1, MID, S1, S2)
+- The most important signal right now
+- Primary risk to watch
+- One actionable observation
+
+Rules:
+- Be specific with prices and level IDs
+- Mention dark pool values when significant (±0.500+)
+- Flag cascade if MID dark pool approaching -0.700
+- Flag FULL STACK ★ if any level shows it
+- Flag expansion GEX if net_gex negative on any level
+- Plain English — no bullet points — flowing prose only
+- Maximum 4 sentences
+
+Return ONLY the narrative text. No labels, no headers.`
+
+  try {
+    console.log('[narrative] calling Anthropic API...')
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+    const data = await response.json()
+    const narrativeText = data.content?.[0]?.text
+    if (!narrativeText) throw new Error(`No narrative in API response: ${JSON.stringify(data).slice(0, 200)}`)
+    const lines = narrativeText.split('. ').filter(Boolean).map(s => s.endsWith('.') ? s : s + '.')
+    console.log('[narrative] claude generated:', lines.length, 'lines')
+    console.log('[narrative] line 1:', lines[0])
+    return lines
+  } catch (err) {
+    console.warn('[narrative] Anthropic API error:', err.message)
+    console.log('[narrative] falling back to template')
+    return generateNarrative(result, dpHist)
+  }
 }
 
 // DP history — last 3 readings per level

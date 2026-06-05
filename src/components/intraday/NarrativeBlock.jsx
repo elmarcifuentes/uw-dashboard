@@ -38,7 +38,7 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
           <span className="text-xs text-gray-500 uppercase tracking-wide">Session Read</span>
           {isClaudeMode && (
             <span className="text-xs bg-purple-800 text-purple-300 px-1.5 py-0.5 rounded font-medium">
-              🤖 Claude+MCP
+              🤖 Claude
             </span>
           )}
           {!isClaudeMode && narrativeMode === 'template' && (
