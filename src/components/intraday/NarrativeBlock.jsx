@@ -32,12 +32,12 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
     : null
 
   return (
-    <div className={`rounded p-3 ${isClaudeMode ? 'border border-purple-600 bg-purple-950' : 'bg-gray-900/80 border border-gray-700'}`}>
+    <div className={`rounded p-3 ${isClaudeMode ? 'border border-purple-900 bg-purple-950/30' : 'bg-gray-900/80 border border-gray-700'}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 uppercase tracking-wide">Session Read</span>
           {isClaudeMode && (
-            <span className="text-xs bg-purple-800 text-purple-300 px-1.5 py-0.5 rounded font-medium">
+            <span className="text-xs bg-purple-950 text-purple-400 px-1.5 py-0.5 rounded font-medium">
               🤖 Claude
             </span>
           )}
@@ -56,8 +56,7 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
             isCascade   ? 'text-red-300'    :
             isWarning   ? 'text-amber-300'  :
             isFullStack ? 'text-yellow-300' :
-            isClaudeMode ? (i === 0 ? 'text-purple-200' : 'text-purple-300') :
-            (i === 0 ? 'text-gray-300' : 'text-gray-400')
+            (i === 0 ? 'text-gray-200' : 'text-gray-300')
           return (
             <p key={i} className={`text-xs leading-relaxed ${i > 0 ? 'mt-1' : ''} ${textColor}`}>{line}</p>
           )
