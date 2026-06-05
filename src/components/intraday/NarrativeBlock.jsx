@@ -22,6 +22,8 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
 
   if (!displayNarrative.length) return null
 
+  const isClaudeMode = narrativeMode === 'claude'
+
   const time = lastUpdate
     ? new Date(lastUpdate).toLocaleTimeString('en-US', {
         hour: '2-digit', minute: '2-digit', second: '2-digit',
@@ -30,15 +32,20 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
     : null
 
   return (
-    <div className="bg-gray-900/80 border border-gray-700 rounded p-3">
+    <div className={`rounded p-3 ${isClaudeMode ? 'border border-purple-600 bg-purple-950' : 'bg-gray-900/80 border border-gray-700'}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-500 uppercase tracking-wide">Session Read</span>
         <div className="flex items-center gap-2">
-          {narrativeMode === 'claude' && (
-            <span className="text-xs text-purple-400 font-medium">🤖 Claude+MCP</span>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">Session Read</span>
+          {isClaudeMode && (
+            <span className="text-xs bg-purple-800 text-purple-300 px-1.5 py-0.5 rounded font-medium">
+              🤖 Claude+MCP
+            </span>
           )}
-          {time && <span className="text-xs text-gray-600 font-mono">{time}</span>}
+          {!isClaudeMode && narrativeMode === 'template' && (
+            <span className="text-xs text-gray-600">📋 template</span>
+          )}
         </div>
+        {time && <span className="text-xs text-gray-600 font-mono">{time}</span>}
       </div>
       <div className="flex flex-col gap-1.5">
         {displayNarrative.map((line, i) => {
@@ -49,9 +56,10 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
             isCascade   ? 'text-red-300'    :
             isWarning   ? 'text-amber-300'  :
             isFullStack ? 'text-yellow-300' :
-            'text-gray-300'
+            isClaudeMode ? (i === 0 ? 'text-purple-200' : 'text-purple-300') :
+            (i === 0 ? 'text-gray-300' : 'text-gray-400')
           return (
-            <p key={i} className={`text-xs leading-relaxed ${textColor}`}>{line}</p>
+            <p key={i} className={`text-xs leading-relaxed ${i > 0 ? 'mt-1' : ''} ${textColor}`}>{line}</p>
           )
         })}
       </div>
