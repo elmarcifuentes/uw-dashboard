@@ -1,5 +1,6 @@
 import { memo } from 'react'
 export default memo(function NarrativeBlock({ narrative, lastUpdate, compact, narrativeMode }) {
+  console.log('[narrative] rendering:', narrative?.length, 'lines, mode:', narrativeMode, '| line 1:', narrative?.[0])
   if (!narrative || narrative.length === 0) return null
 
   const time = lastUpdate

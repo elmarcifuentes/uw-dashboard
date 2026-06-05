@@ -70,7 +70,11 @@ export function useSSE(url) {
         if (data.type === 'chart_stale')        { setChartStale(true); setStaleChanges(data.changes || []); return }
         if (data.type === 'chart_synced')       { setChartStale(false); setStaleChanges([]);       return }
         if (data.type === 'narrative_mode')     { setNarrativeMode(data.mode);                     return }
-        if (data.type === 'narrative_update')   { setNarrative(data.narrative || []);               return }
+        if (data.type === 'narrative_update')   {
+          console.log('[SSE] narrative_update received:', data.narrative?.length, 'lines')
+          setNarrative(data.narrative || [])
+          return
+        }
         if (data.type === 'expansion_gex') {
           setExpansionGex(data.levels || [])
           setPinningSessions(data.consecutivePinningSessions ?? 0)

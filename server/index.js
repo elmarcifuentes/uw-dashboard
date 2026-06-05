@@ -377,8 +377,11 @@ provider.onRescore(async ({ price, reason }) => {
     // Narrative fire-and-forget — pushes separate SSE when ready
     generateNarrativeForMode(result, dpHistory)
       .then(narrative => {
+        console.log('[narrative] generated:', narrative?.length, 'lines')
+        console.log('[narrative] line 1:', narrative?.[0])
         if (narrative?.length > 0) {
           sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+          console.log('[narrative] SSE emitted (auto-rescore)')
         }
       })
       .catch(err => console.warn('[narrative] async failed:', err.message))
@@ -524,8 +527,11 @@ app.post("/update", async (req, res) => {
   // Narrative fire-and-forget after responding
   generateNarrativeForMode(result, dpHistory)
     .then(narrative => {
+      console.log('[narrative] generated:', narrative?.length, 'lines')
+      console.log('[narrative] line 1:', narrative?.[0])
       if (narrative?.length > 0) {
         sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+        console.log('[narrative] SSE emitted (/update)')
       }
     })
     .catch(err => console.warn('[narrative] async failed:', err.message))
@@ -780,8 +786,11 @@ app.post('/rescore', async (req, res) => {
     res.json({ success: true })
     generateNarrativeForMode(result, dpHistory)
       .then(narrative => {
+        console.log('[narrative] generated:', narrative?.length, 'lines')
+        console.log('[narrative] line 1:', narrative?.[0])
         if (narrative?.length > 0) {
           sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+          console.log('[narrative] SSE emitted (/rescore)')
         }
       })
       .catch(err => console.warn('[narrative] async failed:', err.message))
