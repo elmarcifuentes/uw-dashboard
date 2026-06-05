@@ -60,7 +60,21 @@ let expansionGexHistory  = []
 let allPinningSessions   = 0
 
 // Narrative mode: 'template' | 'claude' | 'off'
-let narrativeMode = process.env.NARRATIVE_MODE || 'template'
+let narrativeMode       = process.env.NARRATIVE_MODE || 'template'
+let narrativeModeSource = process.env.NARRATIVE_MODE ? 'env' : 'default'
+
+// Restore persisted mode from SQLite (overrides env default, not explicit env var)
+if (!process.env.NARRATIVE_MODE) {
+  try {
+    const saved = db.prepare(`SELECT value FROM settings WHERE key = 'narrative_mode'`).get()
+    if (saved?.value) {
+      narrativeMode       = saved.value
+      narrativeModeSource = 'db'
+      console.log('[server] Narrative mode restored from DB:', narrativeMode)
+    }
+  } catch { /* settings table may not exist on first boot — db.exec creates it */ }
+}
+console.log('[server] Narrative mode initialized:', narrativeMode, `(${narrativeModeSource})`)
 
 async function generateNarrativeForMode(result, dpHist) {
   console.log('[narrative] mode:', narrativeMode)
@@ -614,6 +628,7 @@ app.get('/status', (req, res) => {
     allPinningSessions,
     dpHistory: { ...dpHistory },
     narrativeMode,
+    narrativeModeSource,
   })
 })
 
@@ -640,15 +655,23 @@ app.post('/narrative-mode', async (req, res) => {
   if (!['template', 'claude', 'off'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid mode — use template|claude|off' })
   }
-  narrativeMode = mode
-  console.log(`[server] Narrative mode: ${mode}`)
+  narrativeMode       = mode
+  narrativeModeSource = 'db'
+  // Persist so mode survives Railway restarts
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('narrative_mode', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(mode)
+  console.log('[server] Narrative mode set:', mode)
   sseEmitter.emit('event', { type: 'narrative_mode', mode, timestamp: new Date().toISOString() })
   res.json({ success: true, mode })
-  // Immediately generate narrative with current data using new mode
+  // Immediately generate narrative with new mode
   if (latest && mode !== 'off') {
     generateNarrativeForMode(latest, dpHistory)
       .then(narrative => {
         if (narrative?.length > 0) {
+          lastNarrative = narrative
           sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
         }
       })
