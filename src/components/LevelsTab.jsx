@@ -162,25 +162,39 @@ export default function LevelsTab() {
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-1 mb-3 text-xs">
-            <div className="text-gray-500">Level</div>
-            <div className="text-gray-500 text-center">Current</div>
-            <div className="text-amber-400 text-center">Incoming</div>
+          <div className="mb-3 text-xs space-y-0.5">
+            <div className="grid grid-cols-5 gap-1 mb-1">
+              <div className="text-gray-500">Level</div>
+              <div className="text-gray-500 text-center">Cur NQ</div>
+              <div className="text-gray-500 text-center">Cur QQQ</div>
+              <div className="text-amber-400 text-center">New NQ</div>
+              <div className="text-amber-400 text-center">New QQQ</div>
+            </div>
             {['R2','R1','MID','S1','S2'].map(id => {
-              const key    = id.toLowerCase()
-              const curQqq = parseFloat(levels[id]?.qqq)
-              const inQqq  = parseFloat(pending[`${key}_qqq`])
-              const changed = !isNaN(curQqq) && !isNaN(inQqq) && Math.abs(curQqq - inQqq) > 0.01
+              const key        = id.toLowerCase()
+              const currentNq  = parseFloat(levels[id]?.nq)
+              const currentQqq = parseFloat(levels[id]?.qqq)
+              const incomingNq  = parseFloat(pending[`${key}_nq`])
+              const incomingQqq = parseFloat(pending[`${key}_qqq`])
+              const nqChanged  = !isNaN(currentNq)  && !isNaN(incomingNq)  && Math.abs(currentNq  - incomingNq)  > 0.25
+              const qqqChanged = !isNaN(currentQqq) && !isNaN(incomingQqq) && Math.abs(currentQqq - incomingQqq) > 0.01
+              const anyChanged = nqChanged || qqqChanged
               return (
-                <>
-                  <div key={`${id}-lbl`} className="font-bold text-gray-300">{id}</div>
-                  <div key={`${id}-cur`} className="text-center font-mono text-gray-400">
-                    {!isNaN(curQqq) ? `$${curQqq.toFixed(2)}` : '—'}
+                <div key={id} className={`grid grid-cols-5 gap-1 py-0.5 ${anyChanged ? 'bg-amber-950 rounded px-1' : ''}`}>
+                  <div className="font-bold text-gray-300">{id}</div>
+                  <div className="text-center font-mono text-gray-500">
+                    {!isNaN(currentNq)  ? currentNq.toFixed(2)        : '—'}
                   </div>
-                  <div key={`${id}-in`} className={`text-center font-mono ${changed ? 'text-amber-300 font-bold' : 'text-gray-400'}`}>
-                    {!isNaN(inQqq) ? `$${inQqq.toFixed(2)}` : '—'}{changed ? ' ←' : ''}
+                  <div className="text-center font-mono text-gray-400">
+                    {!isNaN(currentQqq) ? `$${currentQqq.toFixed(2)}` : '—'}
                   </div>
-                </>
+                  <div className={`text-center font-mono ${nqChanged  ? 'text-amber-300 font-bold' : 'text-gray-400'}`}>
+                    {!isNaN(incomingNq)  ? incomingNq.toFixed(2)        : '—'}{nqChanged  ? ' ←' : ''}
+                  </div>
+                  <div className={`text-center font-mono ${qqqChanged ? 'text-amber-300 font-bold' : 'text-gray-400'}`}>
+                    {!isNaN(incomingQqq) ? `$${incomingQqq.toFixed(2)}` : '—'}{qqqChanged ? ' ←' : ''}
+                  </div>
+                </div>
               )
             })}
           </div>
