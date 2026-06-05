@@ -63,15 +63,27 @@ let allPinningSessions   = 0
 let narrativeMode = process.env.NARRATIVE_MODE || 'template'
 
 async function generateNarrativeForMode(result, dpHist) {
+  console.log('[narrative] mode:', narrativeMode)
+
   if (narrativeMode === 'off') return []
-  if (narrativeMode === 'template') return generateNarrative(result, dpHist)
+
+  if (narrativeMode === 'template') {
+    const lines = generateNarrative(result, dpHist)
+    console.log('[narrative] template generated:', lines?.length)
+    return lines
+  }
+
   // claude mode — forward to relay
   const relayUrl = process.env.DRAW_RELAY_URL
+  console.log('[narrative] claude mode — relay URL:', relayUrl || 'NOT SET')
+
   if (!relayUrl) {
-    console.warn('[narrative] No relay URL — falling back to template')
+    console.warn('[narrative] DRAW_RELAY_URL not set — falling back to template')
     return generateNarrative(result, dpHist)
   }
+
   try {
+    console.log('[narrative] calling relay...')
     const { timestamp, signature } = signRelayRequest('narrative')
     const r = await fetch(`${relayUrl}/narrative`, {
       method: 'POST',
@@ -82,14 +94,21 @@ async function generateNarrativeForMode(result, dpHist) {
       }),
       signal: AbortSignal.timeout(50000),
     })
+    console.log('[narrative] relay response status:', r.status)
     const data = await r.json()
+    console.log('[narrative] relay response:', JSON.stringify(data).slice(0, 200))
     if (data.success && data.narrative) {
-      return data.narrative.split(/(?<=\.) /).filter(Boolean)
-        .map(s => s.trim()).filter(s => s.length > 0)
+      const lines = data.narrative.split(/(?<=\.) /).filter(Boolean).map(s => s.trim()).filter(s => s.length > 0)
+      console.log('[narrative] claude generated:', lines.length, 'lines')
+      return lines
+    } else {
+      console.warn('[narrative] relay returned no narrative:', JSON.stringify(data).slice(0, 200))
     }
   } catch (err) {
-    console.warn('[narrative] Claude relay failed — falling back to template:', err.message)
+    console.warn('[narrative] claude relay error:', err.message)
   }
+
+  console.log('[narrative] falling back to template')
   return generateNarrative(result, dpHist)
 }
 
