@@ -49,6 +49,7 @@ export default function GreekFlow({ apiUrl }) {
   )
 
   if (loading) return skeleton
+  if (!data || !data.totals) return null
 
   const { totals } = data
   const maxAbs = Math.max(Math.abs(totals.dirDelta), Math.abs(totals.dirVega), Math.abs(totals.otmDirDelta)) || 1

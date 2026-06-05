@@ -16,6 +16,7 @@ export function useSSE(url) {
   const [sentiment, setSentiment]             = useState(null)
   const [narrativeMode, setNarrativeMode]     = useState('template')
   const esRef = useRef(null)
+  const lastRescoreRef = useRef(0)
 
   useEffect(() => {
     let destroyed = false
@@ -33,6 +34,12 @@ export function useSSE(url) {
         if (data.type === 'heartbeat') return
 
         if (data.type === 'rescore') {
+          const now = Date.now()
+          if (now - lastRescoreRef.current < 2000) {
+            console.log('[SSE] Debouncing rapid rescore')
+            return
+          }
+          lastRescoreRef.current = now
           setRescoreData(data)
           setHistory(prev => [data, ...prev].slice(0, 50))
           if (data.expansionGex !== undefined) setExpansionGex(data.expansionGex || [])
