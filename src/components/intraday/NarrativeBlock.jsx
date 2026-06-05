@@ -1,7 +1,26 @@
 import { memo } from 'react'
-export default memo(function NarrativeBlock({ narrative, lastUpdate, compact, narrativeMode }) {
-  console.log('[narrative] rendering:', narrative?.length, 'lines, mode:', narrativeMode, '| line 1:', narrative?.[0])
-  if (!narrative || narrative.length === 0) return null
+export default memo(function NarrativeBlock({ narrative, result, lastUpdate, compact, narrativeMode }) {
+  const displayNarrative = narrative?.length > 0
+    ? narrative
+    : result?.current_price ? [
+        `Price $${result.current_price.toFixed(2)} — last scored ${
+          lastUpdate
+            ? new Date(lastUpdate).toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York',
+              }) + ' ET'
+            : '—'
+        }`,
+        result.cascade?.active
+          ? '⚠ CASCADE ACTIVE — no institutional floor below MID'
+          : result.structure_break?.active
+          ? `⚠ STRUCTURE BREAK ${result.structure_break.direction?.toUpperCase()} — GEX extension active`
+          : 'Structure intact — levels valid',
+      ]
+    : []
+
+  console.log('[narrative] rendering:', displayNarrative?.length, 'lines, mode:', narrativeMode, '| line 1:', displayNarrative?.[0])
+
+  if (!displayNarrative.length) return null
 
   const time = lastUpdate
     ? new Date(lastUpdate).toLocaleTimeString('en-US', {
@@ -22,16 +41,14 @@ export default memo(function NarrativeBlock({ narrative, lastUpdate, compact, na
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        {narrative.map((line, i) => {
+        {displayNarrative.map((line, i) => {
           const isCascade   = line.includes('CASCADE')
           const isWarning   = line.startsWith('⚠') && !isCascade
           const isFullStack = line.includes('FULL STACK') || line.includes('★')
-          const isPassive   = line.includes('Passive target')
           const textColor   =
             isCascade   ? 'text-red-300'    :
             isWarning   ? 'text-amber-300'  :
             isFullStack ? 'text-yellow-300' :
-            isPassive   ? 'text-teal-300'   :
             'text-gray-300'
           return (
             <p key={i} className={`text-xs leading-relaxed ${textColor}`}>{line}</p>

@@ -72,6 +72,7 @@ export function useSSE(url) {
         if (data.type === 'narrative_mode')     { setNarrativeMode(data.mode);                     return }
         if (data.type === 'narrative_update')   {
           console.log('[SSE] narrative_update received:', data.narrative?.length, 'lines')
+          console.log('[SSE] line 1:', data.narrative?.[0])
           setNarrative(data.narrative || [])
           return
         }
