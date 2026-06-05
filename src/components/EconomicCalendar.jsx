@@ -11,6 +11,19 @@ const MEDIUM_IMPACT_KEYWORDS = [
   'housing', 'pmi', 'beige book', 'trade balance', 'consumer sentiment',
 ]
 
+function formatEstimate(value) {
+  if (!value && value !== 0) return null
+  const num = parseFloat(value)
+  if (isNaN(num)) return value
+  const abs  = Math.abs(num)
+  const sign = num < 0 ? '-' : ''
+  if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`
+  if (abs >= 1_000_000)     return `${sign}$${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000)         return `${sign}$${(abs / 1_000).toFixed(1)}K`
+  if (abs < 10)             return `${sign}${num.toFixed(1)}%`
+  return `${sign}${num.toLocaleString()}`
+}
+
 function getImpact(eventName) {
   const lower = (eventName || '').toLowerCase()
   if (HIGH_IMPACT_KEYWORDS.some(k => lower.includes(k))) return 'high'
@@ -88,8 +101,10 @@ export default function EconomicCalendar({ apiUrl }) {
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
               <span className={`text-xs font-mono w-20 shrink-0 ${colors.text}`}>{etTime}</span>
               <span className="text-xs text-gray-200 flex-1">{event.event}</span>
-              {event.forecast && (
-                <span className="text-xs text-gray-500 shrink-0">est: {event.forecast}</span>
+              {event.forecast != null && (
+                <span className="text-xs text-gray-500 shrink-0">
+                  est: {formatEstimate(event.forecast) ?? event.forecast}
+                </span>
               )}
             </div>
           )

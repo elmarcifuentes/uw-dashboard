@@ -13,16 +13,17 @@ export function useServerHealth(apiUrl) {
         const data = await res.json()
         console.log('[health] uptime check:', data.uptime_seconds + 's | has_data:', data.has_data, '| started:', data.started_at?.slice(11, 19))
 
-        // Detect restart: started_at changed from what we last saw
+        // Detect restart: started_at changed AND data not yet loaded
         if (lastStartedAtRef.current &&
-            lastStartedAtRef.current !== data.started_at) {
+            lastStartedAtRef.current !== data.started_at &&
+            !data.has_data) {
           setRestarted(true)
-          console.log('[health] Server restart detected')
+          console.log('[health] Server restart detected (no data)')
         }
 
-        // Flag if server is very fresh and has no data
-        if (data.uptime_seconds < 180 && !data.has_data) {
-          setRestarted(true)
+        // Clear banner the moment data is present
+        if (data.has_data) {
+          setRestarted(false)
         }
 
         lastStartedAtRef.current = data.started_at
