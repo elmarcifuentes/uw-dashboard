@@ -51,6 +51,7 @@ let latest            = null
 let previousResult    = null
 let chartSynced       = true
 let lastWebhookPayload = null
+let lastNarrative     = []
 const history         = []
 const MAX_HISTORY     = 20
 
@@ -380,6 +381,7 @@ provider.onRescore(async ({ price, reason }) => {
         console.log('[narrative] generated:', narrative?.length, 'lines')
         console.log('[narrative] line 1:', narrative?.[0])
         if (narrative?.length > 0) {
+          lastNarrative = narrative
           sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
           console.log('[narrative] SSE emitted (auto-rescore)')
         }
@@ -530,6 +532,7 @@ app.post("/update", async (req, res) => {
       console.log('[narrative] generated:', narrative?.length, 'lines')
       console.log('[narrative] line 1:', narrative?.[0])
       if (narrative?.length > 0) {
+        lastNarrative = narrative
         sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
         console.log('[narrative] SSE emitted (/update)')
       }
@@ -789,6 +792,7 @@ app.post('/rescore', async (req, res) => {
         console.log('[narrative] generated:', narrative?.length, 'lines')
         console.log('[narrative] line 1:', narrative?.[0])
         if (narrative?.length > 0) {
+          lastNarrative = narrative
           sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
           console.log('[narrative] SSE emitted (/rescore)')
         }
@@ -1079,6 +1083,11 @@ app.post('/webhook/dismiss', (req, res) => {
     sseEmitter.emit('event', { type: 'levels_dismissed', timestamp: new Date().toISOString() })
     res.json({ success: true })
   } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// GET /narrative — return last generated narrative (for reconnect restore)
+app.get('/narrative', (req, res) => {
+  res.json({ narrative: lastNarrative, timestamp: new Date().toISOString() })
 })
 
 app.listen(PORT, () => {

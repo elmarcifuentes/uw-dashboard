@@ -27,7 +27,22 @@ export function useSSE(url) {
       const es = new EventSource(url)
       esRef.current = es
 
-      es.onopen = () => { if (!destroyed) setConnected(true) }
+      es.onopen = () => {
+        if (destroyed) return
+        setConnected(true)
+        console.log('[SSE] connected')
+        // Restore last narrative immediately — no waiting for next rescore
+        const apiBase = url.replace(/\/stream$/, '')
+        fetch(`${apiBase}/narrative`)
+          .then(r => r.json())
+          .then(data => {
+            if (data?.narrative?.length > 0) {
+              console.log('[SSE] restored narrative on connect:', data.narrative.length, 'lines')
+              setNarrative(data.narrative)
+            }
+          })
+          .catch(() => {})
+      }
 
       es.onmessage = (event) => {
         if (destroyed) return
