@@ -33,7 +33,7 @@ function AppInner() {
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-bold text-white tracking-wider">
-            UW LEVEL SCORING
+            TradesAlgo
           </h1>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">Phase 4b</span>
