@@ -15,6 +15,7 @@ export function useSSE(url) {
   const [narrative, setNarrative]             = useState([])
   const [sentiment, setSentiment]             = useState(null)
   const [narrativeMode, setNarrativeMode]     = useState('template')
+  const [pendingLevels, setPendingLevels]     = useState(null)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
 
@@ -75,6 +76,9 @@ export function useSSE(url) {
           setPinningSessions(data.consecutivePinningSessions ?? 0)
           return
         }
+        if (data.type === 'levels_pending')   { setPendingLevels(data.levels); return }
+        if (data.type === 'levels_dismissed') { setPendingLevels(null);        return }
+        if (data.type === 'levels_updated')   { setPendingLevels(null);        return }
       }
 
       es.onerror = () => {
@@ -105,5 +109,7 @@ export function useSSE(url) {
     narrative,
     sentiment,
     narrativeMode,
+    pendingLevels,
+    clearPendingLevels: () => setPendingLevels(null),
   }
 }

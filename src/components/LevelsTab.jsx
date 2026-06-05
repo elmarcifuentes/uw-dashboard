@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const API_URL   = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const LEVEL_IDS = ['R2', 'R1', 'MID', 'S1', 'S2']
@@ -26,6 +26,9 @@ export default function LevelsTab() {
   const [rescoring, setRescoring]   = useState(false)
   const [rescoreResult, setRescoreResult] = useState(null)
   const [scoringStatus, setScoringStatus] = useState(null)
+  const [pending, setPending]       = useState(null)
+  const [accepting, setAccepting]   = useState(false)
+  const pendingPollRef              = useRef(null)
 
   const fetchScoringStatus = async () => {
     try {
@@ -69,6 +72,16 @@ export default function LevelsTab() {
       .catch(() => {})
 
     fetchScoringStatus()
+
+    const pollPending = () => {
+      fetch(`${API_URL}/webhook/pending`)
+        .then(r => r.json())
+        .then(data => setPending(data.pending || null))
+        .catch(() => {})
+    }
+    pollPending()
+    pendingPollRef.current = setInterval(pollPending, 15_000)
+    return () => clearInterval(pendingPollRef.current)
   }, [])
 
   // Auto-compute ratio from entered values
@@ -137,6 +150,95 @@ export default function LevelsTab() {
           </div>
         )}
       </div>
+
+      {/* Pending webhook banner */}
+      {pending && (
+        <div className="border border-amber-500 rounded p-3 bg-amber-950">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-amber-400 font-bold text-sm">📡 New levels from TradingView</span>
+            <span className="text-amber-600 text-xs font-mono">
+              {new Date(pending.received_at + 'Z')
+                .toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })} ET
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1 mb-3 text-xs">
+            <div className="text-gray-500">Level</div>
+            <div className="text-gray-500 text-center">Current</div>
+            <div className="text-amber-400 text-center">Incoming</div>
+            {['R2','R1','MID','S1','S2'].map(id => {
+              const key    = id.toLowerCase()
+              const curQqq = parseFloat(levels[id]?.qqq)
+              const inQqq  = parseFloat(pending[`${key}_qqq`])
+              const changed = !isNaN(curQqq) && !isNaN(inQqq) && Math.abs(curQqq - inQqq) > 0.01
+              return (
+                <>
+                  <div key={`${id}-lbl`} className="font-bold text-gray-300">{id}</div>
+                  <div key={`${id}-cur`} className="text-center font-mono text-gray-400">
+                    {!isNaN(curQqq) ? `$${curQqq.toFixed(2)}` : '—'}
+                  </div>
+                  <div key={`${id}-in`} className={`text-center font-mono ${changed ? 'text-amber-300 font-bold' : 'text-gray-400'}`}>
+                    {!isNaN(inQqq) ? `$${inQqq.toFixed(2)}` : '—'}{changed ? ' ←' : ''}
+                  </div>
+                </>
+              )
+            })}
+          </div>
+
+          {pending.nq_ratio && (
+            <div className="text-xs text-gray-500 mb-3">
+              Ratio: {parseFloat(pending.nq_ratio).toFixed(3)}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              disabled={accepting}
+              onClick={async () => {
+                setAccepting(true)
+                try {
+                  const res  = await fetch(`${API_URL}/webhook/accept`, { method: 'POST' })
+                  const data = await res.json()
+                  if (data.success) {
+                    setPending(null)
+                    // Reload levels into form
+                    const lr = await fetch(`${API_URL}/levels`).then(r => r.json())
+                    if (lr.levels) {
+                      const l = lr.levels
+                      setLevels({
+                        R2:  { nq: l.r2_nq  ?? '', qqq: l.r2_qqq  ?? '' },
+                        R1:  { nq: l.r1_nq  ?? '', qqq: l.r1_qqq  ?? '' },
+                        MID: { nq: l.mid_nq ?? '', qqq: l.mid_qqq ?? '' },
+                        S1:  { nq: l.s1_nq  ?? '', qqq: l.s1_qqq  ?? '' },
+                        S2:  { nq: l.s2_nq  ?? '', qqq: l.s2_qqq  ?? '' },
+                      })
+                      setRatio(l.nq_ratio)
+                      setSavedDate(data.date)
+                      setIsToday(true)
+                    }
+                    setTimeout(() => fetchScoringStatus(), 4000)
+                  }
+                } catch { /* ignore */ }
+                finally { setAccepting(false) }
+              }}
+              className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
+                accepting ? 'bg-amber-800 text-amber-400 cursor-wait' : 'bg-amber-600 hover:bg-amber-500 text-white'
+              }`}
+            >
+              {accepting ? '⟳ Accepting…' : '✓ Accept — Update Levels'}
+            </button>
+            <button
+              onClick={async () => {
+                await fetch(`${API_URL}/webhook/dismiss`, { method: 'POST' })
+                setPending(null)
+              }}
+              className="px-4 py-1.5 rounded text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white"
+            >
+              ✗ Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Ratio */}
       {ratio && (

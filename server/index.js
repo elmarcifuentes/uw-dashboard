@@ -931,34 +931,164 @@ app.get('/api-data/flow-expiry', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// POST /webhook/levels — TradingView webhook receiver
-// TradingView sends content-type: text/plain, so parse manually
-app.post('/webhook/levels', express.text({ type: '*/*' }), (req, res) => {
-  let payload = {}
-  try {
-    payload = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
-  } catch {
-    payload = { _raw: req.body }
+// Parse TradingView pipe-delimited payload:
+// "date=2026-06-05 | ratio=41.193 | R2_nq=29512.25 | ..."
+function parseTradingViewPayload(raw) {
+  const result = {}
+  for (const pair of raw.split('|').map(s => s.trim())) {
+    const eq = pair.indexOf('=')
+    if (eq < 1) continue
+    const key = pair.slice(0, eq).trim().toLowerCase()
+    const val = pair.slice(eq + 1).trim()
+    if (key && val) result[key] = val
   }
+  const required = ['r2_nq','r2_qqq','r1_nq','r1_qqq','mid_nq','mid_qqq','s1_nq','s1_qqq','s2_nq','s2_qqq']
+  const missing = required.filter(k => !result[k])
+  if (missing.length > 0) throw new Error(`Missing fields: ${missing.join(', ')}`)
+  return {
+    date:     result.date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+    r2_nq:    parseFloat(result.r2_nq),
+    r2_qqq:   parseFloat(result.r2_qqq),
+    r1_nq:    parseFloat(result.r1_nq),
+    r1_qqq:   parseFloat(result.r1_qqq),
+    mid_nq:   parseFloat(result.mid_nq),
+    mid_qqq:  parseFloat(result.mid_qqq),
+    s1_nq:    parseFloat(result.s1_nq),
+    s1_qqq:   parseFloat(result.s1_qqq),
+    s2_nq:    parseFloat(result.s2_nq),
+    s2_qqq:   parseFloat(result.s2_qqq),
+    nq_ratio: result.ratio ? parseFloat(result.ratio) : null,
+  }
+}
+
+// POST /webhook/levels — TradingView webhook receiver
+app.post('/webhook/levels', express.text({ type: '*/*' }), (req, res) => {
   const timestamp = new Date().toISOString()
-
-  console.log('[webhook] Received payload:')
-  console.log(JSON.stringify(payload, null, 2))
-  console.log('[webhook] Headers:')
-  console.log(JSON.stringify(req.headers, null, 2))
-
-  lastWebhookPayload = { payload, timestamp, headers: req.headers }
-
-  res.status(200).json({
-    received: true,
-    timestamp,
-    fields: Object.keys(payload),
-  })
+  const raw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {})
+  console.log('[webhook] Raw payload:', raw)
+  try {
+    const parsed = parseTradingViewPayload(raw)
+    console.log('[webhook] Parsed:', JSON.stringify(parsed))
+    db.prepare(`
+      INSERT INTO pending_levels (
+        date, r2_nq, r2_qqq, r1_nq, r1_qqq,
+        mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq,
+        nq_ratio, source, status, received_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webhook', 'pending', datetime('now'))
+    `).run(
+      parsed.date,
+      parsed.r2_nq,  parsed.r2_qqq,
+      parsed.r1_nq,  parsed.r1_qqq,
+      parsed.mid_nq, parsed.mid_qqq,
+      parsed.s1_nq,  parsed.s1_qqq,
+      parsed.s2_nq,  parsed.s2_qqq,
+      parsed.nq_ratio
+    )
+    lastWebhookPayload = { raw, parsed, timestamp, status: 'pending — awaiting confirmation' }
+    sseEmitter.emit('event', { type: 'levels_pending', levels: parsed, source: 'tradingview', timestamp })
+    console.log('[webhook] Levels saved as pending for', parsed.date)
+    res.status(200).json({ received: true, status: 'pending', date: parsed.date, timestamp })
+  } catch (err) {
+    console.error('[webhook] Parse error:', err.message)
+    res.status(400).json({ error: err.message, raw })
+  }
 })
 
 // GET /webhook/last — inspect last received payload
 app.get('/webhook/last', (req, res) => {
   res.json(lastWebhookPayload || { message: 'No webhook received yet' })
+})
+
+// GET /webhook/pending — latest pending levels
+app.get('/webhook/pending', (req, res) => {
+  try {
+    const row = db.prepare(
+      `SELECT * FROM pending_levels WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1`
+    ).get()
+    res.json({ pending: row || null })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /webhook/accept — promote pending → daily_levels + rescore
+app.post('/webhook/accept', async (req, res) => {
+  try {
+    const pending = db.prepare(
+      `SELECT * FROM pending_levels WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1`
+    ).get()
+    if (!pending) return res.status(404).json({ error: 'No pending levels' })
+
+    db.prepare(`
+      INSERT INTO daily_levels (
+        date, r2_nq, r2_qqq, r1_nq, r1_qqq,
+        mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq,
+        nq_ratio, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(date) DO UPDATE SET
+        r2_nq=excluded.r2_nq, r2_qqq=excluded.r2_qqq,
+        r1_nq=excluded.r1_nq, r1_qqq=excluded.r1_qqq,
+        mid_nq=excluded.mid_nq, mid_qqq=excluded.mid_qqq,
+        s1_nq=excluded.s1_nq, s1_qqq=excluded.s1_qqq,
+        s2_nq=excluded.s2_nq, s2_qqq=excluded.s2_qqq,
+        nq_ratio=excluded.nq_ratio, updated_at=datetime('now')
+    `).run(
+      pending.date,
+      pending.r2_nq,  pending.r2_qqq,
+      pending.r1_nq,  pending.r1_qqq,
+      pending.mid_nq, pending.mid_qqq,
+      pending.s1_nq,  pending.s1_qqq,
+      pending.s2_nq,  pending.s2_qqq,
+      pending.nq_ratio
+    )
+    db.prepare(`UPDATE pending_levels SET status = 'accepted' WHERE id = ?`).run(pending.id)
+
+    sseEmitter.emit('event', {
+      type: 'levels_updated', date: pending.date,
+      nq_ratio: pending.nq_ratio, source: 'webhook_accepted',
+      timestamp: new Date().toISOString(),
+    })
+
+    res.json({ success: true, date: pending.date })
+
+    // Auto-rescore with new levels
+    if (runFullScore) {
+      try {
+        const levelsOverride = getLevelsForScoring(db)
+        const result = await runFullScore({ trigger: 'webhook_accept', levelsOverride })
+        result._received_at = new Date().toISOString()
+        latest = result
+        history.unshift(result)
+        if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
+        provider.setLevels(result.levels)
+        checkExpansionGex(result)
+        updateDpHistory(result)
+        const sent = computeSentiment(result)
+        result._sentiment = sent
+        sseEmitter.emit('event', {
+          type: 'rescore', result, trigger: 'webhook levels accepted',
+          price: result.current_price, expansionGex: detectExpansionGex(result),
+          dpHistory: { ...dpHistory }, sentiment: sent,
+          timestamp: new Date().toISOString(),
+        })
+        generateNarrativeForMode(result, dpHistory)
+          .then(narrative => {
+            if (narrative?.length > 0)
+              sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+          })
+          .catch(err => console.warn('[webhook accept] narrative failed:', err.message))
+      } catch (err) {
+        console.error('[webhook accept] rescore failed:', err.message)
+      }
+    }
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /webhook/dismiss — discard pending levels
+app.post('/webhook/dismiss', (req, res) => {
+  try {
+    db.prepare(`UPDATE pending_levels SET status = 'dismissed' WHERE status = 'pending'`).run()
+    sseEmitter.emit('event', { type: 'levels_dismissed', timestamp: new Date().toISOString() })
+    res.json({ success: true })
+  } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.listen(PORT, () => {
