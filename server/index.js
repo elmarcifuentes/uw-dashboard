@@ -43,6 +43,7 @@ app.use(express.json())
 let latest            = null
 let previousResult    = null
 let chartSynced       = true
+let lastWebhookPayload = null
 const history         = []
 const MAX_HISTORY     = 20
 
@@ -928,6 +929,30 @@ app.get('/api-data/flow-expiry', async (req, res) => {
     )
     res.json(await r.json())
   } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /webhook/levels — TradingView webhook receiver
+app.post('/webhook/levels', (req, res) => {
+  const payload = req.body
+  const timestamp = new Date().toISOString()
+
+  console.log('[webhook] Received payload:')
+  console.log(JSON.stringify(payload, null, 2))
+  console.log('[webhook] Headers:')
+  console.log(JSON.stringify(req.headers, null, 2))
+
+  lastWebhookPayload = { payload, timestamp, headers: req.headers }
+
+  res.status(200).json({
+    received: true,
+    timestamp,
+    fields: Object.keys(payload),
+  })
+})
+
+// GET /webhook/last — inspect last received payload
+app.get('/webhook/last', (req, res) => {
+  res.json(lastWebhookPayload || { message: 'No webhook received yet' })
 })
 
 app.listen(PORT, () => {
