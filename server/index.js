@@ -640,6 +640,83 @@ app.post('/chart-synced', (req, res) => {
   res.json({ success: true })
 })
 
+// ── Daily levels endpoints ────────────────────────────────────────────────────
+function getTodayET() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+}
+
+function getTodayLevels() {
+  const row = db.prepare('SELECT * FROM daily_levels WHERE date = ?').get(getTodayET())
+  if (!row) return null
+  return [
+    { id: 'R2',  price: row.r2_qqq,  nq: row.r2_nq  },
+    { id: 'R1',  price: row.r1_qqq,  nq: row.r1_nq  },
+    { id: 'MID', price: row.mid_qqq, nq: row.mid_nq },
+    { id: 'S1',  price: row.s1_qqq,  nq: row.s1_nq  },
+    { id: 'S2',  price: row.s2_qqq,  nq: row.s2_nq  },
+  ]
+}
+
+app.get('/levels', (req, res) => {
+  try {
+    const today = getTodayET()
+    const row = db.prepare('SELECT * FROM daily_levels WHERE date = ?').get(today)
+    const fallback = row || db.prepare('SELECT * FROM daily_levels ORDER BY date DESC LIMIT 1').get()
+    res.json({ levels: fallback || null, is_today: !!row })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.post('/levels', (req, res) => {
+  try {
+    const { r2_nq, r2_qqq, r1_nq, r1_qqq, mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq } = req.body
+    const pairs = [[r2_nq, r2_qqq],[r1_nq, r1_qqq],[mid_nq, mid_qqq],[s1_nq, s1_qqq],[s2_nq, s2_qqq]]
+    const validPair = pairs.find(([nq, qqq]) => nq && qqq)
+    const nq_ratio = validPair ? parseFloat(validPair[0]) / parseFloat(validPair[1]) : null
+    const today = getTodayET()
+
+    db.prepare(`
+      INSERT INTO daily_levels
+        (date, r2_nq, r2_qqq, r1_nq, r1_qqq, mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq, nq_ratio, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(date) DO UPDATE SET
+        r2_nq=excluded.r2_nq, r2_qqq=excluded.r2_qqq,
+        r1_nq=excluded.r1_nq, r1_qqq=excluded.r1_qqq,
+        mid_nq=excluded.mid_nq, mid_qqq=excluded.mid_qqq,
+        s1_nq=excluded.s1_nq, s1_qqq=excluded.s1_qqq,
+        s2_nq=excluded.s2_nq, s2_qqq=excluded.s2_qqq,
+        nq_ratio=excluded.nq_ratio, updated_at=datetime('now')
+    `).run(today, r2_nq, r2_qqq, r1_nq, r1_qqq, mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq, nq_ratio)
+
+    if (latest && nq_ratio) latest.nq_ratio = nq_ratio
+    sseEmitter.emit('event', { type: 'levels_updated', date: today, nq_ratio, timestamp: new Date().toISOString() })
+    console.log(`[server] Levels saved for ${today} | ratio: ${nq_ratio?.toFixed(3)}`)
+    res.json({ success: true, date: today, nq_ratio })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/levels/history', (req, res) => {
+  try {
+    res.json({ levels: db.prepare('SELECT * FROM daily_levels ORDER BY date DESC LIMIT 5').all() })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.get('/levels/json', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM daily_levels WHERE date = ?').get(getTodayET())
+    if (!row) return res.status(404).json({ error: 'No levels for today' })
+    res.json({
+      date: row.date, ratio: row.nq_ratio?.toFixed(3),
+      levels: {
+        R2:  { nq: row.r2_nq,  qqq: row.r2_qqq  },
+        R1:  { nq: row.r1_nq,  qqq: row.r1_qqq  },
+        MID: { nq: row.mid_nq, qqq: row.mid_qqq },
+        S1:  { nq: row.s1_nq,  qqq: row.s1_qqq  },
+        S2:  { nq: row.s2_nq,  qqq: row.s2_qqq  },
+      }
+    })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 // ── Session story endpoints ───────────────────────────────────────────────────
 app.get('/sessions', (req, res) => {
   res.json(logger.getAllSessions())

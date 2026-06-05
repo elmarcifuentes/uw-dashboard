@@ -6,13 +6,14 @@ import PostSession from './components/PostSession'
 import Guide from './components/Guide'
 import LockModal from './components/LockModal'
 import RestartBanner from './components/RestartBanner'
+import LevelsTab from './components/LevelsTab'
 import { useServerHealth } from './hooks/useServerHealth'
 import { LayoutProvider } from './context/LayoutContext'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/AuthContext'
 import './index.css'
 
-const TABS    = ['Pre-Session', 'Intraday', 'Post-Session', 'Guide']
+const TABS    = ['Pre-Session', 'Intraday', 'Post-Session', '📐 Levels', 'Guide']
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 function AppInner() {
@@ -55,6 +56,7 @@ function AppInner() {
           {activeTab === 'Pre-Session'  && <PreSession />}
           {activeTab === 'Intraday'     && <Intraday />}
           {activeTab === 'Post-Session' && <PostSession />}
+          {activeTab === '📐 Levels'   && <LevelsTab />}
           {activeTab === 'Guide'        && <Guide />}
         </div>
       </div>
