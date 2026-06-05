@@ -81,15 +81,16 @@ console.log('[server] Narrative mode initialized:', narrativeMode, `(${narrative
 function hashScoringResult(result) {
   if (!result) return null
   const key = {
-    price:           result.current_price?.toFixed(2),
-    cascade:         result.cascade?.active,
-    structure_break: result.structure_break?.active,
-    levels:          result.levels?.map(l => ({
+    cascade:             result.cascade?.active,
+    cascade_armed:       result.cascade?.conditions?.[0],
+    structure_break:     result.structure_break?.active,
+    structure_break_dir: result.structure_break?.direction,
+    levels:              result.levels?.map(l => ({
       id:             l.id,
       classification: l.classification,
-      dp:             l.dark_pool?.toFixed(3),
+      dp:             l.dark_pool?.toFixed(2),
       full_stack:     l.full_stack,
-      score:          l.score,
+      score:          Math.round((l.score ?? 0) / 5) * 5,
     })),
   }
   return crypto.createHash('md5').update(JSON.stringify(key)).digest('hex')
