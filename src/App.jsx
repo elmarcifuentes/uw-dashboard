@@ -5,12 +5,15 @@ import Intraday from './components/Intraday'
 import PostSession from './components/PostSession'
 import Guide from './components/Guide'
 import LockModal from './components/LockModal'
+import RestartBanner from './components/RestartBanner'
+import { useServerHealth } from './hooks/useServerHealth'
 import { LayoutProvider } from './context/LayoutContext'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/AuthContext'
 import './index.css'
 
-const TABS = ['Pre-Session', 'Intraday', 'Post-Session', 'Guide']
+const TABS    = ['Pre-Session', 'Intraday', 'Post-Session', 'Guide']
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 function AppInner() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -18,6 +21,7 @@ function AppInner() {
   })
   const [showModal, setShowModal] = useState(false)
   const { unlocked } = useAuth()
+  const { restarted, hasData, dismiss } = useServerHealth(API_URL)
 
   useEffect(() => {
     localStorage.setItem('uw-active-tab', activeTab)
@@ -41,6 +45,9 @@ function AppInner() {
             </button>
           </div>
         </div>
+
+        {/* Global restart / no-data banner — visible on all tabs */}
+        <RestartBanner restarted={restarted} hasData={hasData} onDismiss={dismiss} />
 
         <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
 

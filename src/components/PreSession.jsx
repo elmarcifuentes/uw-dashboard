@@ -245,7 +245,20 @@ export default function PreSession() {
     )
   }
 
-  if (!data) return null
+  if (!data || !data.levels?.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="text-gray-500 text-lg">No session data</div>
+        <div className="text-gray-600 text-sm text-center">
+          Run <span className="font-mono text-white text-sm">/levels-nq R2 R1 MID S1 S2</span>
+          <br/>to load today's levels
+        </div>
+        <div className="text-gray-700 text-xs">
+          or <span className="font-mono">npm start</span> if levels haven't changed
+        </div>
+      </div>
+    )
+  }
 
   const levels   = data.levels || []
   const etfDir   = levels[0]?.etf_direction || 'neutral'

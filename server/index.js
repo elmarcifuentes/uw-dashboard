@@ -21,6 +21,7 @@ import { logger } from './sessionLogger.js'
 const app = express()
 const PORT = process.env.PORT || 3001
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*'
+const SERVER_START = Date.now()
 
 app.use(cors({ origin: ALLOWED_ORIGINS }))
 app.use(express.json())
@@ -530,6 +531,15 @@ app.get('/history', (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', last_update: latest?._received_at || null, version: '4b' })
+})
+
+app.get('/uptime', (req, res) => {
+  res.json({
+    uptime_seconds: Math.floor((Date.now() - SERVER_START) / 1000),
+    started_at:     new Date(SERVER_START).toISOString(),
+    has_data:       !!latest,
+    levels_loaded:  latest?.levels?.length || 0,
+  })
 })
 
 app.get('/status', (req, res) => {
