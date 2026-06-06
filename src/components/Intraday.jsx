@@ -225,7 +225,7 @@ export default function Intraday() {
           <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
             {subTab === 0 && <>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={id => setSelectedLevel(id)} />
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={id => setSelectedLevel(id)} selectedLevel={selectedLevel} />
             </>}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
             {subTab === 2 && <EtfTideChart history={history} compact={compact} />}

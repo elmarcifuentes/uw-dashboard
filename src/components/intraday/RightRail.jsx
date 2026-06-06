@@ -68,6 +68,20 @@ export default function RightRail({
       <div className="border border-gray-800 bg-[#111827] rounded-lg p-3">
         <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Level Evidence</div>
 
+        {/* User-selected indicator */}
+        {userSelected && activeLevel && (
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            <span className="text-xs text-indigo-400">Showing {activeLevel} evidence</span>
+            <button
+              onClick={() => { setUserSelected(false); setActiveLevel(nearestLevelId) }}
+              className="text-xs text-gray-600 hover:text-gray-400 ml-auto"
+            >
+              reset
+            </button>
+          </div>
+        )}
+
         {/* Level buttons */}
         <div className="flex gap-1 mb-3">
           {levels?.map(level => (
@@ -77,12 +91,14 @@ export default function RightRail({
                 setUserSelected(true)
                 setActiveLevel(activeLevel === level.id ? null : level.id)
               }}
-              className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${
+              className={`flex-1 py-1 rounded text-xs font-bold transition-all duration-200 ${
                 activeLevel === level.id
-                  ? level.classification === 'sell_resistance' ? 'bg-red-800 text-white'
-                    : level.classification === 'buy_support' ? 'bg-green-800 text-white'
-                    : 'bg-gray-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                  ? level.classification === 'sell_resistance'
+                    ? 'bg-red-800 text-white ring-1 ring-red-500'
+                    : level.classification === 'buy_support'
+                    ? 'bg-green-800 text-white ring-1 ring-green-500'
+                    : 'bg-gray-600 text-white ring-1 ring-gray-400'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
               {level.id}

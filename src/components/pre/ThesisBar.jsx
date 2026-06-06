@@ -1,0 +1,86 @@
+export default function ThesisBar({
+  sentiment, levels, cascade, assistantRead, currentPrice, nqRatio
+}) {
+  const dominant = levels
+    ?.filter(l => l.classification !== 'no_edge')
+    .sort((a, b) => (b.score || 0) - (a.score || 0))[0]
+
+  const mid   = levels?.find(l => l.id === 'MID')
+  const midDp = mid?.dark_pool || 0
+  const gap   = Math.abs(-0.700 - midDp)
+
+  const nq = p => nqRatio ? ` (NQ ${Math.round(p * nqRatio).toLocaleString()})` : ''
+
+  const riskText = cascade?.active
+    ? 'CASCADE ACTIVE'
+    : midDp <= -0.500
+    ? `MID dp ${midDp.toFixed(3)} — ${gap.toFixed(3)} from cascade`
+    : 'Structure intact'
+
+  const riskColor = cascade?.active
+    ? 'text-red-400'
+    : midDp <= -0.500
+    ? 'text-amber-400'
+    : 'text-green-400'
+
+  const sentimentColor = sentiment?.color === 'green' ? 'text-green-400'
+    : sentiment?.color === 'red' ? 'text-red-400'
+    : 'text-amber-400'
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-lg px-4 py-3">
+      <div className="flex items-center gap-4 overflow-x-auto">
+
+        {/* Sentiment */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`w-2 h-2 rounded-full ${
+            sentiment?.color === 'green' ? 'bg-green-500'
+              : sentiment?.color === 'red' ? 'bg-red-500'
+              : 'bg-amber-500'
+          } ${cascade?.active ? 'animate-pulse' : ''}`} />
+          <span className={`text-sm font-bold ${sentimentColor}`}>
+            {sentiment?.state || 'MIXED'}
+          </span>
+        </div>
+
+        <span className="text-gray-700 shrink-0">|</span>
+
+        {/* Dominant level */}
+        {dominant && (
+          <>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs text-gray-500">Key level</span>
+              <span className={`text-sm font-bold ${
+                dominant.classification === 'sell_resistance' ? 'text-red-400'
+                  : dominant.classification === 'buy_support' ? 'text-green-400'
+                  : 'text-gray-400'
+              }`}>
+                {dominant.id}
+              </span>
+              <span className="text-xs text-white font-mono">
+                ${dominant.price?.toFixed(2)}{nq(dominant.price)}
+              </span>
+              {dominant.full_stack && (
+                <span className="text-xs text-yellow-400 font-bold">★</span>
+              )}
+            </div>
+            <span className="text-gray-700 shrink-0">|</span>
+          </>
+        )}
+
+        {/* Risk */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs text-gray-500">Risk</span>
+          <span className={`text-xs font-medium ${riskColor}`}>{riskText}</span>
+        </div>
+
+        <span className="text-gray-700 shrink-0">|</span>
+
+        {/* One-sentence setup */}
+        {assistantRead?.now && (
+          <p className="text-xs text-gray-400 truncate min-w-0">{assistantRead.now}</p>
+        )}
+      </div>
+    </div>
+  )
+}

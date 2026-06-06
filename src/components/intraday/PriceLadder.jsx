@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect } from 'react'
+import { memo, useState, useRef, useEffect, Fragment } from 'react'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
 import { getLevelProximity, getProximityStyles } from '../../utils/proximity'
 import DpSparkline from '../DpSparkline'
@@ -113,7 +113,7 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect }) {
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel }) {
   const [expandedLevel, setExpandedLevel] = useState(null)
   const [flashLevel, setFlashLevel]       = useState(null)
   const prevPriceRef = useRef(currentPrice)
@@ -182,9 +182,9 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         const bgCls     = getClassificationBg(level.classification)
 
         return (
-          <>
+          <Fragment key={level.id}>
+          <div className="relative">
           <div
-            key={level.id}
             onClick={() => onSelect?.(level.id)}
             className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''} ${onSelect ? 'cursor-pointer' : ''}`}
           >
@@ -330,6 +330,13 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
             )}
           </div>
 
+          {selectedLevel === level.id && (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 -mr-1.5 z-10">
+              <div className="w-3 h-3 bg-indigo-500 rounded-full opacity-80"/>
+            </div>
+          )}
+          </div>
+
           {/* Yellow crosshair — between this level and the next */}
           {nextLevel && cp != null && !isNaN(cp) && cp < level.price && cp > nextLevel.price && (
             <div className="flex items-center gap-2 px-2 py-0.5">
@@ -340,7 +347,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
               <div className="flex-1 h-px bg-yellow-400/60" />
             </div>
           )}
-          </>
+          </Fragment>
         )
       })}
 

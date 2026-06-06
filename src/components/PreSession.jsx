@@ -14,6 +14,7 @@ import MarketStateCard from './pre/MarketStateCard'
 import SessionHeaderCard from './pre/SessionHeaderCard'
 import AlertsCard from './pre/AlertsCard'
 import ScenarioCards from './pre/ScenarioCards'
+import ThesisBar from './pre/ThesisBar'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -284,6 +285,16 @@ export default function PreSession({ assistantRead }) {
 
   return (
     <div className="space-y-3 py-3">
+
+      {/* Thesis bar — always first */}
+      <ThesisBar
+        sentiment={sentiment}
+        levels={levels}
+        cascade={cascade}
+        assistantRead={assistantRead}
+        currentPrice={data?.current_price}
+        nqRatio={nqRatio}
+      />
 
       {/* Session Brief — full-width above hero */}
       {sessionBrief && providerStatus?.narrativeMode === 'claude' && (

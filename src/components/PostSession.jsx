@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import SessionScoreboard from './post/SessionScoreboard'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -121,6 +122,8 @@ export default function PostSession() {
 
       {story && !storyLoading && (
         <>
+          <SessionScoreboard session={story} />
+
           {/* Summary boxes */}
           <div className="grid grid-cols-3 gap-3">
             {/* Price range */}
