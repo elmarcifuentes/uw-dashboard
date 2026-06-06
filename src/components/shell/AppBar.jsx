@@ -22,7 +22,7 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
 
   return (
     <header className="border-b border-gray-800 bg-[#0a0f1e] sticky top-0 z-50">
-      <div className="max-w-screen-xl mx-auto px-4 h-12 flex items-center justify-between gap-4">
+      <div className="max-w-screen-xl mx-auto px-3 sm:px-4 h-11 sm:h-12 flex items-center justify-between gap-2 sm:gap-4">
 
         {/* Logo */}
         <div className="flex items-center gap-2 shrink-0 relative">
@@ -66,8 +66,8 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
           <span className="text-white font-mono font-bold">
             QQQ ${price?.toFixed(2) ?? '—'}
           </span>
-          <span className="text-gray-500">/</span>
-          <span className="text-gray-300 font-mono">
+          <span className="text-gray-500 hidden sm:inline">/</span>
+          <span className="text-gray-300 font-mono hidden sm:inline">
             NQ {nqPrice?.toLocaleString() ?? '—'}
           </span>
           <span className="text-gray-600 hidden sm:block">

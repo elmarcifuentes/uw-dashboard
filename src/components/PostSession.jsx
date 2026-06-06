@@ -201,7 +201,7 @@ export default function PostSession() {
           <SessionScoreboard session={story} />
 
           {/* Summary boxes */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Price range */}
             <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
               <div className="text-xs text-gray-500 mb-1">Price Range</div>
@@ -285,6 +285,34 @@ export default function PostSession() {
           {/* Enhancement 3 — Level outcomes with Flags + ETF columns */}
           <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
             <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Level Outcomes</div>
+
+            {/* Mobile level list */}
+            <div className="block sm:hidden space-y-2">
+              {story.level_outcomes.map(level => (
+                <div key={level.level} className="bg-gray-800/50 rounded border border-gray-700/50 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white font-mono font-bold">{level.level}</span>
+                    <span className={`text-xs font-bold ${
+                      level.outcome === 'correct' ? 'text-green-400' :
+                      level.outcome === 'incorrect' ? 'text-red-400' :
+                      level.outcome === 'noise' ? 'text-amber-400' : 'text-gray-500'
+                    }`}>{level.outcome?.toUpperCase() || 'PENDING'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div className="text-gray-500">Classification <span className="text-gray-300 font-mono">
+                      {level.classification === 'buy_support' ? 'BUY SUP' : level.classification === 'sell_resistance' ? 'SELL RES' : 'NO EDGE'}
+                    </span></div>
+                    <div className="text-gray-500">Score <span className="text-gray-300 font-mono">{level.score}</span></div>
+                    <div className="text-gray-500">DP <span className="text-gray-300 font-mono">{level.dark_pool?.toFixed(3) ?? '—'}</span></div>
+                    <div className="text-gray-500">Move <span className={`font-mono ${level.price_move == null ? 'text-gray-600' : level.price_move >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {level.price_move != null ? `${level.price_move >= 0 ? '+' : ''}${level.price_move.toFixed(2)}` : '—'}
+                    </span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden sm:block">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-gray-500 border-b border-gray-700">
@@ -350,6 +378,7 @@ export default function PostSession() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* High confidence */}

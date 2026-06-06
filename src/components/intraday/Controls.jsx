@@ -101,7 +101,7 @@ export default function Controls({ compact }) {
       {/* Narrative mode */}
       <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
         <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Session Narrative</div>
-        <div className="flex gap-1">
+        <div className="flex flex-col sm:flex-row gap-1">
           {[
             { key: 'template', label: '📋 Template', desc: 'Fast — rule based' },
             { key: 'claude',   label: '🤖 Claude', desc: 'AI narrative — Haiku via Anthropic API' },

@@ -74,7 +74,7 @@ export default function FocusMode({
       {/* Row 2 — Assistant strip */}
       {assistantRead && (
         <div className="border-b border-gray-800 bg-[#0d1424] px-4 py-2">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {[
               { key: 'now',          label: 'NOW',      color: 'text-white',     border: 'border-gray-700' },
               { key: 'next',         label: 'NEXT',     color: 'text-blue-200',  border: 'border-blue-900/50' },
@@ -166,7 +166,7 @@ export default function FocusMode({
 
         <div className="border-2 border-yellow-400/50 bg-yellow-400/5 rounded-lg px-4 py-4 mb-3 text-center">
           <div className="text-xs text-yellow-500 uppercase tracking-wider mb-1">▶ Current Price</div>
-          <div className="text-4xl font-bold text-white font-mono tabular-nums">
+          <div className="text-3xl sm:text-4xl font-bold text-white font-mono tabular-nums">
             ${currentPrice?.toFixed(2)}
           </div>
           <div className="text-lg text-yellow-500/70 font-mono mt-1">
@@ -209,9 +209,9 @@ export default function FocusMode({
       </div>
 
       {/* Row 5 — Action bar */}
-      <div className="border-t border-gray-800 bg-[#0d1424] px-4 py-3 flex items-center gap-3">
+      <div className="border-t border-gray-800 bg-[#0d1424] px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center gap-2">
         <button onClick={onExit}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
+          className="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
           ⊞ Full View
         </button>
         <div className="flex-1" />

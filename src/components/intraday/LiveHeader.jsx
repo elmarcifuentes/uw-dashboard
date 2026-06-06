@@ -37,7 +37,7 @@ export default function LiveHeader({
       {/* Live indicator */}
       <div className="flex items-center gap-1.5 shrink-0">
         <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascadeActive ? 'animate-pulse' : ''}`} />
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">
           {connected ? 'Live' : 'Off'}
         </span>
       </div>
@@ -50,7 +50,7 @@ export default function LiveHeader({
         {velocity != null && (
           <span className={`text-xs font-bold ${arrowColor}`}>{arrow}</span>
         )}
-        <span className="text-sm text-gray-500 font-mono">
+        <span className="text-sm text-gray-500 font-mono hidden sm:inline">
           / NQ {nqPrice?.toLocaleString() ?? '—'}
         </span>
       </div>

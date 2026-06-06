@@ -8,15 +8,15 @@ const FIELDS = [
 export default function AssistantStrip({ assistantRead }) {
   return (
     <div className="border-b border-gray-800 bg-[#0d1424]">
-      <div className="max-w-screen-xl mx-auto px-4 py-2">
+      <div className="max-w-screen-xl mx-auto px-3 sm:px-4 py-2">
         {!assistantRead ? (
           <div className="text-xs text-gray-700 py-1">Initializing market read…</div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {FIELDS.map(f => (
-              <div key={f.key} className={`border rounded-lg px-3 py-2.5 ${f.border} bg-[#111827]/50 min-h-[64px]`}>
+              <div key={f.key} className={`border rounded-lg px-2.5 py-2 ${f.border} bg-[#111827]/50 min-h-[64px]`}>
                 <div className={`text-xs font-bold tracking-wider mb-1 ${f.labelColor}`}>{f.label}</div>
-                <p className={`text-xs leading-relaxed ${f.color}`}>{assistantRead[f.key] || '—'}</p>
+                <p className={`text-xs leading-relaxed line-clamp-3 ${f.color}`}>{assistantRead[f.key] || '—'}</p>
               </div>
             ))}
           </div>

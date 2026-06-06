@@ -11,13 +11,13 @@ const TABS = [
 
 export default function TabNav({ active, onChange, connected, unlocked }) {
   return (
-    <div className="flex border-b border-gray-800 bg-[#0a0f1e] sticky top-12 z-40 overflow-x-auto">
+    <div className="flex border-b border-gray-800 bg-[#0a0f1e] sticky top-11 sm:top-12 z-40 overflow-x-auto scrollbar-none scroll-smooth-ios">
       {TABS.map(tab => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
           className={[
-            'px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px shrink-0 flex items-center gap-1.5',
+            'px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium transition-colors border-b-2 -mb-px shrink-0 flex items-center gap-1',
             active === tab.id
               ? 'border-indigo-500 text-white'
               : 'border-transparent text-gray-400 hover:text-gray-200',

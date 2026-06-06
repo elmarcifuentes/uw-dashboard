@@ -331,7 +331,7 @@ export default function PreSession({ assistantRead }) {
       />
 
       {/* Row 1 — Three hero cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <MarketStateCard sentiment={sentiment} cascadeActive={data?.cascade?.active} />
         <SessionHeaderCard
           date={data.session}
@@ -364,7 +364,7 @@ export default function PreSession({ assistantRead }) {
       </CollapsibleSection>
 
       {/* Row 3 — Signal strength + stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="col-span-1">
           <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 h-full">
             <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Signal Strength</div>
@@ -416,13 +416,13 @@ export default function PreSession({ assistantRead }) {
       </CollapsibleSection>
 
       {/* Row 6 — Market context grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <SectorETF apiUrl={API} />
         <TopNetImpact apiUrl={API} />
       </div>
 
       {/* Row 7 — Flow signals grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <CollapsibleSection title="0DTE Flow" defaultOpen={false}>
           <ZeroDteFlow apiUrl={API} />
         </CollapsibleSection>

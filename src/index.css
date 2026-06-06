@@ -11,3 +11,24 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* Hide scrollbar for tab nav */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth momentum scrolling on iOS */
+.scroll-smooth-ios {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent zoom on input focus on iOS Safari */
+input[type="number"],
+input[type="text"],
+input[type="password"] {
+  font-size: 16px;
+}

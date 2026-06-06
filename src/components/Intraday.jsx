@@ -13,6 +13,7 @@ import NarrativeBlock from './intraday/NarrativeBlock'
 import LiveHeader from './intraday/LiveHeader'
 import RightRail from './intraday/RightRail'
 import FocusMode from './intraday/FocusMode'
+import LevelDetailSheet from './intraday/LevelDetailSheet'
 
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log']
@@ -46,6 +47,17 @@ export default function Intraday() {
   const [drawResult, setDrawResult] = useState(null)
   const [focusMode, setFocusMode] = useState(false)
   const [selectedLevel, setSelectedLevel] = useState(null)
+  const [bottomSheetOpen, setBottomSheetOpen]   = useState(false)
+  const [bottomSheetLevel, setBottomSheetLevel] = useState(null)
+
+  const handleLevelSelect = (levelId) => {
+    if (window.innerWidth < 768) {
+      setBottomSheetLevel(levelId)
+      setBottomSheetOpen(true)
+    } else {
+      setSelectedLevel(levelId)
+    }
+  }
 
   const triggerDraw = async (type) => {
     if (!unlocked || drawing) return
@@ -234,7 +246,7 @@ export default function Intraday() {
           <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
             {subTab === 0 && <>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={id => setSelectedLevel(id)} selectedLevel={selectedLevel} />
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} />
             </>}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
             {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
@@ -255,6 +267,28 @@ export default function Intraday() {
           />
         </div>
       </div>
+
+      {/* Mobile bottom sheet — level detail */}
+      {bottomSheetOpen && (
+        <div className="fixed inset-0 z-50 md:hidden" onClick={() => setBottomSheetOpen(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-[#111827] border-t border-gray-700 rounded-t-2xl p-4 max-h-[75vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-4" />
+            <LevelDetailSheet
+              levelId={bottomSheetLevel}
+              levels={result?.levels}
+              currentPrice={currentPrice}
+              nqRatio={nqRatio}
+              dpHistory={dpHistory}
+              levelNarrative={levelNarratives?.[bottomSheetLevel]}
+              onClose={() => setBottomSheetOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
