@@ -1,5 +1,34 @@
 import { memo } from 'react'
-export default memo(function NarrativeBlock({ narrative, result, lastUpdate, compact, narrativeMode }) {
+export default memo(function NarrativeBlock({ narrative, result, lastUpdate, compact, narrativeMode, tacticalBrief }) {
+  const isClaudeMode = narrativeMode === 'claude'
+
+  // Claude mode: use 2-sentence tactical brief if available
+  if (isClaudeMode && tacticalBrief) {
+    const time = lastUpdate
+      ? new Date(lastUpdate).toLocaleTimeString('en-US', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false, timeZone: 'America/New_York',
+        }) + ' ET'
+      : null
+    return (
+      <div className="rounded p-3 border border-purple-900 bg-purple-950/30">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 uppercase tracking-wide">Session Read</span>
+            <span className="inline-flex items-center gap-1 text-xs bg-purple-950 text-purple-400 px-1.5 py-0.5 rounded font-medium">
+              <svg height="0.85em" width="0.85em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
+              </svg>
+              Claude
+            </span>
+          </div>
+          {time && <span className="text-xs text-gray-600 font-mono">{time}</span>}
+        </div>
+        <p className="text-xs text-gray-300 leading-relaxed">{tacticalBrief}</p>
+      </div>
+    )
+  }
+
   const displayNarrative = narrative?.length > 0
     ? narrative
     : result?.current_price ? [
@@ -21,8 +50,6 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
   console.log('[narrative] rendering:', displayNarrative?.length, 'lines, mode:', narrativeMode, '| line 1:', displayNarrative?.[0])
 
   if (!displayNarrative.length) return null
-
-  const isClaudeMode = narrativeMode === 'claude'
 
   const time = lastUpdate
     ? new Date(lastUpdate).toLocaleTimeString('en-US', {

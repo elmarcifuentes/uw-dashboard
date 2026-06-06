@@ -10,6 +10,7 @@ import GexByExpiry from './GexByExpiry'
 import ZeroDteFlow from './ZeroDteFlow'
 import GreekFlow from './GreekFlow'
 import SentimentBadge from './SentimentBadge'
+import SessionBrief from './SessionBrief'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -146,6 +147,7 @@ export default function PreSession() {
   const [magnetStreak, setMagnetStreak]     = useState(null)
   const [lastRescoreAt, setLastRescoreAt]   = useState(null)
   const [levelNarratives, setLevelNarratives] = useState({})
+  const [sessionBrief, setSessionBrief]       = useState(null)
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -225,12 +227,17 @@ export default function PreSession() {
       .then(r => r.json())
       .then(d => { if (d?.narratives && Object.keys(d.narratives).length > 0) setLevelNarratives(d.narratives) })
       .catch(() => {})
+    fetch(`${API}/session-brief`)
+      .then(r => r.json())
+      .then(d => { if (d?.session) setSessionBrief(d.session) })
+      .catch(() => {})
     const es = new EventSource(`${API}/stream`)
     es.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data)
         if (d.type === 'rescore') setLastRescoreAt(new Date().toISOString())
         if (d.type === 'level_narratives_update') setLevelNarratives(d.narratives || {})
+        if (d.type === 'session_brief_update' && d.session) setSessionBrief(d.session)
       } catch {}
     }
     return () => es.close()
@@ -325,6 +332,7 @@ export default function PreSession() {
     <div className="space-y-4">
       {/* Sentiment badge — first element */}
       <SentimentBadge sentiment={sentiment} compact={false} />
+      <SessionBrief brief={sessionBrief} mode={providerStatus?.narrativeMode} />
 
       {/* Session header */}
       <div className="bg-gray-900/60 rounded border border-gray-700 p-3">

@@ -54,8 +54,11 @@ let lastWebhookPayload = null
 let lastNarrative           = []
 let lastNarrativeHash       = null
 let lastNarrativeMode       = null
-let lastLevelNarratives     = {}
+let lastLevelNarratives      = {}
 let lastLevelNarrativeHashes = {}
+let lastSessionBrief         = null
+let lastSessionBriefHash     = null
+let lastTacticalBrief        = null
 const history         = []
 const MAX_HISTORY     = 20
 
@@ -79,6 +82,128 @@ if (!process.env.NARRATIVE_MODE) {
   } catch { /* settings table may not exist on first boot — db.exec creates it */ }
 }
 console.log('[server] Narrative mode initialized:', narrativeMode, `(${narrativeModeSource})`)
+
+function hashSessionState(result) {
+  if (!result) return null
+  const key = {
+    cascade_active:         result.cascade?.active,
+    cascade_armed:          result.cascade?.conditions?.[0],
+    structure_break:        result.structure_break?.active,
+    structure_break_dir:    result.structure_break?.direction,
+    etf_direction:          result.etf_tide?.direction,
+    dominant_classification: result.levels?.map(l => l.classification).join(','),
+    full_stack_levels:       result.levels?.filter(l => l.full_stack).map(l => l.id).join(','),
+    expansion_gex_levels:    result.levels?.filter(l => (l.net_gex || 0) < 0).map(l => l.id).join(','),
+    mid_dp:                  result.levels?.find(l => l.id === 'MID')?.dark_pool?.toFixed(2),
+  }
+  return crypto.createHash('md5').update(JSON.stringify(key)).digest('hex')
+}
+
+async function generateSessionBrief(result) {
+  if (narrativeMode !== 'claude') return null
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return null
+
+  const hash = hashSessionState(result)
+  if (hash && hash === lastSessionBriefHash && lastSessionBrief) {
+    console.log('[session-brief] cache hit')
+    return { session: lastSessionBrief, tactical: lastTacticalBrief }
+  }
+
+  const levels       = result?.levels || []
+  const nqRatio      = result?.nq_ratio
+  const currentPrice = result?.current_price
+  const cascade      = result?.cascade
+  const mid          = levels.find(l => l.id === 'MID')
+
+  const levelSummary = levels.map(l => {
+    const nq    = nqRatio ? Math.round(l.price * nqRatio) : null
+    const nqStr = nq ? ` (NQ ${nq.toLocaleString()})` : ''
+    return `${l.id}: $${l.price?.toFixed(2)}${nqStr} — ` +
+      `${l.classification} | DP ${l.dark_pool?.toFixed(3)} | score ${l.score} | conf ${l.confidence}` +
+      `${l.full_stack ? ' | FULL STACK ★' : ''}` +
+      `${(l.net_gex || 0) < 0 ? ' | EXPANSION GEX ⚠' : ''}`
+  }).join('\n')
+
+  const currentNq  = nqRatio ? Math.round(currentPrice * nqRatio) : null
+  const currentStr = currentNq
+    ? `$${currentPrice?.toFixed(2)} (NQ ${currentNq.toLocaleString()})`
+    : `$${currentPrice?.toFixed(2)}`
+
+  const cascadeStr = cascade?.active
+    ? 'CASCADE ACTIVE ⚠ — no institutional floor below MID'
+    : cascade?.conditions?.[0]
+    ? `Cascade armed — MID DP ${mid?.dark_pool?.toFixed(3)}, ${Math.abs(-0.700 - (mid?.dark_pool || 0)).toFixed(3)} from trigger`
+    : 'Cascade inactive'
+
+  const sessionPrompt = `You are a professional QQQ/NQ futures trading analyst preparing a pre-session brief.
+
+CURRENT MARKET STATE:
+Price: ${currentStr}
+Date: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+
+LEVEL STRUCTURE:
+${levelSummary}
+
+CASCADE: ${cascadeStr}
+STRUCTURE BREAK: ${result?.structure_break?.active ? 'ACTIVE — ' + result.structure_break.direction : 'intact'}
+ETF TIDE: ${result?.etf_tide?.direction || 'unknown'}
+
+Write a session brief in 4 sentences covering:
+1. Overall structure — which level dominates and why
+2. Primary institutional signal — most important DP/flow reading
+3. Primary risk — what could accelerate a move
+4. Key thresholds — specific QQQ (NQ) prices to watch
+
+Every price must include NQ in parentheses: $703.54 (NQ 28,945).
+Reference actual DP values and scores. Flag FULL STACK ★ if present.
+Flag cascade proximity with exact gap to -0.700. Plain English, no bullets.
+Return ONLY the brief text. No headers, no labels.`
+
+  const tacticalPrompt = `You are analyzing live QQQ/NQ futures flow.
+
+CURRENT STATE: Price ${currentStr}
+LEVELS:\n${levelSummary}
+CASCADE: ${cascadeStr}
+
+Write exactly 2 sentences:
+1. Where price is right now relative to the most important level
+2. The single most important thing to watch next
+
+Include NQ prices in parentheses. Be specific with DP values. Max 2 sentences.
+Return ONLY the 2 sentences.`
+
+  try {
+    console.log('[session-brief] generating...')
+    const [sessionRes, tacticalRes] = await Promise.all([
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 300, messages: [{ role: 'user', content: sessionPrompt }] }),
+        signal: AbortSignal.timeout(15000),
+      }),
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 150, messages: [{ role: 'user', content: tacticalPrompt }] }),
+        signal: AbortSignal.timeout(15000),
+      }),
+    ])
+    const sessionText  = (await sessionRes.json()).content?.[0]?.text
+    const tacticalText = (await tacticalRes.json()).content?.[0]?.text
+    if (sessionText) {
+      lastSessionBrief     = sessionText
+      lastTacticalBrief    = tacticalText
+      lastSessionBriefHash = hash
+      console.log('[session-brief] generated')
+      console.log('[session-brief] preview:', sessionText.slice(0, 80) + '...')
+    }
+    return { session: sessionText, tactical: tacticalText }
+  } catch (err) {
+    console.warn('[session-brief] failed:', err.message)
+    return null
+  }
+}
 
 function hashLevel(level) {
   if (!level) return null
@@ -588,6 +713,14 @@ provider.onRescore(async ({ price, reason }) => {
         }
       })
       .catch(err => console.warn('[level-narrative] failed:', err.message))
+    generateSessionBrief(result)
+      .then(briefs => {
+        if (briefs?.session) {
+          sseEmitter.emit('event', { type: 'session_brief_update', session: briefs.session, tactical: briefs.tactical, timestamp: new Date().toISOString() })
+          console.log('[session-brief] SSE emitted')
+        }
+      })
+      .catch(err => console.warn('[session-brief] failed:', err.message))
   } catch (err) {
     console.error('[server] Auto-rescore failed:', err.message)
   }
@@ -748,6 +881,14 @@ app.post("/update", async (req, res) => {
       }
     })
     .catch(err => console.warn('[level-narrative] failed:', err.message))
+  generateSessionBrief(result)
+    .then(briefs => {
+      if (briefs?.session) {
+        sseEmitter.emit('event', { type: 'session_brief_update', session: briefs.session, tactical: briefs.tactical, timestamp: new Date().toISOString() })
+        console.log('[session-brief] SSE emitted')
+      }
+    })
+    .catch(err => console.warn('[session-brief] failed:', err.message))
 })
 
 app.get('/latest', (req, res) => {
@@ -1028,6 +1169,14 @@ app.post('/rescore', async (req, res) => {
         }
       })
       .catch(err => console.warn('[level-narrative] failed:', err.message))
+    generateSessionBrief(result)
+      .then(briefs => {
+        if (briefs?.session) {
+          sseEmitter.emit('event', { type: 'session_brief_update', session: briefs.session, tactical: briefs.tactical, timestamp: new Date().toISOString() })
+          console.log('[session-brief] SSE emitted')
+        }
+      })
+      .catch(err => console.warn('[session-brief] failed:', err.message))
   } catch (err) {
     console.error('[server] Manual rescore failed:', err.message)
     res.status(500).json({ error: err.message })
@@ -1313,6 +1462,11 @@ app.post('/webhook/dismiss', (req, res) => {
     sseEmitter.emit('event', { type: 'levels_dismissed', timestamp: new Date().toISOString() })
     res.json({ success: true })
   } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// GET /session-brief — return last session + tactical brief (for reconnect restore)
+app.get('/session-brief', (req, res) => {
+  res.json({ session: lastSessionBrief, tactical: lastTacticalBrief, timestamp: new Date().toISOString() })
 })
 
 // GET /level-narratives — return per-level Claude narratives (for reconnect restore)

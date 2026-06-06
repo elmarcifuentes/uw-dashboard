@@ -17,6 +17,8 @@ export function useSSE(url) {
   const [narrativeMode, setNarrativeMode]     = useState('template')
   const [pendingLevels, setPendingLevels]     = useState(null)
   const [levelNarratives, setLevelNarratives] = useState({})
+  const [sessionBrief, setSessionBrief]       = useState(null)
+  const [tacticalBrief, setTacticalBrief]     = useState(null)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
 
@@ -41,6 +43,14 @@ export function useSSE(url) {
               console.log('[SSE] narrative mode restored from status:', data.narrativeMode)
               setNarrativeMode(data.narrativeMode)
             }
+          })
+          .catch(() => {})
+        // Restore session + tactical brief
+        fetch(`${apiBase}/session-brief`)
+          .then(r => r.json())
+          .then(data => {
+            if (data?.session) setSessionBrief(data.session)
+            if (data?.tactical) setTacticalBrief(data.tactical)
           })
           .catch(() => {})
         // Restore level narratives
@@ -117,6 +127,11 @@ export function useSSE(url) {
           setPinningSessions(data.consecutivePinningSessions ?? 0)
           return
         }
+        if (data.type === 'session_brief_update') {
+          if (data.session)  setSessionBrief(data.session)
+          if (data.tactical) setTacticalBrief(data.tactical)
+          return
+        }
         if (data.type === 'level_narratives_update') {
           console.log('[SSE] level narratives updated:', Object.keys(data.narratives || {}))
           setLevelNarratives(data.narratives || {})
@@ -158,5 +173,7 @@ export function useSSE(url) {
     pendingLevels,
     clearPendingLevels: () => setPendingLevels(null),
     levelNarratives,
+    sessionBrief,
+    tacticalBrief,
   }
 }

@@ -24,7 +24,7 @@ export default function Intraday() {
     history, levelAlert, clearLevelAlert,
     chartStale, staleChanges,
     expansionGex, pinningSessions,
-    midDpHistory, dpHistory, narrative, narrativeMode, levelNarratives,
+    midDpHistory, dpHistory, narrative, narrativeMode, levelNarratives, tacticalBrief,
   } = useSSE(`${API_URL}/stream`)
 
   const { compact, toggle } = useLayout()
@@ -174,7 +174,7 @@ export default function Intraday() {
       <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
 
       {/* Auto narrative — memo'd */}
-      <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} />
+      <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} tacticalBrief={tacticalBrief} />
 
       {/* Sub-tab navigation */}
       <div className="flex gap-1 flex-wrap">
