@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import AlertBadge from './AlertBadge'
 
 const API_URL   = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const LEVEL_IDS = ['R2', 'R1', 'MID', 'S1', 'S2']
@@ -191,14 +192,12 @@ export default function LevelsTab() {
 
       {/* Pending webhook banner */}
       {pending && (
-        <div className="border border-amber-500 rounded p-3 bg-amber-950">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-amber-400 font-bold text-sm">📡 New levels from TradingView</span>
-            <span className="text-amber-600 text-xs font-mono">
-              {new Date(pending.received_at + 'Z')
-                .toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })} ET
-            </span>
-          </div>
+        <div className="border border-amber-700/60 rounded-lg bg-amber-950/20 p-3 space-y-3">
+          <AlertBadge
+            type="watch"
+            label="📡 New levels from TradingView"
+            detail={`Received ${new Date(pending.received_at + 'Z').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })} ET — review and accept to update scoring`}
+          />
 
           <div className="mb-3 text-xs space-y-0.5">
             <div className="grid grid-cols-5 gap-1 mb-1">

@@ -1,8 +1,11 @@
+import { useState } from 'react'
+
 export default function LiveHeader({
   connected, price, nqPrice, velocity,
   sentiment, drawing, drawResult, unlocked,
-  onDrawQqq, onDrawBoth, onCompact, compact, onFocus,
+  onDrawQqq, onDrawBoth, onCompact, compact, onFocus, cascadeActive,
 }) {
+  const [showOverflow, setShowOverflow] = useState(false)
   const abs = velocity != null ? Math.abs(velocity) : 0
   const up  = velocity > 0
   const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : abs > 0.005 ? (up ? '↑' : '↓') : '→'
@@ -29,7 +32,7 @@ export default function LiveHeader({
   }
 
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg px-4 py-2.5 flex items-center gap-4 flex-wrap">
+    <div className="bg-[#111827] border border-gray-800 rounded-lg px-4 py-2.5 flex items-center gap-4 flex-wrap relative">
 
       {/* Live indicator */}
       <div className="flex items-center gap-1.5 shrink-0">
@@ -63,15 +66,15 @@ export default function LiveHeader({
             sentiment.color === 'green' ? 'bg-green-500'
               : sentiment.color === 'red' ? 'bg-red-500'
               : 'bg-amber-500'
-          } ${sentiment.state === 'HIGH_RISK' ? 'animate-pulse' : ''}`} />
+          } ${sentiment.state === 'HIGH_RISK' && !cascadeActive ? 'animate-pulse' : ''}`} />
           {sentiment.state}
         </div>
       )}
 
       <div className="flex-1" />
 
-      {/* Draw buttons */}
-      <div className="flex items-center gap-2 shrink-0">
+      {/* Draw buttons — desktop only */}
+      <div className="hidden lg:flex items-center gap-2 shrink-0">
         <button onClick={onDrawQqq} disabled={!unlocked || !!drawing} className={drawBtnClass('qqq')}>
           {drawLabel('qqq')}
         </button>
@@ -79,19 +82,41 @@ export default function LiveHeader({
           {drawLabel('both')}
         </button>
         {onFocus && (
-          <button
-            onClick={onFocus}
-            className="text-xs text-gray-500 hover:text-white px-2 py-1 border border-gray-700 rounded transition-colors"
-          >
+          <button onClick={onFocus} className="text-xs text-gray-500 hover:text-white px-2 py-1 border border-gray-700 rounded transition-colors">
             ⊡ Focus
           </button>
         )}
-        <button
-          onClick={onCompact}
-          className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 border border-gray-700 rounded transition-colors"
-        >
+        <button onClick={onCompact} className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 border border-gray-700 rounded transition-colors">
           {compact ? '⊞ Full' : '⊡ Compact'}
         </button>
+      </div>
+
+      {/* Tablet overflow menu */}
+      <div className="flex lg:hidden items-center gap-2 shrink-0">
+        <button onClick={onCompact} className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 border border-gray-700 rounded transition-colors">
+          {compact ? '⊞ Full' : '⊡ Compact'}
+        </button>
+        <button
+          onClick={() => setShowOverflow(!showOverflow)}
+          className="text-gray-500 hover:text-gray-300 px-2 py-1 border border-gray-700 rounded text-xs transition-colors"
+        >
+          ⋯
+        </button>
+        {showOverflow && (
+          <div className="absolute top-full mt-1 right-0 z-50 bg-[#111827] border border-gray-800 rounded-lg p-2 space-y-1 shadow-xl">
+            <button onClick={() => { onDrawQqq(); setShowOverflow(false) }} disabled={!unlocked || !!drawing} className="block w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded disabled:opacity-50">
+              {drawLabel('qqq')}
+            </button>
+            <button onClick={() => { onDrawBoth(); setShowOverflow(false) }} disabled={!unlocked || !!drawing} className="block w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded disabled:opacity-50">
+              {drawLabel('both')}
+            </button>
+            {onFocus && (
+              <button onClick={() => { onFocus(); setShowOverflow(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded">
+                ⊡ Focus Mode
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -37,7 +37,7 @@ export default function ThesisBar({
             sentiment?.color === 'green' ? 'bg-green-500'
               : sentiment?.color === 'red' ? 'bg-red-500'
               : 'bg-amber-500'
-          } ${cascade?.active ? 'animate-pulse' : ''}`} />
+          } ${sentiment?.state === 'HIGH_RISK' && !cascade?.active ? 'animate-pulse' : ''}`} />
           <span className={`text-sm font-bold ${sentimentColor}`}>
             {sentiment?.state || 'MIXED'}
           </span>
@@ -71,7 +71,15 @@ export default function ThesisBar({
         {/* Risk */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-xs text-gray-500">Risk</span>
-          <span className={`text-xs font-medium ${riskColor}`}>{riskText}</span>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+            cascade?.active
+              ? 'bg-red-950 text-red-400 border border-red-800'
+              : midDp <= -0.500
+              ? 'bg-amber-950 text-amber-400 border border-amber-800'
+              : 'text-gray-500'
+          }`}>
+            {riskText}
+          </span>
         </div>
 
         <span className="text-gray-700 shrink-0">|</span>

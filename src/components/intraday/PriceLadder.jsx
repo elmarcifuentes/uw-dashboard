@@ -143,6 +143,10 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
 
   const cp = currentPrice != null ? Number(currentPrice) : null
 
+  const criticalLevel = cp != null
+    ? sorted.find(l => Math.abs(cp - l.price) <= 0.15)
+    : null
+
   return (
     <div className="flex flex-col gap-1.5">
 
@@ -186,7 +190,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           <div className="relative">
           <div
             onClick={() => onSelect?.(level.id)}
-            className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''} ${onSelect ? 'cursor-pointer' : ''}`}
+            className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse && level.id === criticalLevel?.id ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''} ${onSelect ? 'cursor-pointer' : ''}`}
           >
             {/* Proximity label */}
             {styles.label && (

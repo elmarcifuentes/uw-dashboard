@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import AlertBadge from '../AlertBadge'
 
 function CascadeThermometer({ midDp }) {
   const clamped       = Math.max(-1.0, Math.min(0.5, midDp ?? 0))
@@ -153,19 +154,13 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
       )}
 
       {/* Status line */}
-      <div className="mt-1.5 text-xs">
+      <div className="mt-1.5">
         {active ? (
-          <span className="text-red-400 font-bold">
-            All three conditions met — no institutional floor below MID
-          </span>
+          <AlertBadge type="critical" label="CASCADE ACTIVE" detail="Unimpeded downside — no floor below MID" />
         ) : gap !== null ? (
-          <span className="text-gray-600">
-            {gap.toFixed(3)} remaining to cascade threshold
-          </span>
+          <span className="text-xs text-gray-600">{gap.toFixed(3)} remaining to cascade threshold</span>
         ) : (
-          <span className="text-amber-400 animate-pulse">
-            ⚠ Past cascade threshold — waiting for S1/S2 conditions
-          </span>
+          <AlertBadge type="watch" label="Past threshold" detail="Waiting for S1/S2 conditions" />
         )}
       </div>
 

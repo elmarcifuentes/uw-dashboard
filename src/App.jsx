@@ -30,10 +30,11 @@ function AppInner() {
 
   const { connected, priceData, rescoreData, assistantRead, narrativeMode } = useSSE(`${API_URL}/stream`)
 
-  const result       = useMemo(() => rescoreData?.result ?? null, [rescoreData])
-  const currentPrice = priceData?.price ?? result?.current_price
-  const nqRatio      = result?.nq_ratio ? Number(result.nq_ratio) : null
-  const nqPrice      = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio) : null
+  const result        = useMemo(() => rescoreData?.result ?? null, [rescoreData])
+  const currentPrice  = priceData?.price ?? result?.current_price
+  const nqRatio       = result?.nq_ratio ? Number(result.nq_ratio) : null
+  const nqPrice       = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio) : null
+  const cascadeActive = result?.cascade?.active ?? false
 
   useEffect(() => { localStorage.setItem('uw-active-tab', activeTab) }, [activeTab])
 
@@ -49,6 +50,7 @@ function AppInner() {
         narrativeMode={narrativeMode}
         unlocked={unlocked}
         onLockClick={() => setShowModal(true)}
+        cascadeActive={cascadeActive}
       />
 
       <TabNav active={activeTab} onChange={setActiveTab} connected={connected} unlocked={unlocked} />

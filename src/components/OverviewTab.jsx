@@ -88,7 +88,7 @@ export default function OverviewTab({ onNavigate }) {
                 effectiveSentiment.color === 'green' ? 'bg-green-500'
                   : effectiveSentiment.color === 'red' ? 'bg-red-500'
                   : 'bg-amber-500'
-              } ${effectiveSentiment.state === 'HIGH_RISK' ? 'animate-pulse' : ''}`} />
+              } ${effectiveSentiment.state === 'HIGH_RISK' && !cascade?.active ? 'animate-pulse' : ''}`} />
               {effectiveSentiment.state}
             </div>
           )}

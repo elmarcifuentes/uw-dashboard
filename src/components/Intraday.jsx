@@ -155,6 +155,7 @@ export default function Intraday() {
         onCompact={toggle}
         compact={compact}
         onFocus={() => setFocusMode(true)}
+        cascadeActive={cascade?.active}
       />
 
       {/* Chart stale badge */}
@@ -204,7 +205,7 @@ export default function Intraday() {
       <div className="grid grid-cols-12 gap-3">
 
         {/* Left column */}
-        <div className="col-span-12 lg:col-span-8 space-y-3">
+        <div className="col-span-12 md:col-span-8 space-y-3">
           <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
           <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} tacticalBrief={tacticalBrief} />
 
@@ -239,8 +240,8 @@ export default function Intraday() {
           </div>
         </div>
 
-        {/* Right rail — hidden on mobile, 4-col on large screens */}
-        <div className="hidden lg:block lg:col-span-4">
+        {/* Right rail — visible on tablet+, 4-col */}
+        <div className="hidden md:block md:col-span-4">
           <RightRail
             levels={result?.levels}
             currentPrice={currentPrice}

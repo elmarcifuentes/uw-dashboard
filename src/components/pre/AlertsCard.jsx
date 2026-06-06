@@ -1,3 +1,5 @@
+import AlertBadge from '../AlertBadge'
+
 const CONDITIONS = [
   'MID dp ≤ -0.700',
   'S1 zero/artifact',
@@ -21,37 +23,25 @@ export default function AlertsCard({ cascade, structureBreak, levels, currentPri
       <div className="text-xs text-gray-500 uppercase tracking-wider">Alerts</div>
 
       {/* Cascade status */}
-      <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full ${
-          cascade?.active ? 'bg-red-500 animate-pulse'
-            : isCaution ? 'bg-amber-500'
-            : 'bg-green-500'
-        }`} />
-        <span className={`text-sm font-bold ${
-          cascade?.active ? 'text-red-400'
-            : isCaution ? 'text-amber-400'
-            : 'text-green-400'
-        }`}>
-          {cascade?.active ? 'CASCADE ACTIVE'
-            : isCaution ? 'APPROACHING'
-            : 'CASCADE SAFE'}
-        </span>
-      </div>
-
-      {/* MID dp detail */}
-      <div className="text-xs font-mono">
-        <span className="text-gray-600">MID dp </span>
-        <span className={
-          midDp <= -0.700 ? 'text-red-400'
-            : midDp <= -0.500 ? 'text-amber-400'
-            : 'text-gray-400'
-        }>
-          {midDp.toFixed(3)}
-        </span>
-        {!cascade?.active && (
-          <span className="text-gray-600 ml-2">— {gap} from -0.700</span>
-        )}
-      </div>
+      {cascade?.active ? (
+        <AlertBadge
+          type="critical"
+          label="CASCADE ACTIVE"
+          detail={`MID dp ${midDp.toFixed(3)} — threshold crossed`}
+        />
+      ) : isCaution ? (
+        <AlertBadge
+          type="watch"
+          label="APPROACHING THRESHOLD"
+          detail={`MID dp ${midDp.toFixed(3)} — ${gap} from -0.700`}
+        />
+      ) : (
+        <AlertBadge
+          type="info"
+          label="CASCADE SAFE"
+          detail={`MID dp ${midDp.toFixed(3)} — structure intact`}
+        />
+      )}
 
       {/* Cascade conditions */}
       <div className="space-y-1">

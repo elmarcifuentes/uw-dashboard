@@ -8,7 +8,7 @@ function SessionTypeChip() {
   return <span className={`text-xs px-2 py-0.5 rounded font-medium ${color}`}>{label}</span>
 }
 
-export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked }) {
+export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive }) {
   const [showInfo, setShowInfo] = useState(false)
 
   return (
@@ -53,7 +53,7 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
 
         {/* Market context — center */}
         <div className="flex items-center gap-3 text-xs">
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascadeActive ? 'animate-pulse' : ''}`} />
           <span className="text-white font-mono font-bold">
             QQQ ${price?.toFixed(2) ?? '—'}
           </span>
