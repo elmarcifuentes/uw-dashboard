@@ -69,22 +69,24 @@ export default function OverviewTab() {
           <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Market State</div>
           <SentimentBadge sentiment={sentiment} compact={false} />
           {assistantRead?.now && (
-            <p className="text-xs text-gray-400 mt-3 leading-relaxed line-clamp-2">
+            <p className="text-xs text-gray-500 mt-2 leading-relaxed">
               {assistantRead.now}
             </p>
           )}
           {sessionBrief && (
-            <button
-              onClick={() => setShowBrief(v => !v)}
-              className="text-xs text-purple-600 mt-2 hover:text-purple-400 block"
-            >
-              {showBrief ? '▲ hide brief' : '▼ full brief'}
-            </button>
-          )}
-          {showBrief && sessionBrief && (
-            <p className="text-xs text-gray-400 mt-2 leading-relaxed border-t border-gray-800 pt-2">
-              {sessionBrief}
-            </p>
+            <div className="mt-2 border-t border-gray-800 pt-2">
+              <button
+                onClick={() => setShowBrief(!showBrief)}
+                className="text-xs text-purple-700 hover:text-purple-500"
+              >
+                {showBrief ? '▲ hide' : '▼ session brief'}
+              </button>
+              {showBrief && (
+                <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                  {sessionBrief}
+                </p>
+              )}
+            </div>
           )}
         </div>
 

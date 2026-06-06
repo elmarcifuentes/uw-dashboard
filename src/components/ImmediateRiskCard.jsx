@@ -32,15 +32,16 @@ export default function ImmediateRiskCard({ cascade, levels, structureBreak }) {
           { label: 'S1 zero/artifact', met: cascade?.conditions?.[1] },
           { label: 'S2 structural void', met: cascade?.conditions?.[2] },
         ].map((c, i) => (
-          <div key={i} className={`flex items-center gap-2 rounded px-2 py-1 ${
-            c.met ? 'bg-red-950/50 border border-red-900/50' : 'bg-gray-900/50'
+          <div key={i} className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 ${
+            c.met ? 'bg-red-950/60 border border-red-800/60' : 'bg-gray-900/40 border border-gray-800/40'
           }`}>
-            <span className={`text-xs font-bold ${c.met ? 'text-red-400' : 'text-gray-700'}`}>
+            <span className={`text-sm font-bold leading-none ${c.met ? 'text-red-400' : 'text-gray-700'}`}>
               {c.met ? '✓' : '○'}
             </span>
-            <span className={`text-xs ${c.met ? 'text-red-300' : 'text-gray-600'}`}>
+            <span className={`text-xs ${c.met ? 'text-red-300 font-medium' : 'text-gray-600'}`}>
               {c.label}
             </span>
+            {c.met && <span className="ml-auto text-xs text-red-500 font-bold">MET</span>}
           </div>
         ))}
       </div>

@@ -8,12 +8,20 @@ export default function EvidenceMeter({ levels, etfDirection }) {
 
   const dpPct  = Math.round(((avgDp + 1) / 2) * 100)
   const flPct  = Math.round(((flowBias + 1) / 2) * 100)
-  const etfPct = etfDirection === 'bullish' ? 65 : etfDirection === 'bearish' ? 35 : 50
+  const etfPct = etfDirection === 'bullish' ? 62 : etfDirection === 'bearish' ? 38 : 50
+
+  const flowLabel = buyCount > sellCount ? `↑ ${buyCount} buy`
+    : sellCount > buyCount ? `↓ ${sellCount} sell`
+    : 'neutral'
+
+  const etfLabel = etfDirection === 'bullish' ? '↑ bull'
+    : etfDirection === 'bearish' ? '↓ bear'
+    : '→ neut'
 
   const meters = [
     { label: 'Dark Pool', pct: dpPct,  value: avgDp.toFixed(3) },
-    { label: 'Flow',      pct: flPct,  value: `${buyCount}B/${sellCount}S` },
-    { label: 'ETF Tide',  pct: etfPct, value: etfDirection || 'neutral' },
+    { label: 'Flow',      pct: flPct,  value: flowLabel },
+    { label: 'ETF Tide',  pct: etfPct, value: etfLabel },
   ]
 
   return (

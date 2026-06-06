@@ -380,20 +380,19 @@ async function generateAssistantRead(result) {
     return `${l.id} $${l.price?.toFixed(2)}${nq} — ${l.classification} DP ${l.dark_pool?.toFixed(3)}${l.full_stack ? ' FULL STACK ★' : ''}`
   }).join('\n')
 
-  const prompt = `You are analyzing live QQQ/NQ institutional flow.
+  const currentNq = nqRatio ? Math.round(currentPrice * nqRatio).toLocaleString() : '—'
+  const cascadeStr = cascade?.active ? 'ACTIVE' : mid?.dark_pool <= -0.700 ? 'threshold met' : `${Math.abs(-0.700 - (mid?.dark_pool || 0)).toFixed(3)} from trigger`
 
-Price: $${currentPrice?.toFixed(2)}${nqRatio ? ` (NQ ${Math.round(currentPrice * nqRatio).toLocaleString()})` : ''}
+  const prompt = `Analyze this QQQ/NQ scoring result.
 
-Levels:
-${levelSummary}
+Price: $${currentPrice?.toFixed(2)} (NQ ${currentNq})
+Levels: ${levelSummary}
+Cascade: ${cascadeStr}
 
-Cascade: ${cascade?.active ? 'ACTIVE' : mid?.dark_pool <= -0.700 ? 'threshold met — monitoring S1/S2' : `${Math.abs(-0.700 - (mid?.dark_pool || 0)).toFixed(3)} from trigger`}
-Structure: ${result?.structure_break?.active ? 'BREAK ' + result.structure_break.direction : 'intact'}
+Return ONLY this JSON. Each value MAX 10 words.
+No markdown. No explanation.
 
-Return ONLY valid JSON with exactly these four fields. Each value must be ONE sentence maximum.
-Always include NQ prices in parentheses. No markdown, no explanation, just the JSON object.
-
-{"now":"one sentence — what is happening right now","next":"one sentence — most likely next price test or move","risk":"one sentence — primary risk to current thesis","invalidation":"one sentence — what would change the read"}`
+{"now":"10 words max describing current state","next":"10 words max on next likely move","risk":"10 words max on primary risk","invalidation":"10 words max on what changes thesis"}`
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {

@@ -14,9 +14,9 @@ export default function AssistantStrip({ assistantRead }) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {FIELDS.map(f => (
-              <div key={f.key} className={`border rounded-lg px-3 py-2 ${f.border} bg-[#111827]/50`}>
+              <div key={f.key} className={`border rounded-lg px-3 py-2.5 ${f.border} bg-[#111827]/50 min-h-[64px]`}>
                 <div className={`text-xs font-bold tracking-wider mb-1 ${f.labelColor}`}>{f.label}</div>
-                <p className={`text-xs leading-relaxed ${f.color} line-clamp-2`}>{assistantRead[f.key] || '—'}</p>
+                <p className={`text-xs leading-relaxed ${f.color}`}>{assistantRead[f.key] || '—'}</p>
               </div>
             ))}
           </div>
