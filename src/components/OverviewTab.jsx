@@ -161,17 +161,8 @@ export default function OverviewTab({ onNavigate }) {
 
       {/* Lower row — Top Movers + Sector Flow */}
       <div className="grid grid-cols-2 gap-3">
-
-        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Top Movers</div>
-          <TopNetImpact apiUrl={API_URL} />
-        </div>
-
-        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Sector Flow</div>
-          <SectorETF apiUrl={API_URL} />
-        </div>
-
+        <TopNetImpact apiUrl={API_URL} />
+        <SectorETF apiUrl={API_URL} />
       </div>
     </div>
   )
