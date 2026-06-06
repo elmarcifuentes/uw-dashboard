@@ -401,12 +401,8 @@ export default function PreSession() {
 
       {/* Row 6 — Market context grid */}
       <div className="grid grid-cols-2 gap-3">
-        <CollapsibleSection title="Sector Flow" defaultOpen={true}>
-          <SectorETF apiUrl={API} />
-        </CollapsibleSection>
-        <CollapsibleSection title="Top Movers" defaultOpen={true}>
-          <TopNetImpact apiUrl={API} />
-        </CollapsibleSection>
+        <SectorETF apiUrl={API} />
+        <TopNetImpact apiUrl={API} />
       </div>
 
       {/* Row 7 — Flow signals grid */}

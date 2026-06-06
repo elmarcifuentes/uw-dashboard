@@ -154,18 +154,14 @@ CASCADE: ${cascadeStr}
 STRUCTURE BREAK: ${result?.structure_break?.active ? 'ACTIVE — ' + result.structure_break.direction : 'intact'}
 ETF TIDE: ${result?.etf_tide?.direction || 'unknown'}
 
-Write a session brief in 4 sentences covering:
-1. Overall structure — which level dominates and why
-2. Primary institutional signal — most important DP/flow reading
-3. Primary risk — what could accelerate a move
-4. Key thresholds — specific QQQ (NQ) prices to watch
+Write EXACTLY 3 sentences. No more than 3 sentences total. Each sentence max 25 words.
+Sentence 1: Overall structure — dominant level and why (include DP value).
+Sentence 2: Primary risk — cascade threshold or key level with exact gap.
+Sentence 3: Key thresholds — specific prices QQQ (NQ) to watch.
 
 Every price must include NQ in parentheses: $703.54 (NQ 28,945).
-Reference actual DP values and scores. Flag FULL STACK ★ if present.
-Cascade fires specifically when MID dark pool crosses -0.700 — not R1 or R2.
-R1/R2 dark pool values indicate supply/demand strength but do NOT trigger cascade.
-Only reference cascade risk in context of MID DP. If MID DP is approaching -0.700, state the exact gap.
-Plain English, no bullets. Return ONLY the brief text. No headers, no labels.`
+Cascade fires when MID dark pool crosses -0.700 only. No bullets, no headers.
+CRITICAL: Return ONLY 3 sentences. Stop after the third sentence.`
 
   const tacticalPrompt = `You are analyzing live QQQ/NQ futures flow.
 
@@ -186,7 +182,7 @@ Return ONLY the 2 sentences.`
       fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 300, messages: [{ role: 'user', content: sessionPrompt }] }),
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, messages: [{ role: 'user', content: sessionPrompt }] }),
         signal: AbortSignal.timeout(15000),
       }),
       fetch('https://api.anthropic.com/v1/messages', {

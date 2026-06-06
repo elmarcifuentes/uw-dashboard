@@ -48,7 +48,6 @@ export default function SessionHeaderCard({
         </div>
         <div className="text-sm text-gray-500 font-mono">
           NQ {nqPrice ?? '—'}
-          {nqRatio && <span className="text-gray-700 ml-2">ratio {nqRatio?.toFixed(3)}</span>}
         </div>
       </div>
 

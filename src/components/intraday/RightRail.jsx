@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import DpSparkline from '../DpSparkline'
+import { stripMarkdown } from '../../utils/stripMarkdown'
 
 export default function RightRail({
   levels, currentPrice, nqRatio, cascade, dpHistory, levelNarratives,
 }) {
   const [activeLevel, setActiveLevel] = useState(null)
   const [userSelected, setUserSelected] = useState(false)
+  const [narrativeExpanded, setNarrativeExpanded] = useState(false)
 
   const nearestLevelId = useMemo(() => {
     if (!levels?.length || !currentPrice) return null
@@ -179,9 +181,17 @@ export default function RightRail({
             {/* Claude narrative */}
             {levelNarratives?.[activeLevelData.id] && (
               <div className="border-t border-gray-800 pt-2 mt-1">
-                <p className="text-xs text-gray-300 leading-relaxed italic border-l-2 border-purple-900 pl-2">
-                  {levelNarratives[activeLevelData.id]}
+                <p className={`text-xs text-gray-300 leading-relaxed italic border-l-2 border-purple-900 pl-2 ${narrativeExpanded ? '' : 'line-clamp-4'}`}>
+                  {stripMarkdown(levelNarratives[activeLevelData.id])}
                 </p>
+                {levelNarratives[activeLevelData.id].length > 300 && (
+                  <button
+                    onClick={() => setNarrativeExpanded(!narrativeExpanded)}
+                    className="text-xs text-purple-700 hover:text-purple-500 mt-1"
+                  >
+                    {narrativeExpanded ? '▲ less' : '▼ more'}
+                  </button>
+                )}
               </div>
             )}
           </div>

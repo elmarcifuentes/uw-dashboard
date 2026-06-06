@@ -2,6 +2,7 @@ import { memo, useState, useRef, useEffect } from 'react'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
 import { getLevelProximity, getProximityStyles } from '../../utils/proximity'
 import DpSparkline from '../DpSparkline'
+import { stripMarkdown } from '../../utils/stripMarkdown'
 
 const LEVEL_DESCRIPTIONS = {
   buy_support:     'Institutional buying below — price expected to be drawn upward',
@@ -314,7 +315,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                 </button>
                 {expandedLevel === level.id && (
                   <p className="text-xs text-gray-300 mt-1.5 leading-relaxed italic border-l-2 border-purple-800 pl-2">
-                    {levelNarratives[level.id]}
+                    {stripMarkdown(levelNarratives[level.id])}
                   </p>
                 )}
               </div>

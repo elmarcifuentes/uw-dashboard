@@ -5,6 +5,7 @@ import { getLevelProximity, getProximityStyles } from '../utils/proximity'
 import DpBar from './DpBar'
 import GexBar from './GexBar'
 import { dpConditionLabel, midDpWarning } from '../utils/dpLabels'
+import { stripMarkdown } from '../utils/stripMarkdown'
 
 const LEVEL_DESCRIPTIONS = {
   buy_support:     'Institutional buying below this level — price expected to be drawn upward',
@@ -285,7 +286,7 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
           </button>
           {expanded && (
             <p className="text-xs text-gray-300 mt-1.5 leading-relaxed italic">
-              {levelNarrative}
+              {stripMarkdown(levelNarrative)}
             </p>
           )}
         </div>
