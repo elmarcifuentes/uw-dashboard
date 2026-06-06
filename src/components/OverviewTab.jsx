@@ -128,7 +128,7 @@ export default function OverviewTab({ onNavigate }) {
             NQ {nqPrice?.toLocaleString() ?? '—'}
           </div>
           <div className="flex items-center gap-2 mt-3">
-            <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascade?.active ? 'animate-pulse' : ''}`} />
             <span className="text-xs text-gray-500">{connected ? 'LIVE' : 'DISCONNECTED'}</span>
             {priceVelocity != null && (() => {
               const abs = Math.abs(priceVelocity), up = priceVelocity > 0

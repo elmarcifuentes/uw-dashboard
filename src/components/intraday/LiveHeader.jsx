@@ -36,7 +36,7 @@ export default function LiveHeader({
 
       {/* Live indicator */}
       <div className="flex items-center gap-1.5 shrink-0">
-        <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+        <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascadeActive ? 'animate-pulse' : ''}`} />
         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
           {connected ? 'Live' : 'Off'}
         </span>

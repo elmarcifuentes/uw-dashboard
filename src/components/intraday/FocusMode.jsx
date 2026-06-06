@@ -45,7 +45,7 @@ export default function FocusMode({
       {/* Row 1 — Live bar */}
       <div className="border-b border-gray-800 bg-[#0d1424] px-4 py-2.5 flex items-center gap-4">
         <div className="flex items-center gap-1.5">
-          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascade?.active ? 'animate-pulse' : ''}`} />
           <span className="text-xs text-gray-500 uppercase tracking-wider">LIVE</span>
         </div>
         <div className="flex items-baseline gap-2">

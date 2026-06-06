@@ -1,4 +1,4 @@
-export default function MarketStateCard({ sentiment }) {
+export default function MarketStateCard({ sentiment, cascadeActive }) {
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 space-y-3">
       <div className="text-xs text-gray-500 uppercase tracking-wider">Market State</div>
@@ -15,7 +15,7 @@ export default function MarketStateCard({ sentiment }) {
             sentiment.color === 'green' ? 'bg-green-500'
               : sentiment.color === 'red' ? 'bg-red-500'
               : 'bg-amber-500'
-          } ${sentiment.state === 'HIGH_RISK' ? 'animate-pulse' : ''}`} />
+          } ${sentiment.state === 'HIGH_RISK' && !cascadeActive ? 'animate-pulse' : ''}`} />
           {sentiment.state}
         </div>
       ) : (

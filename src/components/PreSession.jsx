@@ -332,7 +332,7 @@ export default function PreSession({ assistantRead }) {
 
       {/* Row 1 — Three hero cards */}
       <div className="grid grid-cols-3 gap-3">
-        <MarketStateCard sentiment={sentiment} />
+        <MarketStateCard sentiment={sentiment} cascadeActive={data?.cascade?.active} />
         <SessionHeaderCard
           date={data.session}
           sessionType={sessionType}

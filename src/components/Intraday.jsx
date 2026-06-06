@@ -88,6 +88,7 @@ export default function Intraday() {
           gain.gain.setValueAtTime(0.1, ctx.currentTime)
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
           osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5)
+          osc.onended = () => ctx.close()
         } catch { /* audio not supported */ }
       }
     })
@@ -112,6 +113,7 @@ export default function Intraday() {
         gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3)
         osc.start(start); osc.stop(start + 0.3)
       })
+      setTimeout(() => ctx.close(), 1000)
     } catch { /* audio not supported */ }
   }, [cascade?.active, soundEnabled])
 
