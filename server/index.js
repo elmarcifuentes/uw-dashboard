@@ -157,8 +157,10 @@ Write a session brief in 4 sentences covering:
 
 Every price must include NQ in parentheses: $703.54 (NQ 28,945).
 Reference actual DP values and scores. Flag FULL STACK ★ if present.
-Flag cascade proximity with exact gap to -0.700. Plain English, no bullets.
-Return ONLY the brief text. No headers, no labels.`
+Cascade fires specifically when MID dark pool crosses -0.700 — not R1 or R2.
+R1/R2 dark pool values indicate supply/demand strength but do NOT trigger cascade.
+Only reference cascade risk in context of MID DP. If MID DP is approaching -0.700, state the exact gap.
+Plain English, no bullets. Return ONLY the brief text. No headers, no labels.`
 
   const tacticalPrompt = `You are analyzing live QQQ/NQ futures flow.
 
