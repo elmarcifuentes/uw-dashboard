@@ -32,7 +32,8 @@ export default function Intraday() {
   const { unlocked, authPost } = useAuth()
   const sentiment     = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundEnabled') === 'true')
-  const soundCooldownRef = useRef({})
+  const soundCooldownRef    = useRef({})
+  const cascadeSoundPlayed  = useRef(false)
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'soundEnabled') setSoundEnabled(e.newValue === 'true') }
@@ -76,7 +77,7 @@ export default function Intraday() {
     result.levels.forEach(level => {
       const dist = Math.abs(currentPrice - level.price)
       const last = soundCooldownRef.current[level.id] || 0
-      if (dist <= 0.15 && now - last > 10000) {
+      if (dist <= 0.15 && now - last > 60000) {
         soundCooldownRef.current[level.id] = now
         try {
           const ctx  = new (window.AudioContext || window.webkitAudioContext)()
@@ -93,7 +94,12 @@ export default function Intraday() {
   }, [currentPrice, soundEnabled])
 
   useEffect(() => {
-    if (!soundEnabled || !cascade?.active) return
+    if (!soundEnabled || !cascade?.active) {
+      cascadeSoundPlayed.current = false
+      return
+    }
+    if (cascadeSoundPlayed.current) return
+    cascadeSoundPlayed.current = true
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
       ;[440, 370, 311].forEach((freq, i) => {

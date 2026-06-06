@@ -11,6 +11,9 @@ export default function SessionScoreboard({ session }) {
   const classified = outcomes.filter(o => o.classification !== 'no_edge')
   const correct    = classified.filter(o => o.outcome === 'correct')
 
+  const allNoEdge  = outcomes.length > 0 && outcomes.every(o => o.classification === 'no_edge')
+  const noTradeDay = allNoEdge || (accuracyPct != null && accuracyPct < 40 && classified.length >= 3)
+
   const bestLevel = outcomes
     .filter(o => o.outcome === 'correct')
     .sort((a, b) => (b.score || 0) - (a.score || 0))[0]
@@ -90,7 +93,14 @@ export default function SessionScoreboard({ session }) {
           : 'border-gray-800 bg-[#111827]'
       }`}>
         <div>
-          <div className={`text-lg font-bold ${verdictColor}`}>{verdictLabel}</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className={`text-lg font-bold ${verdictColor}`}>{verdictLabel}</div>
+            {noTradeDay && (
+              <span className="text-xs text-gray-500 bg-gray-800 border border-gray-700 px-2 py-1 rounded">
+                ○ No-trade conditions
+              </span>
+            )}
+          </div>
           <div className="text-xs text-gray-500 mt-0.5">
             {session.session?.date} · {session.session?.session_type || 'Session'}
           </div>

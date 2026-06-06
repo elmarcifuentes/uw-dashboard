@@ -49,6 +49,12 @@ export default function OverviewTab({ onNavigate }) {
   const cascade      = result?.cascade ?? null
   const sb           = result?.structure_break ?? null
 
+  const etHour      = parseInt(new Date().toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/New_York' }))
+  const sessionType = etHour >= 9 && etHour < 16 ? 'LIVE' : etHour >= 4 && etHour < 9 ? 'PRE-MARKET' : 'AFTER-HOURS'
+  const lastRescoreTime = rescoreData?.timestamp
+    ? new Date(rescoreData.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/New_York' }) + ' ET'
+    : null
+
   const bearLevel  = [...levels].filter(l => l.classification === 'sell_resistance').sort((a, b) => (b.score || 0) - (a.score || 0))[0] ?? null
   const bullLevel  = [...levels].filter(l => l.classification === 'buy_support').sort((a, b)    => (b.score || 0) - (a.score || 0))[0] ?? null
   const focusLevel = levels.length > 0 && currentPrice != null
@@ -135,6 +141,12 @@ export default function OverviewTab({ onNavigate }) {
             <div className="text-xs text-gray-500 mt-2">
               {Math.abs(currentPrice - focusLevel.price).toFixed(2)} from {focusLevel.id}
             </div>
+          )}
+          <div className="text-xs text-gray-600 mt-1">
+            {sessionType === 'LIVE' ? '● Market open' : sessionType === 'PRE-MARKET' ? '◑ Pre-market' : '○ After hours'}
+          </div>
+          {lastRescoreTime && (
+            <div className="text-xs text-gray-700 mt-0.5">updated {lastRescoreTime}</div>
           )}
         </div>
 

@@ -49,6 +49,11 @@ export default function ImmediateRiskCard({ cascade, levels, structureBreak }) {
       {structureBreak?.active && (
         <div className="mt-2 text-xs text-amber-400">⚠ Structure break {structureBreak.direction}</div>
       )}
+      {levels?.length > 0 && levels.every(l => l.classification === 'no_edge') && !cascade?.active && (
+        <div className="text-xs text-gray-600 mt-2 border-t border-gray-800 pt-2">
+          ○ All levels no_edge — no institutional edge today
+        </div>
+      )}
     </div>
   )
 }

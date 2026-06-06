@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
 function SessionTypeChip() {
@@ -8,14 +9,46 @@ function SessionTypeChip() {
 }
 
 export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked }) {
+  const [showInfo, setShowInfo] = useState(false)
+
   return (
     <header className="border-b border-gray-800 bg-[#0a0f1e] sticky top-0 z-50">
       <div className="max-w-screen-xl mx-auto px-4 h-12 flex items-center justify-between gap-4">
 
         {/* Logo */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 relative">
           <span className="text-white font-bold text-sm tracking-wide">TradesAlgo</span>
-          <span className="text-gray-600 text-xs">v4b</span>
+          <button
+            onClick={() => setShowInfo(!showInfo)}
+            className="text-gray-700 text-xs hover:text-gray-500 transition-colors"
+          >
+            v4b
+          </button>
+          {showInfo && (
+            <div className="absolute top-full mt-2 left-0 bg-[#111827] border border-gray-800 rounded-lg p-3 text-xs space-y-1 z-50 shadow-xl w-48">
+              <div className="text-gray-400 font-bold mb-2">TradesAlgo</div>
+              <div className="flex justify-between gap-8">
+                <span className="text-gray-600">Build</span>
+                <span className="text-gray-400">v4b</span>
+              </div>
+              <div className="flex justify-between gap-8">
+                <span className="text-gray-600">Claude</span>
+                <span className="text-gray-400">Haiku 4.5</span>
+              </div>
+              <div className="flex justify-between gap-8">
+                <span className="text-gray-600">Mode</span>
+                <span className={narrativeMode === 'claude' ? 'text-purple-400' : 'text-gray-400'}>
+                  {narrativeMode || 'default'}
+                </span>
+              </div>
+              <div className="flex justify-between gap-8">
+                <span className="text-gray-600">Railway</span>
+                <span className={connected ? 'text-green-400' : 'text-red-400'}>
+                  {connected ? 'connected' : 'offline'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Market context — center */}

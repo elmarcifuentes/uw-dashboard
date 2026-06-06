@@ -32,6 +32,91 @@ function triggerLabel(trigger) {
   return { label: trigger || '—', color: 'text-gray-400' }
 }
 
+function getEventStyle(eventType) {
+  const map = {
+    'rescore':           { color: 'bg-gray-700',   label: 'Rescore',    text: 'text-gray-400' },
+    'manual':            { color: 'bg-blue-900',   label: 'Manual',     text: 'text-blue-400' },
+    'cascade_fired':     { color: 'bg-red-800',    label: '⚠ CASCADE',  text: 'text-red-300' },
+    'cascade_resolved':  { color: 'bg-green-900',  label: '✓ Resolved', text: 'text-green-400' },
+    'structure_break':   { color: 'bg-amber-900',  label: '⚠ BREAK',   text: 'text-amber-400' },
+    'expansion_gex':     { color: 'bg-red-900',    label: '⚡ GEX EXP', text: 'text-red-400' },
+    'level_cross':       { color: 'bg-yellow-900', label: '⚡ CROSS',   text: 'text-yellow-400' },
+    'level_touch':       { color: 'bg-indigo-900', label: '· touch',    text: 'text-indigo-400' },
+    'narrative':         { color: 'bg-purple-900', label: '🤖 AI',      text: 'text-purple-400' },
+  }
+  return map[eventType] || { color: 'bg-gray-800', label: eventType || '—', text: 'text-gray-500' }
+}
+
+const KEY_EVENTS = new Set(['cascade_fired', 'cascade_resolved', 'structure_break', 'expansion_gex', 'level_cross'])
+
+function SessionTimeline({ events }) {
+  const [selected, setSelected] = useState(null)
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-xs text-gray-500 uppercase tracking-wider">
+          Timeline ({events?.length || 0} events)
+        </div>
+        {selected !== null && (
+          <button onClick={() => setSelected(null)} className="text-xs text-gray-600 hover:text-gray-400">
+            ✕ clear
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-0.5 max-h-64 overflow-y-auto pr-1">
+        {events?.map((event, i) => {
+          const style  = getEventStyle(event.event_type)
+          const isKey  = KEY_EVENTS.has(event.event_type)
+          const timeStr = event.time
+            ? new Date(event.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+            : event.created_at?.split('T')[1]?.slice(0, 5)
+          return (
+            <div
+              key={i}
+              onClick={() => setSelected(selected === i ? null : i)}
+              className={`flex items-start gap-3 rounded px-2 py-1.5 cursor-pointer transition-colors ${
+                selected === i ? 'bg-gray-700/50' : isKey ? 'hover:bg-gray-800/80' : 'hover:bg-gray-800/40'
+              }`}
+            >
+              <span className="text-xs text-gray-600 font-mono shrink-0 mt-0.5">{timeStr}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 font-medium ${style.color} ${style.text}`}>
+                {style.label}
+              </span>
+              <span className="text-xs text-gray-500 truncate">
+                {event.description || event.detail || (event.price != null ? `$${Number(event.price).toFixed(2)}` : '')}
+              </span>
+              {event.price != null && (
+                <span className="text-xs text-gray-600 font-mono shrink-0 ml-auto">
+                  ${Number(event.price).toFixed(2)}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {selected !== null && events?.[selected] && (
+        <div className="mt-3 border-t border-gray-800 pt-3">
+          <div className="bg-gray-900/50 rounded p-3 space-y-1">
+            {Object.entries(events[selected])
+              .filter(([k]) => k !== 'id')
+              .map(([k, v]) => v != null && (
+                <div key={k} className="flex gap-3 text-xs">
+                  <span className="text-gray-600 w-24 shrink-0">{k.replace(/_/g, ' ')}</span>
+                  <span className="text-gray-300 font-mono">
+                    {typeof v === 'number' ? v.toFixed(3) : String(v)}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PostSession() {
   const [sessions, setSessions]       = useState([])
   const [selectedDate, setSelectedDate] = useState(null)
@@ -291,31 +376,8 @@ export default function PostSession() {
             </div>
           )}
 
-          {/* Enhancement 4 — Timeline with trigger labels + badges */}
-          {story.timeline.length > 0 && (
-            <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-              <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">
-                Timeline ({story.timeline.length} events)
-              </div>
-              <div className="overflow-y-auto max-h-48">
-                {story.timeline.map((event, i) => {
-                  const tl = triggerLabel(event.trigger)
-                  return (
-                    <div key={i} className="flex items-center gap-2 text-xs py-1 border-b border-gray-800/60">
-                      <span className="text-gray-500 font-mono w-14 shrink-0">
-                        {new Date(event.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                      </span>
-                      <span className={`shrink-0 ${tl.color}`}>{tl.label}</span>
-                      <span className="text-gray-300 font-mono tabular-nums ml-auto">
-                        {event.price != null ? `$${Number(event.price).toFixed(2)}` : ''}
-                      </span>
-                      {event.cascade_active        && <span className="text-red-400 font-bold shrink-0">CASCADE</span>}
-                      {event.structure_break_active && <span className="text-amber-400 font-bold shrink-0">BREAK</span>}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+          {story.timeline?.length > 0 && (
+            <SessionTimeline events={story.timeline} />
           )}
         </>
       )}
