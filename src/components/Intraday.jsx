@@ -24,7 +24,7 @@ export default function Intraday() {
     history, levelAlert, clearLevelAlert,
     chartStale, staleChanges,
     expansionGex, pinningSessions,
-    midDpHistory, dpHistory, narrative, narrativeMode,
+    midDpHistory, dpHistory, narrative, narrativeMode, levelNarratives,
   } = useSSE(`${API_URL}/stream`)
 
   const { compact, toggle } = useLayout()
@@ -193,7 +193,7 @@ export default function Intraday() {
 
       {/* Sub-tab content */}
       <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
-        {subTab === 0 && <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} />}
+        {subTab === 0 && <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} />}
         {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
         {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
         {subTab === 3 && <NewsHeadlines apiUrl={API_URL} />}

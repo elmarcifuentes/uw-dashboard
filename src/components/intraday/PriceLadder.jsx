@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
 
 const LEVEL_DESCRIPTIONS = {
@@ -102,7 +102,9 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt }) {
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {} }) {
+  const [expandedLevel, setExpandedLevel] = useState(null)
+
   if (!result) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
@@ -234,6 +236,34 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
               <div className="flex justify-end mt-1">
                 <span className="text-gray-600 text-xs font-mono">{formatTime(scoredAt)}</span>
               </div>
+            )}
+
+            {/* Claude level analysis */}
+            {!compact && levelNarratives[level.id] && (
+              <div className="mt-1.5 border-t border-gray-700/50 pt-1.5">
+                <button
+                  onClick={() => setExpandedLevel(expandedLevel === level.id ? null : level.id)}
+                  className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                >
+                  <span>{expandedLevel === level.id ? '▼' : '▶'}</span>
+                  <svg height="0.85em" width="0.85em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="inline">
+                    <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
+                  </svg>
+                  <span>Claude Analysis</span>
+                </button>
+                {expandedLevel === level.id && (
+                  <p className="text-xs text-gray-300 mt-1.5 leading-relaxed italic border-l-2 border-purple-800 pl-2">
+                    {levelNarratives[level.id]}
+                  </p>
+                )}
+              </div>
+            )}
+            {compact && levelNarratives[level.id] && (
+              <span className="text-xs text-purple-500 ml-1" title="Claude Analysis available — switch to full mode">
+                <svg height="0.75em" width="0.75em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="inline">
+                  <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
+                </svg>
+              </span>
             )}
           </div>
         )
