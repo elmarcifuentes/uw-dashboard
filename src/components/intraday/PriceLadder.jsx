@@ -17,8 +17,8 @@ const CLASS_COLORS = {
   continuation:    { border: '#7C3AED', bg: '#1a1040', text: '#a78bfa' },
 }
 
-function getClassificationBg(cls) {
-  return { buy_support: 'bg-green-950', sell_resistance: 'bg-red-950', no_edge: 'bg-gray-900', continuation: 'bg-purple-950' }[cls] || 'bg-gray-900'
+function getClassificationBg(_cls) {
+  return 'bg-[#111827]'
 }
 
 function getBaseBorderCls(cls) {
@@ -157,7 +157,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
       {cp != null && !isNaN(cp) && sorted.length > 0 && cp > sorted[0].price && (
         <div className="flex items-center gap-2 px-2 py-1">
           <div className="flex-1 h-px bg-yellow-400/60" />
-          <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse">
+          <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse bg-yellow-400/10 px-2 py-0.5 rounded">
             ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''} — above structure
           </span>
           <div className="flex-1 h-px bg-yellow-400/60" />
@@ -184,7 +184,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           <>
           <div
             key={level.id}
-            className={`rounded px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''}`}
+            className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''}`}
           >
             {/* Proximity label */}
             {styles.label && (
@@ -332,7 +332,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           {nextLevel && cp != null && !isNaN(cp) && cp < level.price && cp > nextLevel.price && (
             <div className="flex items-center gap-2 px-2 py-0.5">
               <div className="flex-1 h-px bg-yellow-400/60" />
-              <span className="text-xs text-yellow-400 font-mono font-bold shrink-0">
+              <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 bg-yellow-400/10 px-2 py-0.5 rounded">
                 ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''}
               </span>
               <div className="flex-1 h-px bg-yellow-400/60" />
@@ -346,7 +346,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
       {cp != null && !isNaN(cp) && sorted.length > 0 && cp < sorted[sorted.length - 1].price && (
         <div className="flex items-center gap-2 px-2 py-1">
           <div className="flex-1 h-px bg-yellow-400/60" />
-          <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse">
+          <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse bg-yellow-400/10 px-2 py-0.5 rounded">
             ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''} — below structure
           </span>
           <div className="flex-1 h-px bg-yellow-400/60" />
@@ -362,7 +362,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         const nearDist = nearest ? (cp - nearest.price).toFixed(2) : null
         const nqPrice  = nqRatio ? Math.round(cp * nqRatio).toLocaleString() : null
         return (
-          <div className="border-2 border-yellow-400 rounded px-3 py-2 bg-yellow-950 mt-2">
+          <div className="border border-yellow-400/30 rounded-lg px-3 py-2 bg-yellow-400/5 mt-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-yellow-400 font-mono font-bold text-sm">
                 ▶ QQQ ${cp?.toFixed(2) ?? '—'}

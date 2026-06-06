@@ -11,9 +11,9 @@ import Controls from './intraday/Controls'
 import ExpansionGexAlert from './intraday/ExpansionGexAlert'
 import CascadeProximityGauge from './intraday/CascadeProximityGauge'
 import NarrativeBlock from './intraday/NarrativeBlock'
-import LivePrice from './intraday/LivePrice'
-import SentimentBadge from './SentimentBadge'
 import NewsHeadlines from './intraday/NewsHeadlines'
+import LiveHeader from './intraday/LiveHeader'
+import RightRail from './intraday/RightRail'
 
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'News', 'Log', 'Controls']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'News', 'Log', 'Ctrl']
@@ -35,15 +35,15 @@ export default function Intraday() {
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundEnabled') === 'true')
   const soundCooldownRef = useRef({})
 
-  // Keep sound state in sync with Controls tab toggle (via localStorage)
   useEffect(() => {
     const handler = (e) => { if (e.key === 'soundEnabled') setSoundEnabled(e.newValue === 'true') }
     window.addEventListener('storage', handler)
     return () => window.removeEventListener('storage', handler)
   }, [])
+
   const [subTab, setSubTab]   = useState(0)
-  const [drawing, setDrawing] = useState(null)    // null | 'qqq' | 'both'
-  const [drawResult, setDrawResult] = useState(null) // null | 'success' | 'error'
+  const [drawing, setDrawing] = useState(null)
+  const [drawResult, setDrawResult] = useState(null)
 
   const triggerDraw = async (type) => {
     if (!unlocked || drawing) return
@@ -61,33 +61,14 @@ export default function Intraday() {
     }
   }
 
-  const drawBtnClass = (type) => {
-    const base = 'px-2 py-1 rounded text-xs font-medium transition-colors'
-    if (!unlocked)                return `${base} bg-gray-800 text-gray-600 cursor-not-allowed`
-    if (drawing === type)         return `${base} bg-gray-700 text-gray-400 cursor-wait`
-    if (drawResult === 'success') return `${base} bg-green-800 text-green-300`
-    if (drawResult === 'error')   return `${base} bg-red-800 text-red-300`
-    return `${base} bg-gray-700 text-gray-300 hover:bg-gray-600`
-  }
-
-  const drawLabel = (type) => {
-    if (!unlocked)                return type === 'qqq' ? '🔒 Draw QQQ' : '🔒 Draw Both'
-    if (drawing === type)         return '⟳ Drawing…'
-    if (drawResult === 'success') return '✓ Done'
-    if (drawResult === 'error')   return '✗ Failed'
-    return type === 'qqq' ? '📊 Draw QQQ' : '📊 Draw Both'
-  }
-
-  // Rescore-derived values — only recompute when rescoreData changes (not on price ticks)
   const result     = useMemo(() => rescoreData?.result ?? null, [rescoreData])
   const nqRatio    = useMemo(() => result?.nq_ratio ? Number(result.nq_ratio) : null, [result])
   const cascade    = useMemo(() => result?.cascade ?? rescoreData?.cascade ?? null, [rescoreData, result])
   const lastUpdate = useMemo(() => rescoreData?.timestamp ?? null, [rescoreData])
 
-  // Current price — from live price ticks OR most recent rescore
   const currentPrice = priceData?.price ?? result?.current_price
+  const nqPrice      = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio) : null
 
-  // Sound alerts — must be after result/cascade/currentPrice are defined
   useEffect(() => {
     if (!soundEnabled || !currentPrice || !result?.levels) return
     const now = Date.now()
@@ -127,8 +108,6 @@ export default function Intraday() {
     } catch { /* audio not supported */ }
   }, [cascade?.active, soundEnabled])
 
-  // NarrativeBlock handles its own fallback — pass raw narrative + result
-
   if (!connected && !rescoreData && !priceData) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -138,50 +117,22 @@ export default function Intraday() {
   }
 
   return (
-    <div className={`flex flex-col ${compact ? 'gap-2' : 'gap-4'}`}>
+    <div className="space-y-3 py-3">
 
-      {/* Header bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
-          <span className="text-sm text-gray-400">
-            {connected ? 'LIVE' : 'RECONNECTING...'}
-          </span>
-          {/* LivePrice is memo'd — only re-renders when priceData or nqRatio changes */}
-          <LivePrice priceData={priceData} nqRatio={nqRatio} />
-          {priceVelocity != null && (() => {
-            const abs = Math.abs(priceVelocity), up = priceVelocity > 0
-            const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : abs > 0.005 ? (up ? '↑' : '↓') : '→'
-            const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : abs > 0.005 ? (up ? 'text-green-700' : 'text-red-700') : 'text-gray-600'
-            return <span className={`text-xs font-bold ${color}`}>{arrow}</span>
-          })()}
-          <SentimentBadge sentiment={sentiment} compact={true} />
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => triggerDraw('qqq')}
-            disabled={!unlocked || !!drawing}
-            className={drawBtnClass('qqq')}
-            title="Triggers fresh scoring and dashboard update. Run /draw-qqq in Claude Code to update chart labels."
-          >
-            {drawLabel('qqq')}
-          </button>
-          <button
-            onClick={() => triggerDraw('both')}
-            disabled={!unlocked || !!drawing}
-            className={drawBtnClass('both')}
-            title="Triggers fresh scoring and dashboard update. Run /draw in Claude Code to update both chart labels."
-          >
-            {drawLabel('both')}
-          </button>
-          <button
-            onClick={toggle}
-            className="text-xs text-gray-400 border border-gray-600 px-2 py-1 rounded hover:text-white transition-colors"
-          >
-            {compact ? '⛶ Full' : '⊡ Compact'}
-          </button>
-        </div>
-      </div>
+      <LiveHeader
+        connected={connected}
+        price={currentPrice}
+        nqPrice={nqPrice}
+        velocity={priceVelocity}
+        sentiment={sentiment}
+        drawing={drawing}
+        drawResult={drawResult}
+        unlocked={unlocked}
+        onDrawQqq={() => triggerDraw('qqq')}
+        onDrawBoth={() => triggerDraw('both')}
+        onCompact={toggle}
+        compact={compact}
+      />
 
       {/* Chart stale badge */}
       {chartStale && (() => {
@@ -224,41 +175,58 @@ export default function Intraday() {
         </div>
       )}
 
-      {/* Expansion GEX alert — memo'd, stable on price ticks */}
       <ExpansionGexAlert expansionGex={expansionGex} pinningSessions={pinningSessions} />
 
-      {/* Cascade proximity gauge — memo'd */}
-      <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
+      {/* 12-col grid: left 8-col main content, right 4-col rail */}
+      <div className="grid grid-cols-12 gap-3">
 
-      {/* Auto narrative — memo'd */}
-      <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} tacticalBrief={tacticalBrief} />
+        {/* Left column */}
+        <div className="col-span-12 lg:col-span-8 space-y-3">
+          <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
+          <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} tacticalBrief={tacticalBrief} />
 
-      {/* Sub-tab navigation */}
-      <div className="flex gap-1 flex-wrap">
-        {(compact ? SUB_TABS_COMPACT : SUB_TABS).map((tab, i) => (
-          <button
-            key={i}
-            onClick={() => setSubTab(i)}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              subTab === i ? 'bg-teal-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+          {/* Sub-tab navigation — flat underline style */}
+          <div className="flex gap-0 border-b border-gray-800">
+            {(compact ? SUB_TABS_COMPACT : SUB_TABS).map((tab, i) => (
+              <button
+                key={i}
+                onClick={() => setSubTab(i)}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors -mb-px border-b-2 ${
+                  subTab === i
+                    ? 'border-indigo-500 text-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
 
-      {/* Sub-tab content */}
-      <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
-        {subTab === 0 && <>
-          <PriceSparkline history={priceHistory} levels={result?.levels} />
-          <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} />
-        </>}
-        {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
-        {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
-        {subTab === 3 && <NewsHeadlines apiUrl={API_URL} />}
-        {subTab === 4 && <RescoreLog history={history} compact={compact} />}
-        {subTab === 5 && <Controls compact={compact} />}
+          {/* Sub-tab content */}
+          <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
+            {subTab === 0 && <>
+              <PriceSparkline history={priceHistory} levels={result?.levels} />
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} />
+            </>}
+            {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
+            {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
+            {subTab === 3 && <NewsHeadlines apiUrl={API_URL} />}
+            {subTab === 4 && <RescoreLog history={history} compact={compact} />}
+            {subTab === 5 && <Controls compact={compact} />}
+          </div>
+        </div>
+
+        {/* Right rail — hidden on mobile, 4-col on large screens */}
+        <div className="hidden lg:block lg:col-span-4">
+          <RightRail
+            levels={result?.levels}
+            currentPrice={currentPrice}
+            nqRatio={nqRatio}
+            cascade={cascade}
+            dpHistory={dpHistory}
+            levelNarratives={levelNarratives}
+          />
+        </div>
       </div>
     </div>
   )
