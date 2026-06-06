@@ -121,12 +121,22 @@ export default function GexByExpiry({ apiUrl }) {
           const barW = Math.max(2, Math.round(pct))
           return (
             <div key={key} className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 w-24 shrink-0">{label}</span>
-              <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+              <span style={{ minWidth: '96px', flexShrink: 0 }}
+                    className="text-xs text-gray-400 whitespace-nowrap">
+                {label}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}
+                   className="bg-gray-800 rounded-full h-2 overflow-hidden">
                 <div className={`h-full rounded-full ${color}`} style={{ width: `${barW}%` }} />
               </div>
-              <span className="text-xs font-mono text-gray-400 w-8 text-right">{pct.toFixed(0)}%</span>
-              <span className="text-xs font-mono text-gray-500 w-16 text-right">{fmtK(val)}</span>
+              <span style={{ minWidth: '32px', flexShrink: 0, textAlign: 'right' }}
+                    className="text-xs font-mono text-gray-400 whitespace-nowrap">
+                {pct.toFixed(0)}%
+              </span>
+              <span style={{ minWidth: '64px', flexShrink: 0, textAlign: 'right' }}
+                    className="text-xs font-mono text-gray-500 whitespace-nowrap">
+                {fmtK(val)}
+              </span>
             </div>
           )
         })}

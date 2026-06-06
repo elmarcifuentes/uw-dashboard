@@ -71,11 +71,18 @@ export default function GreekFlow({ apiUrl }) {
       <div className="flex flex-col gap-1.5 mb-2">
         {rows.map((row, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 w-20 shrink-0">{row.label}</span>
-            <div className="flex-1 bg-gray-800 rounded-full h-1.5 overflow-hidden">
+            <span style={{ minWidth: '80px', flexShrink: 0 }}
+                  className="text-xs text-gray-500 whitespace-nowrap">
+              {row.label}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}
+                 className="bg-gray-800 rounded-full h-1.5 overflow-hidden">
               <div className={`h-full rounded-full ${barColor(row.value)}`} style={{ width: `${pct(row.value)}%` }} />
             </div>
-            <span className={`text-xs font-mono w-16 text-right ${signColor(row.value)}`}>{fmtM(row.value)}</span>
+            <span style={{ minWidth: '64px', flexShrink: 0, textAlign: 'right' }}
+                  className={`text-xs font-mono whitespace-nowrap ${signColor(row.value)}`}>
+              {fmtM(row.value)}
+            </span>
           </div>
         ))}
       </div>

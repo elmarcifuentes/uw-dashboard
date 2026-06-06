@@ -153,11 +153,15 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
       {/* Row 3: DP bar + ETF + GEX */}
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 w-6">DP</span>
-          <div className="flex-1">
+          <span style={{ minWidth: '24px', flexShrink: 0 }}
+                className="text-xs text-gray-500 whitespace-nowrap">
+            DP
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <DpBar value={level.dark_pool} />
           </div>
-          <span className="text-xs text-gray-300 w-14 text-right">
+          <span style={{ minWidth: '56px', flexShrink: 0, textAlign: 'right' }}
+                className="text-xs text-gray-300 whitespace-nowrap">
             {typeof level.dark_pool === 'number' ? level.dark_pool.toFixed(3) : '—'}
           </span>
           <DpSparkline history={dpHistory} />
