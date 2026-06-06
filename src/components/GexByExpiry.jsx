@@ -6,23 +6,33 @@ function GexDecayCountdown({ todayPct }) {
 
   const update = useCallback(() => {
     const now   = new Date()
-    const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' })
-    const etNow = new Date(etStr)
-    const close = new Date(etNow)
-    close.setHours(16, 0, 0, 0)
-    const diff  = close - etNow
-    if (diff <= 0) { setTimeLeft('CLOSED'); setUrgency('closed'); return }
-    const h = Math.floor(diff / 3600000)
-    const m = Math.floor((diff % 3600000) / 60000)
-    const s = Math.floor((diff % 60000) / 1000)
-    setTimeLeft(h > 0 ? `${h}h ${m}m to close` : `${m}m ${s}s to close`)
-    setUrgency(diff < 30 * 60000 ? 'critical' : diff < 60 * 60000 ? 'high' : diff < 120 * 60000 ? 'medium' : 'low')
+    const etNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+    const fmt   = ms => {
+      const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000)
+      return h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`
+    }
+    const open  = new Date(etNow); open.setHours(9, 30, 0, 0)
+    const close = new Date(etNow); close.setHours(16, 0, 0, 0)
+    const toClose = close - etNow
+    const toOpen  = open  - etNow
+
+    if (toClose > 0) {
+      setTimeLeft(`${fmt(toClose)} to close`)
+      setUrgency(toClose < 30 * 60000 ? 'critical' : toClose < 60 * 60000 ? 'high' : toClose < 120 * 60000 ? 'medium' : 'low')
+    } else if (toOpen > 0) {
+      setTimeLeft(`${fmt(toOpen)} to open`)
+      setUrgency('low')
+    } else {
+      const tomorrowOpen = new Date(open); tomorrowOpen.setDate(tomorrowOpen.getDate() + 1)
+      setTimeLeft(`${fmt(tomorrowOpen - etNow)} to open`)
+      setUrgency('low')
+    }
   }, [])
 
   useEffect(() => { update(); const t = setInterval(update, 1000); return () => clearInterval(t) }, [update])
 
   const colors = { low: 'text-gray-400', medium: 'text-yellow-400', high: 'text-amber-400', critical: 'text-red-400 animate-pulse', closed: 'text-gray-600' }
-  if (urgency === 'closed' || !todayPct) return null
+  if (!todayPct) return null
 
   return (
     <div className="flex items-center gap-2 text-xs mt-1.5 pt-1.5 border-t border-gray-700">

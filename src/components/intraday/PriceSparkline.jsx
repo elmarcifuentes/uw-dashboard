@@ -1,5 +1,9 @@
 export default function PriceSparkline({ history, levels }) {
-  if (!history?.length || history.length < 2) return null
+  if (!history || history.length < 2) return (
+    <div className="h-8 bg-gray-900 rounded mb-2 flex items-center justify-center">
+      <span className="text-xs text-gray-700">Price history building…</span>
+    </div>
+  )
 
   const W = 600, H = 60
   const prices    = history.map(h => h.price)

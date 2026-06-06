@@ -32,8 +32,15 @@ export default function Intraday() {
   const { compact, toggle } = useLayout()
   const { unlocked, authPost } = useAuth()
   const sentiment     = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
-  const [soundEnabled, setSoundEnabled] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundEnabled') === 'true')
   const soundCooldownRef = useRef({})
+
+  // Keep sound state in sync with Controls tab toggle (via localStorage)
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'soundEnabled') setSoundEnabled(e.newValue === 'true') }
+    window.addEventListener('storage', handler)
+    return () => window.removeEventListener('storage', handler)
+  }, [])
   const [subTab, setSubTab]   = useState(0)
   const [drawing, setDrawing] = useState(null)    // null | 'qqq' | 'both'
   const [drawResult, setDrawResult] = useState(null) // null | 'success' | 'error'
@@ -144,9 +151,9 @@ export default function Intraday() {
           <LivePrice priceData={priceData} nqRatio={nqRatio} />
           {priceVelocity != null && (() => {
             const abs = Math.abs(priceVelocity), up = priceVelocity > 0
-            const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : abs > 0.005 ? (up ? '↑' : '↓') : null
-            const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : (up ? 'text-green-700' : 'text-red-700')
-            return arrow ? <span className={`text-xs font-bold ${color}`}>{arrow}</span> : null
+            const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : abs > 0.005 ? (up ? '↑' : '↓') : '→'
+            const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : abs > 0.005 ? (up ? 'text-green-700' : 'text-red-700') : 'text-gray-600'
+            return <span className={`text-xs font-bold ${color}`}>{arrow}</span>
           })()}
           <SentimentBadge sentiment={sentiment} compact={true} />
         </div>
@@ -166,13 +173,6 @@ export default function Intraday() {
             title="Triggers fresh scoring and dashboard update. Run /draw in Claude Code to update both chart labels."
           >
             {drawLabel('both')}
-          </button>
-          <button
-            onClick={() => setSoundEnabled(s => !s)}
-            className={`text-xs border px-2 py-1 rounded transition-colors ${soundEnabled ? 'border-teal-600 text-teal-400' : 'border-gray-600 text-gray-400 hover:text-white'}`}
-            title="Sound alerts"
-          >
-            {soundEnabled ? '🔔' : '🔕'}
           </button>
           <button
             onClick={toggle}

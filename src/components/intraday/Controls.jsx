@@ -10,7 +10,7 @@ export default function Controls({ compact }) {
   const [rescoring, setRescoring]     = useState(false)
   const [rescoreMsg, setRescoreMsg]   = useState(null)
   const [narrativeMode, setNarrativeMode] = useState('template')
-  const [soundEnabled, setSoundEnabled]   = useState(false)
+  const [soundEnabled, setSoundEnabled]   = useState(() => localStorage.getItem('soundEnabled') === 'true')
 
   const fetchAll = async () => {
     try {
@@ -184,7 +184,11 @@ export default function Controls({ compact }) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">Level proximity + cascade</span>
           <button
-            onClick={() => setSoundEnabled(s => !s)}
+            onClick={() => {
+              const next = !soundEnabled
+              setSoundEnabled(next)
+              localStorage.setItem('soundEnabled', String(next))
+            }}
             className={`px-3 py-1 rounded text-xs font-medium transition-colors ${soundEnabled ? 'bg-teal-700 text-white' : 'bg-gray-700 text-gray-400'}`}
           >
             {soundEnabled ? '🔔 On' : '🔕 Off'}

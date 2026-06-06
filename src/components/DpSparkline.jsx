@@ -6,7 +6,7 @@ export default function DpSparkline({ history }) {
   const max    = Math.max(...values, 0.5)
   const range  = max - min || 1
 
-  const W = 60, H = 20
+  const W = 80, H = 24
   const pts = values.map((v, i) => {
     const x = (i / (values.length - 1)) * W
     const y = H - ((v - min) / range) * H
@@ -23,9 +23,9 @@ export default function DpSparkline({ history }) {
     <svg width={W} height={H} className="inline-block overflow-visible">
       <line x1="0" y1={thresholdY.toFixed(1)} x2={W} y2={thresholdY.toFixed(1)}
             stroke="#ef4444" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.5" />
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2"
                 strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={lx} cy={ly} r="2" fill={color} />
+      <circle cx={lx} cy={ly} r="3" fill={color} />
     </svg>
   )
 }
