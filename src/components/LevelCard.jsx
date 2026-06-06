@@ -74,7 +74,7 @@ const formatTime = (iso) => {
 export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt, levelNarrative, currentPrice }) {
   const [expanded, setExpanded] = useState(false)
   const proximity  = getLevelProximity(currentPrice, level.price)
-  const proxStyles = getProximityStyles(proximity, level.classification)
+  const proxStyles = getProximityStyles(proximity, level.classification, level)
   const classKey    = level.classification === 'mid' ? 'mid' : level.classification
   const borderColor = BORDER_COLOR[classKey] || '#6B7280'
   const nqPrice  = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : '—'

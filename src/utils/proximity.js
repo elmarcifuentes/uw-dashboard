@@ -13,7 +13,7 @@ export function getLevelProximity(currentPrice, levelPrice) {
   return { zone, dist, absDist, fromBelow }
 }
 
-export function getProximityStyles(proximity, classification) {
+export function getProximityStyles(proximity, classification, level) {
   if (!proximity || proximity.zone === 'away') {
     return { border: '', glow: '', pulse: false, label: null, labelColor: '' }
   }
@@ -69,7 +69,18 @@ export function getProximityStyles(proximity, classification) {
     },
   }
 
-  const label = labelMap[cls]?.[zone] || labelMap.no_edge[zone]
+  let label = labelMap[cls]?.[zone] || labelMap.no_edge[zone]
+
+  // MID override — replace generic label with cascade context
+  if (level?.id === 'MID' && label) {
+    const dp  = level.dark_pool || 0
+    const gap = Math.abs(-0.700 - dp)
+    if (dp <= -0.700) {
+      label = label.replace('unconfirmed level', '⚠ cascade threshold — monitor S1/S2')
+    } else if (dp <= -0.500) {
+      label = label.replace('unconfirmed level', `cascade trigger — ${gap.toFixed(3)} from -0.700`)
+    }
+  }
 
   return { ...colors, pulse: zone === 'critical', label }
 }

@@ -174,7 +174,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         const isFlashing = flashLevel === level.id
 
         const proximity = getLevelProximity(cp, level.price)
-        const styles    = getProximityStyles(proximity, level.classification)
+        const styles    = getProximityStyles(proximity, level.classification, level)
         const isProximate = proximity && proximity.zone !== 'away'
         const borderCls = isProximate ? styles.border : getBaseBorderCls(level.classification)
         const bgCls     = getClassificationBg(level.classification)
