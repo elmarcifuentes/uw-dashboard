@@ -211,9 +211,6 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
               </div>
               <div className="flex items-center gap-2">
                 {level.full_stack  && <span className="text-yellow-400 text-xs font-bold">★</span>}
-                {level.conflict    && <span className="text-amber-400 text-xs">⚠</span>}
-                {level.boundary    && <span className="text-orange-400 text-xs">⚡</span>}
-                {level.lower_high  && <span className="text-purple-400 text-xs">↙</span>}
                 {distStr != null && (
                   <div className="flex flex-col items-end">
                     <span className={`text-xs font-mono tabular-nums ${isAbove ? 'text-green-400' : 'text-red-400'}`}>
@@ -229,104 +226,128 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
               </div>
             </div>
 
-            {!compact && (
-              <p className="text-xs text-gray-500 italic mt-1">
-                {LEVEL_DESCRIPTIONS[level.classification] || ''}
-              </p>
-            )}
+            {/* Layer 1 — Classification label + GEX EXP flag */}
+            <div className="flex items-center justify-between mt-1">
+              <span className={`text-xs font-medium ${colors.text}`}>
+                {level.classification === 'buy_support'     ? 'BUY SUPPORT'     :
+                 level.classification === 'sell_resistance' ? 'SELL RESISTANCE' :
+                 level.classification === 'continuation'    ? 'CONTINUATION'    : 'NO EDGE'}
+                {level.confidence && level.confidence !== 'none' && (
+                  <span className="text-gray-600 font-normal ml-1">· {level.confidence}</span>
+                )}
+              </span>
+              {level.net_gex != null && level.net_gex < 0 && (
+                <span className="text-xs font-mono px-1 rounded bg-red-950 text-red-400 font-bold">
+                  GEX ⚠ {((level.net_gex ?? 0) / 1000).toFixed(0)}K EXP
+                </span>
+              )}
+            </div>
 
-            {!compact && (
-              <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                <span style={{ color: colors.text }}>
-                  {level.classification === 'buy_support'    ? 'BUY SUP'  :
-                   level.classification === 'sell_resistance' ? 'SELL RES' :
-                   level.classification === 'continuation'   ? 'CONT'     : 'NO EDGE'}
-                  {' '}{level.score}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  DP {level.dark_pool >= 0.3 ? '↑' : level.dark_pool <= -0.3 ? '↓' : '—'}{' '}
-                  {level.dark_pool?.toFixed(3)}
-                  <DpSparkline history={dpHistory[level.id]} />
-                </span>
-                <span>
-                  ETF {level.etf_direction === 'bullish' ? '↑' : level.etf_direction === 'bearish' ? '↓' : '—'}
-                </span>
-                {level.net_gex != null && (() => {
-                  const isExp = level.net_gex < 0
-                  return (
-                    <span className={`text-xs font-mono px-1 rounded ${isExp ? 'bg-red-950 text-red-400 font-bold' : 'text-gray-500'}`}>
-                      GEX {isExp ? '⚠ ' : ''}{((level.net_gex ?? 0) / 1000).toFixed(0)}K{isExp ? ' EXP' : ' pin'}
-                    </span>
+            {/* Layer 2 — DP bar (always visible) */}
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-xs text-gray-600 whitespace-nowrap" style={{ minWidth: '64px', flexShrink: 0 }}>Dark Pool</span>
+              <div className="h-1.5 bg-gray-800 rounded relative overflow-hidden" style={{ flex: 1, minWidth: 0 }}>
+                <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700 z-10" />
+                {(() => {
+                  const dp  = level.dark_pool || 0
+                  const pct = ((dp + 1) / 2) * 100
+                  return pct >= 50 ? (
+                    <div className="absolute inset-y-0 left-1/2 bg-green-500" style={{ width: `${(pct - 50) * 2}%` }} />
+                  ) : (
+                    <div className="absolute inset-y-0 right-1/2 bg-red-500" style={{ width: `${(50 - pct) * 2}%` }} />
                   )
                 })()}
-                <span className={`px-1.5 py-0.5 rounded text-xs ${
-                  level.confidence === 'high'   ? 'bg-green-900 text-green-300'  :
-                  level.confidence === 'medium' ? 'bg-amber-900 text-amber-300'  :
-                  level.confidence === 'low'    ? 'bg-red-900/50 text-red-300'   :
-                                                  'bg-gray-800 text-gray-500'
-                }`}>
-                  {(level.confidence || 'none').toUpperCase()}
-                </span>
               </div>
+              <span className="text-xs font-mono text-gray-400" style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}>
+                {level.dark_pool?.toFixed(3)}
+              </span>
+            </div>
+
+            {/* Layer 2 — expand toggle (non-compact only) */}
+            {!compact && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setExpandedLevel(expandedLevel === level.id ? null : level.id) }}
+                className="w-full text-center text-xs text-gray-600 hover:text-gray-400 mt-1.5 pt-1.5 border-t border-gray-800/50 transition-colors"
+              >
+                {expandedLevel === level.id ? '▲ less' : '▼ more'}
+              </button>
             )}
 
-            <DpTrend levelId={level.id} history={dpHistory[level.id]} compact={compact} />
+            {/* Layer 3 — evidence (behind expand) */}
+            {expandedLevel === level.id && !compact && (
+              <div className="pt-2 space-y-1.5">
+                <p className="text-xs text-gray-500 italic">{LEVEL_DESCRIPTIONS[level.classification] || ''}</p>
 
-            {(() => {
-              const dc = dpConditionLabel(level.dark_pool, level.type, level.classification)
-              const mw = level.id === 'MID' ? midDpWarning(level.dark_pool) : { show: false }
-              return (
-                <div className={`text-xs font-bold ${dc.color} mt-0.5`}>
-                  {dc.label}
-                  {!compact && (
-                    <span className="text-gray-600 font-normal ml-1">— {dc.sublabel}</span>
-                  )}
-                  {mw.show && (
-                    <span className={`ml-1 ${mw.color}`}>⚠ {mw.text}</span>
-                  )}
+                <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                  <span style={{ color: colors.text }}>
+                    {level.classification === 'buy_support'    ? 'BUY SUP'  :
+                     level.classification === 'sell_resistance' ? 'SELL RES' :
+                     level.classification === 'continuation'   ? 'CONT'     : 'NO EDGE'}
+                    {' '}{level.score}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-xs ${
+                    level.confidence === 'high'   ? 'bg-green-900 text-green-300'  :
+                    level.confidence === 'medium' ? 'bg-amber-900 text-amber-300'  :
+                    level.confidence === 'low'    ? 'bg-red-900/50 text-red-300'   :
+                                                    'bg-gray-800 text-gray-500'
+                  }`}>
+                    {(level.confidence || 'none').toUpperCase()}
+                  </span>
+                  <span>ETF {level.etf_direction === 'bullish' ? '↑' : level.etf_direction === 'bearish' ? '↓' : '—'}</span>
+                  {level.conflict   && <span className="text-amber-400">⚠ conflict</span>}
+                  {level.boundary   && <span className="text-orange-400">⚡ boundary</span>}
+                  {level.lower_high && <span className="text-purple-400">↙ lower high</span>}
                 </div>
-              )
-            })()}
-            {scoredAt && (
-              <div className="flex justify-end mt-1">
-                <span className="text-gray-600 text-xs font-mono">{formatTime(scoredAt)}</span>
-              </div>
-            )}
 
-            {/* Touch counter */}
-            {levelTouches[level.id] && (
-              <div className="flex items-center gap-2 mt-0.5">
-                {levelTouches[level.id].total_touches > 0 && <span className="text-xs text-gray-500">touched {levelTouches[level.id].total_touches}×</span>}
-                {levelTouches[level.id].crosses > 0 && <span className="text-xs text-amber-500">crossed {levelTouches[level.id].crosses}×</span>}
-              </div>
-            )}
+                {dpHistory[level.id]?.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600" style={{ minWidth: '64px', flexShrink: 0 }}>DP history</span>
+                    <DpSparkline history={dpHistory[level.id]} />
+                  </div>
+                )}
 
-            {/* Claude level analysis */}
-            {!compact && levelNarratives[level.id] && (
-              <div className="mt-1.5 border-t border-gray-700/50 pt-1.5">
-                <button
-                  onClick={() => setExpandedLevel(expandedLevel === level.id ? null : level.id)}
-                  className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                >
-                  <span>{expandedLevel === level.id ? '▼' : '▶'}</span>
-                  <svg height="0.85em" width="0.85em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="inline">
-                    <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
-                  </svg>
-                  <span>Claude Analysis</span>
-                </button>
-                {expandedLevel === level.id && (
-                  <p className="text-xs text-gray-300 mt-1.5 leading-relaxed italic border-l-2 border-purple-800 pl-2">
-                    {stripMarkdown(levelNarratives[level.id])}
-                  </p>
+                <DpTrend levelId={level.id} history={dpHistory[level.id]} compact={false} />
+
+                {(() => {
+                  const dc = dpConditionLabel(level.dark_pool, level.type, level.classification)
+                  const mw = level.id === 'MID' ? midDpWarning(level.dark_pool) : { show: false }
+                  if (!dc.label && !mw.show) return null
+                  return (
+                    <div className={`text-xs font-bold ${dc.color}`}>
+                      {dc.label}
+                      <span className="text-gray-600 font-normal ml-1">— {dc.sublabel}</span>
+                      {mw.show && <span className={`ml-1 ${mw.color}`}>⚠ {mw.text}</span>}
+                    </div>
+                  )
+                })()}
+
+                {levelTouches[level.id] && (
+                  <div className="flex items-center gap-2">
+                    {levelTouches[level.id].total_touches > 0 && <span className="text-xs text-gray-500">touched {levelTouches[level.id].total_touches}×</span>}
+                    {levelTouches[level.id].crosses > 0 && <span className="text-xs text-amber-500">crossed {levelTouches[level.id].crosses}×</span>}
+                  </div>
+                )}
+
+                {levelNarratives[level.id] && (
+                  <div className="border-t border-gray-700/50 pt-1.5">
+                    <div className="flex items-center gap-1 mb-1 text-xs text-purple-400">
+                      <svg height="0.85em" width="0.85em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="inline">
+                        <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
+                      </svg>
+                      <span>Claude Analysis</span>
+                    </div>
+                    <p className="text-xs text-gray-300 leading-relaxed italic border-l-2 border-purple-800 pl-2">
+                      {stripMarkdown(levelNarratives[level.id])}
+                    </p>
+                  </div>
+                )}
+
+                {scoredAt && (
+                  <div className="flex justify-end">
+                    <span className="text-gray-600 text-xs font-mono">{formatTime(scoredAt)}</span>
+                  </div>
                 )}
               </div>
-            )}
-            {compact && levelNarratives[level.id] && (
-              <span className="text-xs text-purple-500 ml-1" title="Claude Analysis available — switch to full mode">
-                <svg height="0.75em" width="0.75em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="inline">
-                  <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
-                </svg>
-              </span>
             )}
           </div>
 
