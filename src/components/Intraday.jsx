@@ -34,47 +34,6 @@ export default function Intraday() {
   const sentiment     = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
   const [soundEnabled, setSoundEnabled] = useState(false)
   const soundCooldownRef = useRef({})
-
-  // Sound alerts — proximity + cascade
-  useEffect(() => {
-    if (!soundEnabled || !currentPrice || !result?.levels) return
-    const now = Date.now()
-    result.levels.forEach(level => {
-      const dist = Math.abs(currentPrice - level.price)
-      const last = soundCooldownRef.current[level.id] || 0
-      if (dist <= 0.15 && now - last > 10000) {
-        soundCooldownRef.current[level.id] = now
-        try {
-          const ctx  = new (window.AudioContext || window.webkitAudioContext)()
-          const osc  = ctx.createOscillator()
-          const gain = ctx.createGain()
-          osc.connect(gain); gain.connect(ctx.destination)
-          osc.frequency.value = level.classification === 'buy_support' ? 523 : 311
-          gain.gain.setValueAtTime(0.1, ctx.currentTime)
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
-          osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5)
-        } catch { /* audio not supported */ }
-      }
-    })
-  }, [currentPrice, soundEnabled])
-
-  useEffect(() => {
-    if (!soundEnabled || !cascade?.active) return
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      ;[440, 370, 311].forEach((freq, i) => {
-        const osc  = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain); gain.connect(ctx.destination)
-        osc.frequency.value = freq
-        const start = ctx.currentTime + i * 0.2
-        gain.gain.setValueAtTime(0.15, start)
-        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3)
-        osc.start(start); osc.stop(start + 0.3)
-      })
-    } catch { /* audio not supported */ }
-  }, [cascade?.active, soundEnabled])
-
   const [subTab, setSubTab]   = useState(0)
   const [drawing, setDrawing] = useState(null)    // null | 'qqq' | 'both'
   const [drawResult, setDrawResult] = useState(null) // null | 'success' | 'error'
@@ -120,6 +79,46 @@ export default function Intraday() {
 
   // Current price — from live price ticks OR most recent rescore
   const currentPrice = priceData?.price ?? result?.current_price
+
+  // Sound alerts — must be after result/cascade/currentPrice are defined
+  useEffect(() => {
+    if (!soundEnabled || !currentPrice || !result?.levels) return
+    const now = Date.now()
+    result.levels.forEach(level => {
+      const dist = Math.abs(currentPrice - level.price)
+      const last = soundCooldownRef.current[level.id] || 0
+      if (dist <= 0.15 && now - last > 10000) {
+        soundCooldownRef.current[level.id] = now
+        try {
+          const ctx  = new (window.AudioContext || window.webkitAudioContext)()
+          const osc  = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.connect(gain); gain.connect(ctx.destination)
+          osc.frequency.value = level.classification === 'buy_support' ? 523 : 311
+          gain.gain.setValueAtTime(0.1, ctx.currentTime)
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+          osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5)
+        } catch { /* audio not supported */ }
+      }
+    })
+  }, [currentPrice, soundEnabled])
+
+  useEffect(() => {
+    if (!soundEnabled || !cascade?.active) return
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      ;[440, 370, 311].forEach((freq, i) => {
+        const osc  = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = freq
+        const start = ctx.currentTime + i * 0.2
+        gain.gain.setValueAtTime(0.15, start)
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3)
+        osc.start(start); osc.stop(start + 0.3)
+      })
+    } catch { /* audio not supported */ }
+  }, [cascade?.active, soundEnabled])
 
   // NarrativeBlock handles its own fallback — pass raw narrative + result
 
