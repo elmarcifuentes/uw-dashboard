@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSSE } from '../hooks/useSSE'
 import SentimentBadge from './SentimentBadge'
 import ImmediateRiskCard from './ImmediateRiskCard'
@@ -10,9 +10,9 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 function StatCard({ label, value, sub, color = 'text-white' }) {
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg p-3">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</div>
-      <div className={`text-lg font-bold font-mono ${color}`}>{value ?? '—'}</div>
+    <div className="bg-[#111827] border border-gray-800 rounded-lg px-4 py-3">
+      <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">{label}</div>
+      <div className={`text-xl font-bold ${color}`}>{value ?? '—'}</div>
       {sub && <div className="text-xs text-gray-600 mt-0.5">{sub}</div>}
     </div>
   )
@@ -21,12 +21,13 @@ function StatCard({ label, value, sub, color = 'text-white' }) {
 export default function OverviewTab() {
   const {
     rescoreData, priceData, connected,
-    sentiment, sessionBrief, levelNarratives,
+    sentiment, sessionBrief, assistantRead, levelNarratives,
     dpHistory, levelTouches, priceVelocity,
   } = useSSE(`${API_URL}/stream`)
 
   const [status, setStatus]   = useState(null)
   const [budget, setBudget]   = useState(null)
+  const [showBrief, setShowBrief] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -65,10 +66,25 @@ export default function OverviewTab() {
 
         {/* Market state */}
         <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Market State</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Market State</div>
           <SentimentBadge sentiment={sentiment} compact={false} />
+          {assistantRead?.now && (
+            <p className="text-xs text-gray-400 mt-3 leading-relaxed line-clamp-2">
+              {assistantRead.now}
+            </p>
+          )}
           {sessionBrief && (
-            <p className="text-xs text-gray-400 mt-3 leading-relaxed line-clamp-3">{sessionBrief}</p>
+            <button
+              onClick={() => setShowBrief(v => !v)}
+              className="text-xs text-purple-600 mt-2 hover:text-purple-400 block"
+            >
+              {showBrief ? '▲ hide brief' : '▼ full brief'}
+            </button>
+          )}
+          {showBrief && sessionBrief && (
+            <p className="text-xs text-gray-400 mt-2 leading-relaxed border-t border-gray-800 pt-2">
+              {sessionBrief}
+            </p>
           )}
         </div>
 
@@ -110,13 +126,13 @@ export default function OverviewTab() {
       </div>
 
       {/* Evidence meter */}
-      <EvidenceMeter levels={levels} />
+      <EvidenceMeter levels={levels} etfDirection={etfDir} />
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Streak"     value={`${streak}`}    sub="consecutive sessions"                          color="text-green-400" />
-        <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} />
-        <StatCard label="API Budget" value={apiCalls}        sub={`/ ${budget?.workingBudget?.toLocaleString() ?? '14,000'}`} />
+        <StatCard label="Streak"     value={streak}          sub="consecutive sessions" color="text-white" />
+        <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} color={etfDir === 'bullish' ? 'text-green-400' : etfDir === 'bearish' ? 'text-red-400' : 'text-gray-400'} />
+        <StatCard label="API Budget" value={apiCalls}        sub={`/ 14,000 (${typeof apiCalls === 'number' ? ((apiCalls / 14000) * 100).toFixed(1) : '—'}%)`} color="text-white" />
         <StatCard label="GEX Regime" value={status?.expansionGexActive ? 'EXPANSION' : 'PINNING'} sub={`${status?.allPinningSessions ?? '—'} sessions`} color={status?.expansionGexActive ? 'text-red-400' : 'text-green-400'} />
       </div>
 

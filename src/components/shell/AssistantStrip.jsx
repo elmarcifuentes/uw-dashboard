@@ -1,22 +1,26 @@
 const FIELDS = [
-  { key: 'now',          label: 'NOW',      color: 'text-white'      },
-  { key: 'next',         label: 'NEXT',     color: 'text-blue-300'   },
-  { key: 'risk',         label: 'RISK',     color: 'text-amber-300'  },
-  { key: 'invalidation', label: 'IF WRONG', color: 'text-gray-400'   },
+  { key: 'now',          label: 'NOW',      color: 'text-white',     border: 'border-gray-700',      labelColor: 'text-gray-500'  },
+  { key: 'next',         label: 'NEXT',     color: 'text-blue-200',  border: 'border-blue-900/50',   labelColor: 'text-blue-500'  },
+  { key: 'risk',         label: 'RISK',     color: 'text-amber-200', border: 'border-amber-900/50',  labelColor: 'text-amber-500' },
+  { key: 'invalidation', label: 'IF WRONG', color: 'text-gray-400',  border: 'border-gray-800',      labelColor: 'text-gray-600'  },
 ]
 
 export default function AssistantStrip({ assistantRead }) {
   return (
-    <div className="border-b border-gray-800/50 bg-[#0d1424] sticky top-12 z-40">
-      <div className="max-w-screen-xl mx-auto px-4 py-1.5 flex items-start gap-6 overflow-x-auto">
+    <div className="border-b border-gray-800 bg-[#0d1424]">
+      <div className="max-w-screen-xl mx-auto px-4 py-2">
         {!assistantRead ? (
-          <span className="text-xs text-gray-700 py-0.5">Initializing market read…</span>
-        ) : FIELDS.map(f => (
-          <div key={f.key} className="flex items-baseline gap-1.5 shrink-0 max-w-xs">
-            <span className="text-xs font-bold text-gray-600 shrink-0 tracking-wider">{f.label}</span>
-            <span className={`text-xs ${f.color} leading-relaxed`}>{assistantRead[f.key] || '—'}</span>
+          <div className="text-xs text-gray-700 py-1">Initializing market read…</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {FIELDS.map(f => (
+              <div key={f.key} className={`border rounded-lg px-3 py-2 ${f.border} bg-[#111827]/50`}>
+                <div className={`text-xs font-bold tracking-wider mb-1 ${f.labelColor}`}>{f.label}</div>
+                <p className={`text-xs leading-relaxed ${f.color} line-clamp-2`}>{assistantRead[f.key] || '—'}</p>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
     </div>
   )

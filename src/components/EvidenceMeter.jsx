@@ -1,22 +1,19 @@
-export default function EvidenceMeter({ levels }) {
+export default function EvidenceMeter({ levels, etfDirection }) {
   if (!levels?.length) return null
 
   const buyCount  = levels.filter(l => l.classification === 'buy_support').length
   const sellCount = levels.filter(l => l.classification === 'sell_resistance').length
   const avgDp     = levels.reduce((s, l) => s + (l.dark_pool || 0), 0) / levels.length
-  const etfBull   = levels.filter(l => l.etf_direction === 'bullish').length
-  const etfBear   = levels.filter(l => l.etf_direction === 'bearish').length
   const flowBias  = (buyCount - sellCount) / levels.length
-  const etfBias   = (etfBull - etfBear) / levels.length
 
   const dpPct  = Math.round(((avgDp + 1) / 2) * 100)
   const flPct  = Math.round(((flowBias + 1) / 2) * 100)
-  const etfPct = Math.round(((etfBias + 1) / 2) * 100)
+  const etfPct = etfDirection === 'bullish' ? 65 : etfDirection === 'bearish' ? 35 : 50
 
   const meters = [
     { label: 'Dark Pool', pct: dpPct,  value: avgDp.toFixed(3) },
     { label: 'Flow',      pct: flPct,  value: `${buyCount}B/${sellCount}S` },
-    { label: 'ETF Tide',  pct: etfPct, value: etfBias > 0.1 ? '↑' : etfBias < -0.1 ? '↓' : '→' },
+    { label: 'ETF Tide',  pct: etfPct, value: etfDirection || 'neutral' },
   ]
 
   return (

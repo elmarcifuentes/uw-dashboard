@@ -9,8 +9,13 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
   const [expanded, setExpanded] = useState(false)
 
   if (!level) return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 flex items-center justify-center min-h-[120px]">
-      <span className="text-xs text-gray-600">No {label?.toLowerCase() || 'level'} active</span>
+    <div className="bg-[#111827] border border-gray-800/50 rounded-lg p-4">
+      {label && <div className="text-xs text-gray-600 uppercase tracking-wider mb-3">{label}</div>}
+      <div className="flex flex-col items-center justify-center py-4 gap-1">
+        <span className="text-gray-700 text-lg">—</span>
+        <span className="text-xs text-gray-700">No active {label?.toLowerCase() || 'level'}</span>
+        <span className="text-xs text-gray-800 mt-1 text-center">All levels showing no_edge or<br/>no classified support today</span>
+      </div>
     </div>
   )
 
