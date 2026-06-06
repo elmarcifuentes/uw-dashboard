@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSSE } from '../hooks/useSSE'
-import SentimentBadge from './SentimentBadge'
 import ImmediateRiskCard from './ImmediateRiskCard'
 import EvidenceMeter from './EvidenceMeter'
 import SmartLevelCard from './SmartLevelCard'
@@ -65,24 +64,45 @@ export default function OverviewTab() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
         {/* Market state */}
-        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Market State</div>
-          <SentimentBadge sentiment={sentiment} compact={false} />
+        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 flex flex-col gap-3">
+          <div className="text-xs text-gray-500 uppercase tracking-wider">Market State</div>
+
+          {/* Sentiment badge — most prominent */}
+          {sentiment && (
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold w-fit ${
+              sentiment.color === 'green'
+                ? 'bg-green-950 text-green-400 border border-green-800'
+                : sentiment.color === 'red'
+                ? 'bg-red-950 text-red-400 border border-red-800'
+                : 'bg-amber-950 text-amber-400 border border-amber-800'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                sentiment.color === 'green' ? 'bg-green-500'
+                  : sentiment.color === 'red' ? 'bg-red-500'
+                  : 'bg-amber-500'
+              } ${sentiment.state === 'HIGH_RISK' ? 'animate-pulse' : ''}`} />
+              {sentiment.state}
+            </div>
+          )}
+
+          {/* NOW text */}
           {assistantRead?.now && (
-            <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+            <p className="text-xs text-gray-400 leading-relaxed">
               {assistantRead.now}
             </p>
           )}
+
+          {/* Session brief expander */}
           {sessionBrief && (
-            <div className="mt-2 border-t border-gray-800 pt-2">
+            <div className="border-t border-gray-800 pt-2">
               <button
                 onClick={() => setShowBrief(!showBrief)}
-                className="text-xs text-purple-700 hover:text-purple-500"
+                className="text-xs text-purple-700 hover:text-purple-500 transition-colors"
               >
                 {showBrief ? '▲ hide' : '▼ session brief'}
               </button>
               {showBrief && (
-                <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                <p className="text-xs text-gray-400 mt-2 leading-relaxed border-l-2 border-purple-900 pl-2">
                   {sessionBrief}
                 </p>
               )}
