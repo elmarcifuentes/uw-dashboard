@@ -17,7 +17,6 @@ import ScenarioCards from './pre/ScenarioCards'
 import ThesisBar from './pre/ThesisBar'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-const POLL_MS        = 30_000
 const STATUS_POLL_MS = 10_000
 const BUDGET_POLL_MS = 60_000
 
@@ -142,8 +141,6 @@ export default function PreSession({ assistantRead }) {
 
   useEffect(() => {
     fetchLatest()
-    const t1 = setInterval(fetchLatest, POLL_MS)
-    return () => clearInterval(t1)
   }, [fetchLatest])
 
   useEffect(() => {
@@ -186,7 +183,7 @@ export default function PreSession({ assistantRead }) {
     es.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data)
-        if (d.type === 'rescore') setLastRescoreAt(new Date().toISOString())
+        if (d.type === 'rescore') { setLastRescoreAt(new Date().toISOString()); fetchLatest() }
         if (d.type === 'level_narratives_update') setLevelNarratives(d.narratives || {})
         if (d.type === 'session_brief_update' && d.session) setSessionBrief(d.session)
       } catch {}

@@ -30,26 +30,9 @@ export default function LevelsTab() {
   const [history, setHistory]       = useState([])
   const [rescoring, setRescoring]   = useState(false)
   const [rescoreResult, setRescoreResult] = useState(null)
-  const [scoringStatus, setScoringStatus] = useState(null)
   const [pending, setPending]       = useState(null)
   const [accepting, setAccepting]   = useState(false)
   const pendingPollRef              = useRef(null)
-
-  const fetchScoringStatus = async () => {
-    try {
-      const res  = await fetch(`${API_URL}/latest`)
-      const data = await res.json()
-      if (data?.levels) {
-        setScoringStatus({
-          timestamp:       data.scored_at || data._received_at,
-          price:           data.current_price,
-          levels:          data.levels,
-          cascade:         data.cascade,
-          structure_break: data.structure_break,
-        })
-      }
-    } catch { /* optional — don't break if /latest unavailable */ }
-  }
 
   useEffect(() => {
     fetch(`${API_URL}/levels`)
@@ -75,8 +58,6 @@ export default function LevelsTab() {
       .then(r => r.json())
       .then(data => setHistory(data.levels || []))
       .catch(() => {})
-
-    fetchScoringStatus()
 
     const pollPending = () => {
       fetch(`${API_URL}/webhook/pending`)
@@ -267,7 +248,6 @@ export default function LevelsTab() {
                       setSavedDate(data.date)
                       setIsToday(true)
                     }
-                    setTimeout(() => fetchScoringStatus(), 4000)
                   }
                 } catch { /* ignore */ }
                 finally { setAccepting(false) }
@@ -367,7 +347,6 @@ export default function LevelsTab() {
               const data = await res.json()
               if (data.success) {
                 setRescoreResult('success')
-                setTimeout(() => fetchScoringStatus(), 3000)
               } else { setRescoreResult('error') }
             } catch { setRescoreResult('error') }
             finally {
@@ -385,56 +364,6 @@ export default function LevelsTab() {
         >
           {rescoring ? '⟳ Scoring…' : rescoreResult === 'success' ? '✓ Scored' : rescoreResult === 'error' ? '✗ Failed' : '⟳ Score Now'}
         </button>
-      )}
-
-      {/* Scoring status panel */}
-      {scoringStatus && (
-        <div className="bg-gray-800 rounded border border-gray-700 p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400 uppercase tracking-wide">Last Scoring Result</span>
-            <span className="text-xs text-gray-500 font-mono">
-              {scoringStatus.timestamp
-                ? new Date(scoringStatus.timestamp).toLocaleTimeString('en-US', {
-                    hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York',
-                  }) + ' ET'
-                : '—'}
-            </span>
-          </div>
-
-          {scoringStatus.price != null && (
-            <div className="text-xs text-gray-400">
-              QQQ <span className="text-white font-mono">${scoringStatus.price?.toFixed(2)}</span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-5 gap-1">
-            {scoringStatus.levels?.map(level => {
-              const id = level.id || level.level_id
-              const cls = level.classification
-              const color = cls === 'buy_support'     ? 'bg-green-900 text-green-400'
-                          : cls === 'sell_resistance' ? 'bg-red-900 text-red-400'
-                          : cls === 'continuation'   ? 'bg-blue-900 text-blue-400'
-                          :                            'bg-gray-700 text-gray-400'
-              const label = cls === 'buy_support' ? 'BUY' : cls === 'sell_resistance' ? 'SELL' : cls === 'continuation' ? 'CONT' : 'EDGE'
-              return (
-                <div key={id} className={`rounded p-1 text-center ${color}`}>
-                  <div className="text-xs font-bold">{id}</div>
-                  <div className="text-xs opacity-75">{label}</div>
-                  {level.full_stack && <div className="text-yellow-400 text-xs">★</div>}
-                </div>
-              )
-            })}
-          </div>
-
-          {scoringStatus.cascade?.active && (
-            <div className="text-xs text-red-400 font-bold animate-pulse">⚠ CASCADE ACTIVE</div>
-          )}
-          {scoringStatus.structure_break?.active && (
-            <div className="text-xs text-amber-400">
-              ⚠ Structure break {scoringStatus.structure_break.direction?.toUpperCase()}
-            </div>
-          )}
-        </div>
       )}
 
       {/* History */}
