@@ -160,7 +160,6 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
           <span className="text-xs text-gray-300 w-14 text-right">
             {typeof level.dark_pool === 'number' ? level.dark_pool.toFixed(3) : '—'}
           </span>
-          <span className="text-xs text-gray-600">[{dpHistory?.length || 0}pts]</span>
           <DpSparkline history={dpHistory} />
           <span className={`text-sm w-4 ${level.etf_direction === 'bullish' ? 'text-green-400' : level.etf_direction === 'bearish' ? 'text-red-400' : 'text-gray-500'}`}>
             {etfArrow}
