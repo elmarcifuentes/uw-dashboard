@@ -28,7 +28,7 @@ function AppInner() {
   const { unlocked } = useAuth()
   const { restarted, hasData, dismiss } = useServerHealth(API_URL)
 
-  const { connected, priceData, rescoreData, assistantRead, narrativeMode } = useSSE(`${API_URL}/stream`)
+  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt } = useSSE(`${API_URL}/stream`)
 
   const result        = useMemo(() => rescoreData?.result ?? null, [rescoreData])
   const currentPrice  = priceData?.price ?? result?.current_price
@@ -51,6 +51,8 @@ function AppInner() {
         unlocked={unlocked}
         onLockClick={() => setShowModal(true)}
         cascadeActive={cascadeActive}
+        systemPaused={systemPaused}
+        pausedAt={pausedAt}
       />
 
       <TabNav active={activeTab} onChange={setActiveTab} connected={connected} unlocked={unlocked} />
@@ -67,7 +69,7 @@ function AppInner() {
           {activeTab === 'Post-Session' && <PostSession />}
           {activeTab === 'News'         && <NewsTab />}
           {activeTab === 'Levels'       && <LevelsTab />}
-          {activeTab === 'Controls'     && <ControlsTab />}
+          {activeTab === 'Controls'     && <ControlsTab systemPaused={systemPaused} pausedAt={pausedAt} />}
           {activeTab === 'Guide'        && <GuideTab />}
         </div>
       </main>

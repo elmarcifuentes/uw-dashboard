@@ -67,6 +67,9 @@ let lastAssistantReadHash    = null
 const history         = []
 const MAX_HISTORY     = 20
 
+// Pause state
+let systemPaused = false
+
 // Expansion GEX tracking
 let expansionGexHistory  = []
 let allPinningSessions   = 0
@@ -87,6 +90,17 @@ if (!process.env.NARRATIVE_MODE) {
   } catch { /* settings table may not exist on first boot — db.exec creates it */ }
 }
 console.log('[server] Narrative mode initialized:', narrativeMode, `(${narrativeModeSource})`)
+
+// Restore pause state from SQLite
+{
+  try {
+    const saved = db.prepare(`SELECT value FROM settings WHERE key = 'system_paused'`).get()
+    if (saved?.value === 'true') {
+      systemPaused = true
+      console.log('[server] System pause state restored from DB — polling disabled')
+    }
+  } catch { /* settings table may not exist on first boot */ }
+}
 
 function hashSessionState(result) {
   if (!result) return null
@@ -775,6 +789,10 @@ const provider = new SmartDataProvider(
 
 // On rescore trigger — run full scoring, update store, broadcast SSE
 provider.onRescore(async ({ price, reason }) => {
+  if (systemPaused) {
+    console.log(`[rescore] Skipped — system paused (${reason} at $${price})`)
+    return
+  }
   if (!runFullScore) {
     // Scorer unavailable (Railway hosted) — emit price tick only, never touch latest
     console.log(`[server] Scorer unavailable — emitting price only (${reason} at $${price})`)
@@ -871,6 +889,7 @@ let alertFired        = false
 let lastEmittedPrice  = null  // throttle: only emit when price moves ≥ $0.05
 
 provider.onPriceUpdate((price) => {
+  if (systemPaused) return
   const s     = provider.getStatus()
   const today = new Date().toISOString().split('T')[0]
 
@@ -1076,7 +1095,37 @@ app.get('/status', (req, res) => {
     dpHistory: { ...dpHistory },
     narrativeMode,
     narrativeModeSource,
+    systemPaused,
+    pausedAt: systemPaused
+      ? (db.prepare(`SELECT value FROM settings WHERE key = 'paused_at'`).get()?.value || null)
+      : null,
   })
+})
+
+app.post('/system/pause', (req, res) => {
+  systemPaused = true
+  const now = new Date().toISOString()
+  try {
+    db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('system_paused', 'true', datetime('now')) ON CONFLICT(key) DO UPDATE SET value = 'true', updated_at = datetime('now')`).run()
+    db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('paused_at', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`).run(now)
+  } catch (e) { console.warn('[pause] SQLite write failed:', e.message) }
+  provider?.stop?.()
+  sseEmitter.emit('event', { type: 'system_paused', pausedAt: now, timestamp: now })
+  console.log('[server] System PAUSED at', now)
+  res.json({ success: true, paused: true, pausedAt: now })
+})
+
+app.post('/system/resume', (req, res) => {
+  systemPaused = false
+  const now = new Date().toISOString()
+  try {
+    db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('system_paused', 'false', datetime('now')) ON CONFLICT(key) DO UPDATE SET value = 'false', updated_at = datetime('now')`).run()
+    db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('paused_at', NULL, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = NULL, updated_at = datetime('now')`).run()
+  } catch (e) { console.warn('[resume] SQLite write failed:', e.message) }
+  provider?.start?.()
+  sseEmitter.emit('event', { type: 'system_resumed', resumedAt: now, timestamp: now })
+  console.log('[server] System RESUMED at', now)
+  res.json({ success: true, paused: false, resumedAt: now })
 })
 
 app.post('/mode', (req, res) => {

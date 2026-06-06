@@ -23,6 +23,8 @@ export function useSSE(url) {
   const [priceVelocity, setPriceVelocity]     = useState(0)
   const [levelTouches, setLevelTouches]       = useState({})
   const [priceHistory, setPriceHistory]       = useState([])
+  const [systemPaused, setSystemPaused]       = useState(false)
+  const [pausedAt, setPausedAt]               = useState(null)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
   const priceHistoryRef = useRef([])
@@ -48,6 +50,8 @@ export function useSSE(url) {
               console.log('[SSE] narrative mode restored from status:', data.narrativeMode)
               setNarrativeMode(data.narrativeMode)
             }
+            if (data?.systemPaused !== undefined) setSystemPaused(data.systemPaused)
+            if (data?.pausedAt !== undefined) setPausedAt(data.pausedAt)
           })
           .catch(() => {})
         // Restore assistant read
@@ -178,6 +182,8 @@ export function useSSE(url) {
         if (data.type === 'levels_pending')   { setPendingLevels(data.levels); return }
         if (data.type === 'levels_dismissed') { setPendingLevels(null);        return }
         if (data.type === 'levels_updated')   { setPendingLevels(null);        return }
+        if (data.type === 'system_paused')    { setSystemPaused(true);  setPausedAt(data.pausedAt || null);  return }
+        if (data.type === 'system_resumed')   { setSystemPaused(false); setPausedAt(null);                   return }
       }
 
       es.onerror = () => {
@@ -217,5 +223,7 @@ export function useSSE(url) {
     priceVelocity,
     levelTouches,
     priceHistory,
+    systemPaused,
+    pausedAt,
   }
 }

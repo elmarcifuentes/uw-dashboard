@@ -8,7 +8,16 @@ function SessionTypeChip() {
   return <span className={`text-xs px-2 py-0.5 rounded font-medium ${color}`}>{label}</span>
 }
 
-export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive }) {
+function formatPausedTime(isoString) {
+  if (!isoString) return ''
+  try {
+    return new Date(isoString).toLocaleTimeString('en-US', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York'
+    })
+  } catch { return '' }
+}
+
+export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive, systemPaused, pausedAt }) {
   const [showInfo, setShowInfo] = useState(false)
 
   return (
@@ -73,7 +82,11 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
               🤖 Claude
             </span>
           )}
-          <SessionTypeChip />
+          {systemPaused ? (
+            <span className="text-xs px-2 py-0.5 rounded font-medium text-amber-400 bg-amber-950 animate-pulse">⏸ PAUSED</span>
+          ) : (
+            <SessionTypeChip />
+          )}
           <button
             onClick={onLockClick}
             title={unlocked ? 'Unlocked — click to lock' : 'Click to unlock'}
@@ -83,6 +96,15 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
           </button>
         </div>
       </div>
+
+      {systemPaused && (
+        <div className="bg-amber-950/80 border-t border-amber-800/40 px-4 py-1.5 flex items-center gap-3 text-xs">
+          <span className="text-amber-400 font-bold shrink-0">⏸ SYSTEM PAUSED</span>
+          <span className="text-amber-300/60">— data frozen</span>
+          {pausedAt && <span className="text-gray-600">since {formatPausedTime(pausedAt)} ET</span>}
+          <span className="text-gray-600 hidden sm:block">· Resume in Controls tab</span>
+        </div>
+      )}
     </header>
   )
 }
