@@ -95,7 +95,7 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
 
         {/* Dark Pool bar */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 w-12 shrink-0">Dark Pool</span>
+          <span className="text-xs text-gray-600 w-16 shrink-0 whitespace-nowrap">Dark Pool</span>
           <div className="flex-1 h-1.5 bg-gray-800 rounded relative">
             <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gray-700" />
             {(() => {
@@ -118,7 +118,7 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
 
         {/* Score bar */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 w-12 shrink-0">Score</span>
+          <span className="text-xs text-gray-600 w-16 shrink-0 whitespace-nowrap">Score</span>
           <div className="flex-1 h-1.5 bg-gray-800 rounded overflow-hidden">
             <div className={`h-full rounded ${
               level.classification === 'sell_resistance' ? 'bg-red-500'

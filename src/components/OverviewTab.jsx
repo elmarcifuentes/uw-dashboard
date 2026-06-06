@@ -68,7 +68,7 @@ export default function OverviewTab() {
           <div className="text-xs text-gray-500 uppercase tracking-wider">Market State</div>
 
           {/* Sentiment badge — most prominent */}
-          {sentiment && (
+          {sentiment?.state && (
             <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold w-fit ${
               sentiment.color === 'green'
                 ? 'bg-green-950 text-green-400 border border-green-800'
@@ -76,7 +76,7 @@ export default function OverviewTab() {
                 ? 'bg-red-950 text-red-400 border border-red-800'
                 : 'bg-amber-950 text-amber-400 border border-amber-800'
             }`}>
-              <span className={`w-2 h-2 rounded-full ${
+              <span className={`w-2 h-2 rounded-full shrink-0 ${
                 sentiment.color === 'green' ? 'bg-green-500'
                   : sentiment.color === 'red' ? 'bg-red-500'
                   : 'bg-amber-500'
