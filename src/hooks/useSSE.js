@@ -19,8 +19,12 @@ export function useSSE(url) {
   const [levelNarratives, setLevelNarratives] = useState({})
   const [sessionBrief, setSessionBrief]       = useState(null)
   const [tacticalBrief, setTacticalBrief]     = useState(null)
+  const [priceVelocity, setPriceVelocity]     = useState(0)
+  const [levelTouches, setLevelTouches]       = useState({})
+  const [priceHistory, setPriceHistory]       = useState([])
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
+  const priceHistoryRef = useRef([])
 
   useEffect(() => {
     let destroyed = false
@@ -62,6 +66,21 @@ export function useSSE(url) {
               setLevelNarratives(data.narratives)
             }
           })
+          .catch(() => {})
+        // Restore price history
+        fetch(`${apiBase}/price-history`)
+          .then(r => r.json())
+          .then(data => {
+            if (data?.priceHistory?.length > 0) {
+              priceHistoryRef.current = data.priceHistory
+              setPriceHistory(data.priceHistory)
+            }
+          })
+          .catch(() => {})
+        // Restore level touches
+        fetch(`${apiBase}/level-touches`)
+          .then(r => r.json())
+          .then(data => { if (data?.touches) setLevelTouches(data.touches) })
           .catch(() => {})
         // Restore last narrative content immediately
         fetch(`${apiBase}/narrative`)
@@ -109,6 +128,15 @@ export function useSSE(url) {
         if (data.type === 'price') {
           // Update price only — does NOT trigger rescore re-renders
           setPriceData({ price: data.price, timestamp: data.timestamp, interval: data.interval, isMarketHours: data.isMarketHours })
+          // Track velocity
+          const ph = priceHistoryRef.current
+          ph.push({ price: data.price, ts: Date.now() })
+          if (ph.length > 5) ph.shift()
+          if (ph.length >= 2) {
+            const change  = ph[ph.length - 1].price - ph[0].price
+            const elapsed = (ph[ph.length - 1].ts - ph[0].ts) / 1000
+            if (elapsed > 0) setPriceVelocity(change / elapsed)
+          }
           return
         }
 
@@ -175,5 +203,8 @@ export function useSSE(url) {
     levelNarratives,
     sessionBrief,
     tacticalBrief,
+    priceVelocity,
+    levelTouches,
+    priceHistory,
   }
 }

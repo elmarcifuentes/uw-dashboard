@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import SignalBadge from './SignalBadge'
+import DpSparkline from './DpSparkline'
 import { getLevelProximity, getProximityStyles } from '../utils/proximity'
 import DpBar from './DpBar'
 import GexBar from './GexBar'
@@ -71,7 +72,25 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt, levelNarrative, currentPrice }) {
+function SignalPills({ level }) {
+  const pills = []
+  if (level.confidence && level.confidence !== 'none') {
+    pills.push({ label: level.confidence.toUpperCase(), color: level.confidence === 'high' ? 'bg-green-900 text-green-300' : level.confidence === 'medium' ? 'bg-yellow-900 text-yellow-300' : 'bg-gray-700 text-gray-400' })
+  }
+  if (level.full_stack)                 pills.push({ label: '★ FULL',  color: 'bg-yellow-900 text-yellow-300' })
+  if (level.etf_direction === 'bullish') pills.push({ label: '↑ ETF',  color: 'bg-green-900 text-green-400' })
+  if (level.etf_direction === 'bearish') pills.push({ label: '↓ ETF',  color: 'bg-red-900 text-red-400' })
+  if ((level.net_gex || 0) < 0)         pills.push({ label: '⚡ EXP',  color: 'bg-red-950 text-red-400' })
+  if (level.lower_high)                  pills.push({ label: '↘ LH',   color: 'bg-orange-900 text-orange-400' })
+  if (!pills.length) return null
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {pills.map((p, i) => <span key={i} className={`text-xs px-1.5 py-0.5 rounded font-medium ${p.color}`}>{p.label}</span>)}
+    </div>
+  )
+}
+
+export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt, levelNarrative, currentPrice, levelTouch }) {
   const [expanded, setExpanded] = useState(false)
   const proximity  = getLevelProximity(currentPrice, level.price)
   const proxStyles = getProximityStyles(proximity, level.classification, level)
@@ -141,6 +160,7 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
           <span className="text-xs text-gray-300 w-14 text-right">
             {typeof level.dark_pool === 'number' ? level.dark_pool.toFixed(3) : '—'}
           </span>
+          <DpSparkline history={dpHistory} />
           <span className={`text-sm w-4 ${level.etf_direction === 'bullish' ? 'text-green-400' : level.etf_direction === 'bearish' ? 'text-red-400' : 'text-gray-500'}`}>
             {etfArrow}
           </span>
@@ -210,6 +230,17 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
           )
         })()}
       </div>
+
+      {/* Signal pills */}
+      <SignalPills level={level} />
+
+      {/* Touch counter */}
+      {levelTouch && (
+        <div className="flex items-center gap-2 mt-0.5">
+          {levelTouch.total_touches > 0 && <span className="text-xs text-gray-500">touched {levelTouch.total_touches}×</span>}
+          {levelTouch.crosses > 0 && <span className="text-xs text-amber-500">crossed {levelTouch.crosses}×</span>}
+        </div>
+      )}
 
       {/* Row 4: Passive target */}
       {level.passive_target && level.passive_target_from && (

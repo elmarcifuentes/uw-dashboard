@@ -11,6 +11,7 @@ import ZeroDteFlow from './ZeroDteFlow'
 import GreekFlow from './GreekFlow'
 import SentimentBadge from './SentimentBadge'
 import SessionBrief from './SessionBrief'
+import SignalStrengthBar from './SignalStrengthBar'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -148,6 +149,7 @@ export default function PreSession() {
   const [lastRescoreAt, setLastRescoreAt]   = useState(null)
   const [levelNarratives, setLevelNarratives] = useState({})
   const [sessionBrief, setSessionBrief]       = useState(null)
+  const [levelTouches, setLevelTouches]       = useState({})
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -230,6 +232,10 @@ export default function PreSession() {
     fetch(`${API}/session-brief`)
       .then(r => r.json())
       .then(d => { if (d?.session) setSessionBrief(d.session) })
+      .catch(() => {})
+    fetch(`${API}/level-touches`)
+      .then(r => r.json())
+      .then(d => { if (d?.touches) setLevelTouches(d.touches) })
       .catch(() => {})
     const es = new EventSource(`${API}/stream`)
     es.onmessage = (e) => {
@@ -333,6 +339,7 @@ export default function PreSession() {
       {/* Sentiment badge — first element */}
       <SentimentBadge sentiment={sentiment} compact={false} />
       <SessionBrief brief={sessionBrief} mode={providerStatus?.narrativeMode} />
+      <SignalStrengthBar levels={levels} />
 
       {/* Session header */}
       <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
@@ -456,6 +463,7 @@ export default function PreSession() {
               scoredAt={data?.scored_at || data?._received_at}
               levelNarrative={levelNarratives[level.id]}
               currentPrice={data?.current_price}
+              levelTouch={levelTouches[level.id]}
             />
           ))
         })()}

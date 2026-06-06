@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSSE } from '../hooks/useSSE'
 import { useLayout } from '../context/LayoutContext'
 import { useAuth } from '../context/AuthContext'
 import PriceLadder from './intraday/PriceLadder'
+import PriceSparkline from './intraday/PriceSparkline'
 import DarkPoolChart from './intraday/DarkPoolChart'
 import EtfTideChart from './intraday/EtfTideChart'
 import RescoreLog from './intraday/RescoreLog'
@@ -25,11 +26,55 @@ export default function Intraday() {
     chartStale, staleChanges,
     expansionGex, pinningSessions,
     midDpHistory, dpHistory, narrative, narrativeMode, levelNarratives, tacticalBrief,
+    priceVelocity, priceHistory, levelTouches,
   } = useSSE(`${API_URL}/stream`)
 
   const { compact, toggle } = useLayout()
   const { unlocked, authPost } = useAuth()
   const sentiment     = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
+  const [soundEnabled, setSoundEnabled] = useState(false)
+  const soundCooldownRef = useRef({})
+
+  // Sound alerts — proximity + cascade
+  useEffect(() => {
+    if (!soundEnabled || !currentPrice || !result?.levels) return
+    const now = Date.now()
+    result.levels.forEach(level => {
+      const dist = Math.abs(currentPrice - level.price)
+      const last = soundCooldownRef.current[level.id] || 0
+      if (dist <= 0.15 && now - last > 10000) {
+        soundCooldownRef.current[level.id] = now
+        try {
+          const ctx  = new (window.AudioContext || window.webkitAudioContext)()
+          const osc  = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.connect(gain); gain.connect(ctx.destination)
+          osc.frequency.value = level.classification === 'buy_support' ? 523 : 311
+          gain.gain.setValueAtTime(0.1, ctx.currentTime)
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+          osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5)
+        } catch { /* audio not supported */ }
+      }
+    })
+  }, [currentPrice, soundEnabled])
+
+  useEffect(() => {
+    if (!soundEnabled || !cascade?.active) return
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      ;[440, 370, 311].forEach((freq, i) => {
+        const osc  = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = freq
+        const start = ctx.currentTime + i * 0.2
+        gain.gain.setValueAtTime(0.15, start)
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3)
+        osc.start(start); osc.stop(start + 0.3)
+      })
+    } catch { /* audio not supported */ }
+  }, [cascade?.active, soundEnabled])
+
   const [subTab, setSubTab]   = useState(0)
   const [drawing, setDrawing] = useState(null)    // null | 'qqq' | 'both'
   const [drawResult, setDrawResult] = useState(null) // null | 'success' | 'error'
@@ -98,6 +143,12 @@ export default function Intraday() {
           </span>
           {/* LivePrice is memo'd — only re-renders when priceData or nqRatio changes */}
           <LivePrice priceData={priceData} nqRatio={nqRatio} />
+          {priceVelocity != null && (() => {
+            const abs = Math.abs(priceVelocity), up = priceVelocity > 0
+            const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : abs > 0.005 ? (up ? '↑' : '↓') : null
+            const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : (up ? 'text-green-700' : 'text-red-700')
+            return arrow ? <span className={`text-xs font-bold ${color}`}>{arrow}</span> : null
+          })()}
           <SentimentBadge sentiment={sentiment} compact={true} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -116,6 +167,13 @@ export default function Intraday() {
             title="Triggers fresh scoring and dashboard update. Run /draw in Claude Code to update both chart labels."
           >
             {drawLabel('both')}
+          </button>
+          <button
+            onClick={() => setSoundEnabled(s => !s)}
+            className={`text-xs border px-2 py-1 rounded transition-colors ${soundEnabled ? 'border-teal-600 text-teal-400' : 'border-gray-600 text-gray-400 hover:text-white'}`}
+            title="Sound alerts"
+          >
+            {soundEnabled ? '🔔' : '🔕'}
           </button>
           <button
             onClick={toggle}
@@ -193,7 +251,10 @@ export default function Intraday() {
 
       {/* Sub-tab content */}
       <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
-        {subTab === 0 && <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} />}
+        {subTab === 0 && <>
+          <PriceSparkline history={priceHistory} levels={result?.levels} />
+          <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} />
+        </>}
         {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
         {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
         {subTab === 3 && <NewsHeadlines apiUrl={API_URL} />}

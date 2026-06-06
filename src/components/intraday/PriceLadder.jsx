@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useEffect } from 'react'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
 import { getLevelProximity, getProximityStyles } from '../../utils/proximity'
+import DpSparkline from '../DpSparkline'
 
 const LEVEL_DESCRIPTIONS = {
   buy_support:     'Institutional buying below — price expected to be drawn upward',
@@ -111,7 +112,7 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {} }) {
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {} }) {
   const [expandedLevel, setExpandedLevel] = useState(null)
   const [flashLevel, setFlashLevel]       = useState(null)
   const prevPriceRef = useRef(currentPrice)
@@ -240,9 +241,10 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                    level.classification === 'continuation'   ? 'CONT'     : 'NO EDGE'}
                   {' '}{level.score}
                 </span>
-                <span>
+                <span className="inline-flex items-center gap-1">
                   DP {level.dark_pool >= 0.3 ? '↑' : level.dark_pool <= -0.3 ? '↓' : '—'}{' '}
                   {level.dark_pool?.toFixed(3)}
+                  <DpSparkline history={dpHistory[level.id]} />
                 </span>
                 <span>
                   ETF {level.etf_direction === 'bullish' ? '↑' : level.etf_direction === 'bearish' ? '↓' : '—'}
@@ -286,6 +288,14 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
             {scoredAt && (
               <div className="flex justify-end mt-1">
                 <span className="text-gray-600 text-xs font-mono">{formatTime(scoredAt)}</span>
+              </div>
+            )}
+
+            {/* Touch counter */}
+            {levelTouches[level.id] && (
+              <div className="flex items-center gap-2 mt-0.5">
+                {levelTouches[level.id].total_touches > 0 && <span className="text-xs text-gray-500">touched {levelTouches[level.id].total_touches}×</span>}
+                {levelTouches[level.id].crosses > 0 && <span className="text-xs text-amber-500">crossed {levelTouches[level.id].crosses}×</span>}
               </div>
             )}
 

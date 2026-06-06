@@ -10,6 +10,7 @@ export default function Controls({ compact }) {
   const [rescoring, setRescoring]     = useState(false)
   const [rescoreMsg, setRescoreMsg]   = useState(null)
   const [narrativeMode, setNarrativeMode] = useState('template')
+  const [soundEnabled, setSoundEnabled]   = useState(false)
 
   const fetchAll = async () => {
     try {
@@ -176,6 +177,21 @@ export default function Controls({ compact }) {
           </div>
         </div>
       )}
+
+      {/* Sound alerts */}
+      <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Sound Alerts</div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">Level proximity + cascade</span>
+          <button
+            onClick={() => setSoundEnabled(s => !s)}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${soundEnabled ? 'bg-teal-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+          >
+            {soundEnabled ? '🔔 On' : '🔕 Off'}
+          </button>
+        </div>
+        {soundEnabled && <p className="text-xs text-gray-600 mt-1">C5 tone near buy support · Eb4 tone near sell resistance · 3-tone descend on cascade</p>}
+      </div>
 
     </div>
   )

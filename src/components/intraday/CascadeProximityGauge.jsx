@@ -1,4 +1,27 @@
 import { memo } from 'react'
+
+function CascadeThermometer({ midDp }) {
+  const clamped       = Math.max(-1.0, Math.min(0.5, midDp ?? 0))
+  const H = 60, W = 12
+  const pct           = ((clamped - (-1.0)) / 1.5) * 100
+  const thresholdPct  = ((-0.700 - (-1.0)) / 1.5) * 100
+  const fillH         = (pct / 100) * H
+  const thresholdY    = H - (thresholdPct / 100) * H
+  const color = midDp <= -0.700 ? '#ef4444' : midDp <= -0.500 ? '#f59e0b' : '#22c55e'
+  return (
+    <div className="flex flex-col items-center gap-1 shrink-0">
+      <span className="text-xs text-gray-600">dp</span>
+      <svg width={W} height={H}>
+        <rect x="2" y="0" width={W - 4} height={H} rx="3" fill="#1f2937" />
+        <rect x="2" y={H - fillH} width={W - 4} height={fillH} rx="3" fill={color} opacity="0.8" />
+        <line x1="0" y1={thresholdY.toFixed(1)} x2={W} y2={thresholdY.toFixed(1)}
+              stroke="#ef4444" strokeWidth="1.5" strokeDasharray="2,1" />
+      </svg>
+      <span className="text-xs font-mono" style={{ color }}>{midDp?.toFixed(2)}</span>
+    </div>
+  )
+}
+
 export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
   if (!cascade || cascade.mid_dp === null || cascade.mid_dp === undefined) return null
 
@@ -33,6 +56,8 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
 
   return (
     <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+      <div className="flex items-start gap-3">
+      <div className="flex-1">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
@@ -143,6 +168,10 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
           </span>
         )}
       </div>
+
+      </div>{/* flex-1 */}
+      <CascadeThermometer midDp={midDp} />
+      </div>{/* flex items-start gap-3 */}
     </div>
   )
 })

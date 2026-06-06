@@ -52,6 +52,9 @@ let previousResult    = null
 let chartSynced       = true
 let lastWebhookPayload = null
 let lastNarrative           = []
+let priceHistory            = []   // max 50 points for mini chart
+let lastTrackedPrice        = null
+const touchedLevels         = {}   // level_id → last touch timestamp
 let lastNarrativeHash       = null
 let lastNarrativeMode       = null
 let lastLevelNarratives      = {}
@@ -554,8 +557,36 @@ function updateDpHistory(result) {
   for (const level of result.levels) {
     if (!dpHistory[level.id]) dpHistory[level.id] = []
     dpHistory[level.id].push({ value: level.dark_pool, time: new Date().toISOString() })
-    if (dpHistory[level.id].length > 3) dpHistory[level.id].shift()
+    if (dpHistory[level.id].length > 8) dpHistory[level.id].shift()
   }
+}
+
+function trackLevelTouches(currentPrice, levels, dbInstance) {
+  if (!currentPrice || !levels?.length) return
+  const today   = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  const prev    = lastTrackedPrice
+  const cooldown = 60000
+  levels.forEach(level => {
+    const dist      = Math.abs(currentPrice - level.price)
+    const lastTouch = touchedLevels[level.id] || 0
+    if (dist <= 0.15 && Date.now() - lastTouch > cooldown) {
+      touchedLevels[level.id] = Date.now()
+      let touchType = 'touch'
+      if (prev) {
+        const crossed = (prev < level.price && currentPrice >= level.price) ||
+                        (prev >= level.price && currentPrice < level.price)
+        if (crossed) touchType = 'cross'
+      }
+      try {
+        dbInstance.prepare(
+          `INSERT INTO level_touches (session_date, level_id, touch_type, price, dp, classification)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).run(today, level.id, touchType, currentPrice, level.dark_pool, level.classification)
+        console.log(`[touch] ${level.id} ${touchType} at $${currentPrice?.toFixed(2)}`)
+      } catch { /* table may not exist on first boot */ }
+    }
+  })
+  lastTrackedPrice = currentPrice
 }
 
 function detectExpansionGex(result) {
@@ -681,6 +712,7 @@ provider.onRescore(async ({ price, reason }) => {
     emitStaleIfChanged(result)
     checkExpansionGex(result)
     updateDpHistory(result)
+    if (result.current_price) trackLevelTouches(result.current_price, result.levels, db)
     const sentiment = computeSentiment(result)
     result._sentiment = sentiment
     // Emit rescore immediately — no narrative wait
@@ -773,6 +805,9 @@ provider.onPriceUpdate((price) => {
   const priceMoved = !lastEmittedPrice || Math.abs(price - lastEmittedPrice) >= 0.05
   if (!priceMoved) return
   lastEmittedPrice = price
+  priceHistory.push({ price, ts: Date.now() })
+  if (priceHistory.length > 50) priceHistory.shift()
+  if (latest?.levels) trackLevelTouches(price, latest.levels, db)
 
   sseEmitter.emit('event', {
     type:         'price',
@@ -1464,6 +1499,33 @@ app.post('/webhook/dismiss', (req, res) => {
     sseEmitter.emit('event', { type: 'levels_dismissed', timestamp: new Date().toISOString() })
     res.json({ success: true })
   } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// GET /dp-history — per-level dark pool history
+app.get('/dp-history', (req, res) => {
+  res.json({ dpHistory })
+})
+
+// GET /price-history — price sparkline data
+app.get('/price-history', (req, res) => {
+  res.json({ priceHistory })
+})
+
+// GET /level-touches — session touch/cross counts
+app.get('/level-touches', (req, res) => {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  try {
+    const rows = db.prepare(`
+      SELECT level_id,
+        COUNT(*) as total_touches,
+        SUM(CASE WHEN touch_type='cross' THEN 1 ELSE 0 END) as crosses,
+        MIN(touched_at) as first_touch, MAX(touched_at) as last_touch
+      FROM level_touches WHERE session_date = ? GROUP BY level_id
+    `).all(today)
+    const touches = {}
+    rows.forEach(r => { touches[r.level_id] = r })
+    res.json({ touches, date: today })
+  } catch { res.json({ touches: {}, date: today }) }
 })
 
 // GET /session-brief — return last session + tactical brief (for reconnect restore)

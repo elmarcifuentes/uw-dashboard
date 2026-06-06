@@ -1,4 +1,37 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
+function GexDecayCountdown({ todayPct }) {
+  const [timeLeft, setTimeLeft] = useState('')
+  const [urgency, setUrgency]   = useState('low')
+
+  const update = useCallback(() => {
+    const now   = new Date()
+    const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' })
+    const etNow = new Date(etStr)
+    const close = new Date(etNow)
+    close.setHours(16, 0, 0, 0)
+    const diff  = close - etNow
+    if (diff <= 0) { setTimeLeft('CLOSED'); setUrgency('closed'); return }
+    const h = Math.floor(diff / 3600000)
+    const m = Math.floor((diff % 3600000) / 60000)
+    const s = Math.floor((diff % 60000) / 1000)
+    setTimeLeft(h > 0 ? `${h}h ${m}m to close` : `${m}m ${s}s to close`)
+    setUrgency(diff < 30 * 60000 ? 'critical' : diff < 60 * 60000 ? 'high' : diff < 120 * 60000 ? 'medium' : 'low')
+  }, [])
+
+  useEffect(() => { update(); const t = setInterval(update, 1000); return () => clearInterval(t) }, [update])
+
+  const colors = { low: 'text-gray-400', medium: 'text-yellow-400', high: 'text-amber-400', critical: 'text-red-400 animate-pulse', closed: 'text-gray-600' }
+  if (urgency === 'closed' || !todayPct) return null
+
+  return (
+    <div className="flex items-center gap-2 text-xs mt-1.5 pt-1.5 border-t border-gray-700">
+      <span className="text-gray-500">0DTE</span>
+      <span className="font-mono font-bold text-amber-400">{todayPct.toFixed(0)}% GEX</span>
+      <span className={`font-mono ${colors[urgency]}`}>{timeLeft}</span>
+    </div>
+  )
+}
 
 function bucket(entries) {
   const today = [], thisWeek = [], nextWeek = [], later = []
@@ -89,6 +122,7 @@ export default function GexByExpiry({ apiUrl }) {
         })}
       </div>
       <div className={`text-xs italic ${warnColor}`}>{warning}</div>
+      <GexDecayCountdown todayPct={todayPct} />
     </div>
   )
 }

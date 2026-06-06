@@ -95,6 +95,17 @@ db.exec(`
     UNIQUE(date)
   );
 
+  CREATE TABLE IF NOT EXISTS level_touches (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_date   TEXT NOT NULL,
+    level_id       TEXT NOT NULL,
+    touch_type     TEXT NOT NULL,
+    price          REAL,
+    dp             REAL,
+    classification TEXT,
+    touched_at     TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key        TEXT PRIMARY KEY,
     value      TEXT,
