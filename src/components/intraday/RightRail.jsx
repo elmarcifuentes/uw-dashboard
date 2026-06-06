@@ -1,10 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import DpSparkline from '../DpSparkline'
 
 export default function RightRail({
   levels, currentPrice, nqRatio, cascade, dpHistory, levelNarratives,
 }) {
   const [activeLevel, setActiveLevel] = useState(null)
+  const [userSelected, setUserSelected] = useState(false)
+
+  const nearestLevelId = useMemo(() => {
+    if (!levels?.length || !currentPrice) return null
+    return levels.reduce((nearest, l) => {
+      const d  = Math.abs(currentPrice - l.price)
+      const nd = Math.abs(currentPrice - nearest.price)
+      return d < nd ? l : nearest
+    }).id
+  }, [currentPrice, levels])
+
+  useEffect(() => {
+    if (!userSelected && nearestLevelId) {
+      setActiveLevel(nearestLevelId)
+    }
+  }, [nearestLevelId, userSelected])
 
   const mid   = levels?.find(l => l.id === 'MID')
   const midDp = mid?.dark_pool ?? 0
@@ -48,7 +64,10 @@ export default function RightRail({
           {levels?.map(level => (
             <button
               key={level.id}
-              onClick={() => setActiveLevel(activeLevel === level.id ? null : level.id)}
+              onClick={() => {
+                setUserSelected(true)
+                setActiveLevel(activeLevel === level.id ? null : level.id)
+              }}
               className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${
                 activeLevel === level.id
                   ? level.classification === 'sell_resistance' ? 'bg-red-800 text-white'
