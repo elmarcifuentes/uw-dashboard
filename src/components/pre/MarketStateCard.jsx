@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 export default function MarketStateCard({ sentiment, sessionBrief, narrativeMode }) {
-  const [showBrief, setShowBrief] = useState(true)
+  const [showBrief, setShowBrief] = useState(false)
 
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 space-y-3">
@@ -50,8 +50,13 @@ export default function MarketStateCard({ sentiment, sessionBrief, narrativeMode
             </span>
             <span>{showBrief ? '▲' : '▼'}</span>
           </button>
+          {!showBrief && (
+            <p className="text-xs text-gray-600 mt-1 line-clamp-1 italic">
+              {sessionBrief.slice(0, 80)}...
+            </p>
+          )}
           {showBrief && (
-            <p className="text-xs text-gray-400 leading-relaxed border-l-2 border-purple-900 pl-2">
+            <p className="text-xs text-gray-400 mt-2 leading-relaxed border-l-2 border-purple-900 pl-2">
               {sessionBrief}
             </p>
           )}
