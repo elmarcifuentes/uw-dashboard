@@ -113,7 +113,7 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {} }) {
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect }) {
   const [expandedLevel, setExpandedLevel] = useState(null)
   const [flashLevel, setFlashLevel]       = useState(null)
   const prevPriceRef = useRef(currentPrice)
@@ -185,7 +185,8 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           <>
           <div
             key={level.id}
-            className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''}`}
+            onClick={() => onSelect?.(level.id)}
+            className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''} ${onSelect ? 'cursor-pointer' : ''}`}
           >
             {/* Proximity label */}
             {styles.label && (

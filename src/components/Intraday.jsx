@@ -12,6 +12,7 @@ import CascadeProximityGauge from './intraday/CascadeProximityGauge'
 import NarrativeBlock from './intraday/NarrativeBlock'
 import LiveHeader from './intraday/LiveHeader'
 import RightRail from './intraday/RightRail'
+import FocusMode from './intraday/FocusMode'
 
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log']
@@ -24,7 +25,7 @@ export default function Intraday() {
     chartStale, staleChanges,
     expansionGex, pinningSessions,
     midDpHistory, dpHistory, narrative, narrativeMode, levelNarratives, tacticalBrief,
-    priceVelocity, priceHistory, levelTouches,
+    assistantRead, priceVelocity, priceHistory, levelTouches,
   } = useSSE(`${API_URL}/stream`)
 
   const { compact, toggle } = useLayout()
@@ -39,9 +40,11 @@ export default function Intraday() {
     return () => window.removeEventListener('storage', handler)
   }, [])
 
-  const [subTab, setSubTab]   = useState(0)
-  const [drawing, setDrawing] = useState(null)
+  const [subTab, setSubTab]       = useState(0)
+  const [drawing, setDrawing]     = useState(null)
   const [drawResult, setDrawResult] = useState(null)
+  const [focusMode, setFocusMode] = useState(false)
+  const [selectedLevel, setSelectedLevel] = useState(null)
 
   const triggerDraw = async (type) => {
     if (!unlocked || drawing) return
@@ -117,6 +120,21 @@ export default function Intraday() {
   return (
     <div className="space-y-3 py-3">
 
+      {focusMode && (
+        <FocusMode
+          connected={connected}
+          currentPrice={currentPrice}
+          nqPrice={nqPrice}
+          priceVelocity={priceVelocity}
+          sentiment={sentiment}
+          assistantRead={assistantRead}
+          cascade={cascade}
+          levels={result?.levels}
+          nqRatio={nqRatio}
+          onExit={() => setFocusMode(false)}
+        />
+      )}
+
       <LiveHeader
         connected={connected}
         price={currentPrice}
@@ -130,6 +148,7 @@ export default function Intraday() {
         onDrawBoth={() => triggerDraw('both')}
         onCompact={toggle}
         compact={compact}
+        onFocus={() => setFocusMode(true)}
       />
 
       {/* Chart stale badge */}
@@ -206,7 +225,7 @@ export default function Intraday() {
           <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
             {subTab === 0 && <>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} />
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={id => setSelectedLevel(id)} />
             </>}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
             {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
@@ -223,6 +242,7 @@ export default function Intraday() {
             cascade={cascade}
             dpHistory={dpHistory}
             levelNarratives={levelNarratives}
+            selectedLevel={selectedLevel}
           />
         </div>
       </div>

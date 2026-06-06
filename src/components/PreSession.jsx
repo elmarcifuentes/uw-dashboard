@@ -13,6 +13,7 @@ import CollapsibleSection from './CollapsibleSection'
 import MarketStateCard from './pre/MarketStateCard'
 import SessionHeaderCard from './pre/SessionHeaderCard'
 import AlertsCard from './pre/AlertsCard'
+import ScenarioCards from './pre/ScenarioCards'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -80,7 +81,7 @@ function GexCageSummary({ levels }) {
   )
 }
 
-export default function PreSession() {
+export default function PreSession({ assistantRead }) {
   const [data, setData]             = useState(null)
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
@@ -312,6 +313,15 @@ export default function PreSession() {
         </div>
       )}
 
+      {/* Scenario cards */}
+      <ScenarioCards
+        assistantRead={assistantRead}
+        levels={levels}
+        cascade={cascade}
+        currentPrice={data?.current_price}
+        nqRatio={nqRatio}
+      />
+
       {/* Row 1 — Three hero cards */}
       <div className="grid grid-cols-3 gap-3">
         <MarketStateCard sentiment={sentiment} />
@@ -382,13 +392,11 @@ export default function PreSession() {
           <LevelCard
             key={level.id}
             level={level}
-            sessionMaxGex={sessionMaxGex}
             nqRatio={nqRatio}
-            dpHistory={providerStatus?.dpHistory?.[level.id] || []}
-            scoredAt={data?.scored_at || data?._received_at}
+            dpHistory={providerStatus?.dpHistory || {}}
             levelNarrative={levelNarratives[level.id]}
             currentPrice={data?.current_price}
-            levelTouch={levelTouches[level.id]}
+            levelTouches={levelTouches[level.id]}
           />
         ))}
       </div>

@@ -3,11 +3,18 @@ import DpSparkline from '../DpSparkline'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 
 export default function RightRail({
-  levels, currentPrice, nqRatio, cascade, dpHistory, levelNarratives,
+  levels, currentPrice, nqRatio, cascade, dpHistory, levelNarratives, selectedLevel,
 }) {
   const [activeLevel, setActiveLevel] = useState(null)
   const [userSelected, setUserSelected] = useState(false)
   const [narrativeExpanded, setNarrativeExpanded] = useState(false)
+
+  useEffect(() => {
+    if (selectedLevel) {
+      setActiveLevel(selectedLevel)
+      setUserSelected(true)
+    }
+  }, [selectedLevel])
 
   const nearestLevelId = useMemo(() => {
     if (!levels?.length || !currentPrice) return null

@@ -60,7 +60,7 @@ function AppInner() {
 
         <div className="mt-4">
           {activeTab === 'Overview'     && <OverviewTab onNavigate={setActiveTab} />}
-          {activeTab === 'Pre-Session'  && <PreSession />}
+          {activeTab === 'Pre-Session'  && <PreSession assistantRead={assistantRead} />}
           {activeTab === 'Intraday'     && <Intraday />}
           {activeTab === 'Post-Session' && <PostSession />}
           {activeTab === 'News'         && <NewsTab />}

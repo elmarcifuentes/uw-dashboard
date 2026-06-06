@@ -1,7 +1,7 @@
 export default function LiveHeader({
   connected, price, nqPrice, velocity,
   sentiment, drawing, drawResult, unlocked,
-  onDrawQqq, onDrawBoth, onCompact, compact,
+  onDrawQqq, onDrawBoth, onCompact, compact, onFocus,
 }) {
   const abs = velocity != null ? Math.abs(velocity) : 0
   const up  = velocity > 0
@@ -78,6 +78,14 @@ export default function LiveHeader({
         <button onClick={onDrawBoth} disabled={!unlocked || !!drawing} className={drawBtnClass('both')}>
           {drawLabel('both')}
         </button>
+        {onFocus && (
+          <button
+            onClick={onFocus}
+            className="text-xs text-gray-500 hover:text-white px-2 py-1 border border-gray-700 rounded transition-colors"
+          >
+            ⊡ Focus
+          </button>
+        )}
         <button
           onClick={onCompact}
           className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 border border-gray-700 rounded transition-colors"

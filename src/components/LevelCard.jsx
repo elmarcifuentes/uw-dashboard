@@ -1,293 +1,204 @@
 import { useState } from 'react'
-import SignalBadge from './SignalBadge'
-import DpSparkline from './DpSparkline'
 import { getLevelProximity, getProximityStyles } from '../utils/proximity'
-import DpBar from './DpBar'
-import GexBar from './GexBar'
-import { dpConditionLabel, midDpWarning } from '../utils/dpLabels'
+import DpSparkline from './DpSparkline'
 import { stripMarkdown } from '../utils/stripMarkdown'
 
-const LEVEL_DESCRIPTIONS = {
-  buy_support:     'Institutional buying below this level — price expected to be drawn upward',
-  sell_resistance: 'Institutional supply above this level — price expected to struggle or reject',
-  no_edge:         'Insufficient signal — no directional read at this level',
-  mid:             'Midpoint — watching for dark pool direction to develop',
-}
-
-const CONFIDENCE_TOOLTIPS = {
-  high:   'High: Score ≥70, flow ≥8 matches — two signals agree — full conviction',
-  medium: 'Medium: Score 65–69, flow ≥4 matches — one strong signal confirmed',
-  low:    'Low: Score ≥65, flow <4 matches — sparse data, use caution',
-  none:   'None: Score below threshold — no actionable read',
-}
-
-const FLAG_TOOLTIPS = {
-  full_stack: 'FULL STACK ★: Resistance magnet + High confidence + ETF confirmed — maximum conviction. Never fade on first approach.',
-  conflict:   'CONFLICT ⚠: Level type contradicts classification — this IS the resistance magnet pattern. 16/16 sessions confirmed.',
-  boundary:   'BOUNDARY ⚡: Score exactly 65 — minimum threshold. Verify: dark pool ≥ +0.700 AND flow ≥ 4 matches before trading.',
-  lower_high: 'LOWER HIGH ↙: Second approach below prior touch — momentum exhausting. Tighten stop, reduce size.',
-}
-
-const BORDER_COLOR = {
-  buy_support:     '#1A7A4A',
-  sell_resistance: '#C0392B',
-  no_edge:         '#6B7280',
-  mid:             '#1B8CA6',
-}
-
-const CLASS_LABEL = {
-  buy_support:     'BUY SUP',
-  sell_resistance: 'SELL RES',
-  no_edge:         'NO EDGE',
-  mid:             'MID',
-}
-
 const CLASS_COLOR = {
-  buy_support:     'text-green-400',
   sell_resistance: 'text-red-400',
-  no_edge:         'text-gray-400',
-  mid:             'text-cyan-400',
+  buy_support:     'text-green-400',
+  no_edge:         'text-gray-500',
+  continuation:    'text-blue-400',
 }
 
-const CONFIDENCE_STYLE = {
-  high:   'bg-green-600 text-white',
-  medium: 'bg-amber-500 text-black',
-  low:    'border border-red-500 text-red-400',
-  none:   'border border-gray-500 text-gray-400',
+const CLASS_BORDER = {
+  sell_resistance: 'border-red-900/40',
+  buy_support:     'border-green-900/40',
+  no_edge:         'border-gray-800',
+  continuation:    'border-blue-900/40',
 }
 
-const ETF_ARROW = {
-  bullish: '↑',
-  bearish: '↓',
-  neutral: '—',
-  'no data': '?',
-}
-
-const formatTime = (iso) => {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return null
-  return d.toLocaleTimeString('en-US', {
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false, timeZone: 'America/New_York',
-  }) + ' ET'
-}
-
-function SignalPills({ level }) {
-  const pills = []
-  if (level.confidence && level.confidence !== 'none') {
-    pills.push({ label: level.confidence.toUpperCase(), color: level.confidence === 'high' ? 'bg-green-900 text-green-300' : level.confidence === 'medium' ? 'bg-yellow-900 text-yellow-300' : 'bg-gray-700 text-gray-400' })
-  }
-  if (level.full_stack)                 pills.push({ label: '★ FULL',  color: 'bg-yellow-900 text-yellow-300' })
-  if (level.etf_direction === 'bullish') pills.push({ label: '↑ ETF',  color: 'bg-green-900 text-green-400' })
-  if (level.etf_direction === 'bearish') pills.push({ label: '↓ ETF',  color: 'bg-red-900 text-red-400' })
-  if ((level.net_gex || 0) < 0)         pills.push({ label: '⚡ EXP',  color: 'bg-red-950 text-red-400' })
-  if (level.lower_high)                  pills.push({ label: '↘ LH',   color: 'bg-orange-900 text-orange-400' })
-  if (!pills.length) return null
-  return (
-    <div className="flex flex-wrap gap-1 mt-1">
-      {pills.map((p, i) => <span key={i} className={`text-xs px-1.5 py-0.5 rounded font-medium ${p.color}`}>{p.label}</span>)}
-    </div>
-  )
-}
-
-export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt, levelNarrative, currentPrice, levelTouch }) {
+export default function LevelCard({
+  level, currentPrice, nqRatio,
+  dpHistory, levelNarrative, levelTouches,
+  onSelect,
+}) {
   const [expanded, setExpanded] = useState(false)
-  const proximity  = getLevelProximity(currentPrice, level.price)
-  const proxStyles = getProximityStyles(proximity, level.classification, level)
-  const classKey    = level.classification === 'mid' ? 'mid' : level.classification
-  const borderColor = BORDER_COLOR[classKey] || '#6B7280'
-  const nqPrice  = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : '—'
-  const etfArrow = ETF_ARROW[level.etf_direction] || '—'
-  const confStyle = CONFIDENCE_STYLE[level.confidence] || CONFIDENCE_STYLE.none
 
-  const targetLevel  = level.passive_target_from
-  const targetPrice  = targetLevel ? null : null
-  const dpCondition  = dpConditionLabel(level.dark_pool, level.type, level.classification)
-  const midWarning   = level.id === 'MID' ? midDpWarning(level.dark_pool) : { show: false }
+  const nq      = nqRatio ? Math.round(level.price * nqRatio) : null
+  const dist    = currentPrice != null ? (currentPrice - level.price) : null
+  const distStr = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
+  const distNq  = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio) : null
 
-  const isProximate = proximity && proximity.zone !== 'away'
+  const classColor  = CLASS_COLOR[level.classification]  || 'text-gray-500'
+  const borderColor = CLASS_BORDER[level.classification] || 'border-gray-800'
+
+  const proximity = getLevelProximity(currentPrice, level.price)
+  const styles    = getProximityStyles(proximity, level.classification, level)
 
   return (
     <div
-      style={isProximate ? undefined : { borderColor }}
-      className={`rounded p-3 space-y-2 bg-[#111827] ${isProximate ? proxStyles.border : 'border'} ${proxStyles.pulse ? 'animate-pulse' : ''}`}
+      onClick={() => onSelect?.(level.id)}
+      className={`border rounded-lg overflow-hidden bg-[#111827] transition-all duration-300 ${
+        onSelect ? 'cursor-pointer' : ''
+      } ${styles.border || borderColor} ${styles.glow || ''} ${styles.pulse ? 'animate-pulse' : ''}`}
     >
-      {/* Proximity label — subtle on Tab 1 */}
-      {proxStyles.label && (
-        <div className={`text-xs ${proxStyles.labelColor}`}>{proxStyles.label}</div>
-      )}
-      {/* Row 1: Level ID + prices */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-base font-bold text-white w-10">{level.id}</span>
-          <span className="text-sm font-medium text-white">${level.price?.toFixed(2) ?? '—'}</span>
-          <span className="text-sm font-medium text-gray-400">/ NQ {nqPrice}</span>
+      {/* LAYER 1 — SCAN */}
+      <div className="px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className={`text-base font-bold shrink-0 ${classColor}`}>{level.id}</span>
+          <span className="text-white font-mono font-semibold text-sm tabular-nums">
+            ${level.price?.toFixed(2)}
+          </span>
+          {nq && (
+            <span className="text-xs text-gray-600 font-mono hidden sm:inline">
+              NQ {nq.toLocaleString()}
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-1.5">
-          {level.full_stack  && <span title={FLAG_TOOLTIPS.full_stack}  className="cursor-help"><SignalBadge type="full_stack" /></span>}
-          {level.conflict    && !level.full_stack && <span title={FLAG_TOOLTIPS.conflict} className="cursor-help"><SignalBadge type="conflict" /></span>}
-          {level.boundary    && <span title={FLAG_TOOLTIPS.boundary}    className="cursor-help"><SignalBadge type="boundary" /></span>}
-          {level.lower_high  && <span title={FLAG_TOOLTIPS.lower_high}  className="cursor-help"><SignalBadge type="lower_high" /></span>}
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`text-xs font-bold ${classColor}`}>
+            {level.classification?.replace('_', ' ').toUpperCase()}
+          </span>
+          {level.confidence && level.confidence.toLowerCase() !== 'none' && (
+            <span className="text-xs text-gray-600">· {level.confidence.toLowerCase()}</span>
+          )}
+        </div>
+
+        <div className="text-right shrink-0">
+          {distStr && (
+            <div className="text-sm font-mono font-bold text-gray-300">{distStr}</div>
+          )}
+          {distNq && (
+            <div className="text-xs text-gray-600 font-mono">{distNq} NQ</div>
+          )}
         </div>
       </div>
 
-      {/* Description */}
-      <p className="text-xs text-gray-500 italic leading-snug">
-        {LEVEL_DESCRIPTIONS[classKey]}
-      </p>
+      {/* LAYER 2 — DECISION */}
+      <div className="px-4 pb-2.5">
+        {styles.label && (
+          <div className={`text-xs mb-1.5 ${styles.labelColor}`}>{styles.label}</div>
+        )}
 
-      {/* Row 2: Classification + score + confidence */}
-      <div className="flex items-center gap-2 text-xs">
-        <span className={`font-bold ${CLASS_COLOR[classKey] || 'text-gray-400'}`}>
-          {CLASS_LABEL[classKey] || level.classification}
-        </span>
-        <span className="text-gray-300 font-medium">{level.score}</span>
-        <span
-          title={CONFIDENCE_TOOLTIPS[level.confidence] || ''}
-          className={`px-1.5 py-0.5 rounded text-xs font-bold cursor-help ${confStyle}`}
-        >
-          {(level.confidence || 'none').toUpperCase()}
-        </span>
-      </div>
+        {level.dp_condition && (
+          <p className={`text-xs mb-2 ${classColor}`}>{level.dp_condition}</p>
+        )}
 
-      {/* Row 3: DP bar + ETF + GEX */}
-      <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <span style={{ minWidth: '24px', flexShrink: 0 }}
-                className="text-xs text-gray-500 whitespace-nowrap">
-            DP
-          </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <DpBar value={level.dark_pool} />
+          <span style={{ minWidth: '20px', flexShrink: 0 }} className="text-xs text-gray-600">DP</span>
+          <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-gray-800 rounded relative overflow-hidden">
+            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700 z-10" />
+            {(() => {
+              const dp  = level.dark_pool || 0
+              const pct = ((dp + 1) / 2) * 100
+              return pct >= 50 ? (
+                <div className="absolute inset-y-0 left-1/2 bg-green-500" style={{ width: `${(pct - 50) * 2}%` }} />
+              ) : (
+                <div className="absolute inset-y-0 right-1/2 bg-red-500" style={{ width: `${(50 - pct) * 2}%` }} />
+              )
+            })()}
           </div>
-          <span style={{ minWidth: '56px', flexShrink: 0, textAlign: 'right' }}
-                className="text-xs text-gray-300 whitespace-nowrap">
-            {typeof level.dark_pool === 'number' ? level.dark_pool.toFixed(3) : '—'}
-          </span>
-          <DpSparkline history={dpHistory} />
-          <span className={`text-sm w-4 ${level.etf_direction === 'bullish' ? 'text-green-400' : level.etf_direction === 'bearish' ? 'text-red-400' : 'text-gray-500'}`}>
-            {etfArrow}
+          <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
+                className="text-xs font-mono text-gray-400">
+            {level.dark_pool?.toFixed(3)}
           </span>
         </div>
-        {level.last_dp_print && (() => {
-          const ts      = new Date(level.last_dp_print)
-          const timeStr = ts.toLocaleTimeString('en-US', {
-            hour: '2-digit', minute: '2-digit', hour12: true,
-            timeZone: 'America/New_York',
-          }) + ' ET'
-          const isRecent = (Date.now() - ts.getTime()) < 2 * 60 * 60 * 1000
-          return (
-            <div className="flex items-center gap-1 pl-8">
-              <span className="text-gray-600 text-xs">Last print:</span>
-              <span className={`text-xs font-mono ${isRecent ? 'text-gray-400' : 'text-gray-600'}`}>
-                {timeStr}
-              </span>
-            </div>
-          )
-        })()}
-        {dpHistory.length >= 2 && (() => {
-          const last  = dpHistory[dpHistory.length - 1].value
-          const prev  = dpHistory[dpHistory.length - 2].value
-          const diff  = last - prev
-          const trend = Math.abs(diff) < 0.050 ? 'stable' : diff < 0 ? 'declining' : 'improving'
-          return (
-            <div className="flex items-center gap-1 pl-8 flex-wrap">
-              <div className="flex items-center gap-0.5 text-xs font-mono">
-                {dpHistory.map((h, i) => (
-                  <span key={i}>
-                    <span className={
-                      h.value <= -0.700 ? 'text-red-400' :
-                      h.value <= -0.300 ? 'text-amber-400' :
-                      h.value >= 0.300  ? 'text-green-400' :
-                      'text-gray-500'
-                    }>{h.value.toFixed(2)}</span>
-                    {i < dpHistory.length - 1 && <span className="text-gray-700"> → </span>}
-                  </span>
-                ))}
-              </div>
-              <span className={`text-xs font-bold ${
-                trend === 'declining' ? 'text-red-400' : trend === 'improving' ? 'text-green-400' : 'text-gray-500'
-              }`}>{trend === 'declining' ? '↓' : trend === 'improving' ? '↑' : '→'}</span>
-            </div>
-          )
-        })()}
-        {/* DP condition label */}
-        <div className={`rounded px-2 py-1 ${dpCondition.bg}`}>
-          <div className={`text-xs font-bold ${dpCondition.color}`}>{dpCondition.label}</div>
-          <div className="text-xs text-gray-500 mt-0.5">{dpCondition.sublabel}</div>
-          {midWarning.show && (
-            <div className={`text-xs font-bold mt-0.5 ${midWarning.color}`}>⚠ {midWarning.text}</div>
-          )}
-        </div>
-        {(() => {
-          const netGex = level.net_gex ?? level.gex?.net_gex
-          if (netGex == null) return null
-          const isExp = netGex < 0
-          return (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 w-6">GEX</span>
-              <GexBar value={netGex} sessionMax={sessionMaxGex} />
-              <span className={`text-xs font-mono ${isExp ? 'text-red-400 font-bold' : 'text-gray-400'}`}>
-                {isExp ? '⚠ EXPANSION' : 'pinning'} {(netGex / 1000).toFixed(0)}K
-              </span>
-            </div>
-          )
-        })()}
+
+        {(level.full_stack || (level.net_gex || 0) < 0) && (
+          <div className="flex gap-1.5 mt-1.5">
+            {level.full_stack && (
+              <span className="text-xs text-yellow-400 font-bold">★ FULL STACK</span>
+            )}
+            {(level.net_gex || 0) < 0 && (
+              <span className="text-xs text-red-400">⚡ EXP</span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Signal pills */}
-      <SignalPills level={level} />
-
-      {/* Touch counter */}
-      {levelTouch && (
-        <div className="flex items-center gap-2 mt-0.5">
-          {levelTouch.total_touches > 0 && <span className="text-xs text-gray-500">touched {levelTouch.total_touches}×</span>}
-          {levelTouch.crosses > 0 && <span className="text-xs text-amber-500">crossed {levelTouch.crosses}×</span>}
-        </div>
-      )}
-
-      {/* Row 4: Passive target */}
-      {level.passive_target && level.passive_target_from && (
-        <div className={`text-xs font-medium flex items-center gap-1 ${level.classification === 'buy_support' ? 'text-green-400' : 'text-red-400'}`}>
-          <span>→ TARGET {level.passive_target_from}</span>
-          {level._target_delta !== undefined && level._target_delta !== null && (
-            <>
-              <span className="text-white font-mono">
-                {level._target_delta >= 0 ? '+' : ''}{level._target_delta?.toFixed(2) ?? '—'}
-              </span>
-              {nqRatio && (
-                <span className="text-gray-400 font-mono">
-                  / {level._target_delta >= 0 ? '+' : '-'}{Math.round(Math.abs(level._target_delta) * nqRatio)} NQ
-                </span>
-              )}
-            </>
+      {/* Expand toggle */}
+      <div
+        className="border-t border-gray-800/50 px-4 py-1.5 flex items-center justify-between"
+        onClick={e => { e.stopPropagation(); setExpanded(!expanded) }}
+      >
+        <span className="text-xs text-gray-700 hover:text-gray-500 cursor-pointer">
+          {expanded ? '▲ less' : '▼ more'}
+        </span>
+        <div className="flex items-center gap-2">
+          {levelTouches?.total_touches > 0 && (
+            <span className="text-xs text-gray-700">{levelTouches.total_touches}× today</span>
           )}
+          {levelNarrative && <span className="text-xs text-purple-700">🤖</span>}
         </div>
-      )}
-      {scoredAt && (
-        <div className="flex justify-end mt-1">
-          <span className="text-gray-600 text-xs font-mono">{formatTime(scoredAt)}</span>
-        </div>
-      )}
+      </div>
 
-      {/* Claude level analysis — expandable */}
-      {levelNarrative && (
-        <div className="border-t border-gray-700 pt-2">
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-          >
-            <span>{expanded ? '▼' : '▶'}</span>
-            <svg height="0.85em" width="0.85em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="inline">
-              <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
-            </svg>
-            <span>Claude Analysis</span>
-          </button>
-          {expanded && (
-            <p className="text-xs text-gray-300 mt-1.5 leading-relaxed italic">
-              {stripMarkdown(levelNarrative)}
-            </p>
+      {/* LAYER 3 — EVIDENCE */}
+      {expanded && (
+        <div className="border-t border-gray-800/50 px-4 py-3 space-y-2 bg-[#0d1424]/50">
+
+          <div className="flex items-center gap-2">
+            <span style={{ minWidth: '44px', flexShrink: 0 }} className="text-xs text-gray-600 whitespace-nowrap">
+              Score
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-gray-800 rounded overflow-hidden">
+              <div className={`h-full rounded ${
+                level.classification === 'sell_resistance' ? 'bg-red-500'
+                  : level.classification === 'buy_support' ? 'bg-green-500'
+                  : 'bg-gray-600'
+              }`} style={{ width: `${Math.min(level.score || 0, 100)}%` }} />
+            </div>
+            <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
+                  className="text-xs font-mono text-gray-400">
+              {level.score || 0}/100
+            </span>
+          </div>
+
+          {dpHistory?.[level.id]?.length > 1 && (
+            <div style={{ marginLeft: '52px' }}>
+              <DpSparkline history={dpHistory[level.id]} />
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            {level.etf_direction === 'bullish' && (
+              <span className="text-xs bg-green-950 text-green-400 px-1.5 py-0.5 rounded">↑ ETF</span>
+            )}
+            {level.etf_direction === 'bearish' && (
+              <span className="text-xs bg-red-950 text-red-400 px-1.5 py-0.5 rounded">↓ ETF</span>
+            )}
+            {level.lower_high && (
+              <span className="text-xs bg-orange-950 text-orange-400 px-1.5 py-0.5 rounded">↘ LH</span>
+            )}
+          </div>
+
+          {levelTouches?.total_touches > 0 && (
+            <div className="flex gap-3 text-xs text-gray-600">
+              <span>touched {levelTouches.total_touches}×</span>
+              {levelTouches.crosses > 0 && (
+                <span className="text-amber-700">crossed {levelTouches.crosses}×</span>
+              )}
+            </div>
+          )}
+
+          {level.net_gex != null && (
+            <div className="text-xs text-gray-600">
+              GEX {level.net_gex?.toLocaleString()}
+              {(level.net_gex || 0) < 0 ? ' — expansion' : ' — pinning'}
+            </div>
+          )}
+
+          {levelNarrative && (
+            <div className="border-t border-gray-800 pt-2">
+              <div className="text-xs text-purple-600 mb-1">🤖 Claude Analysis</div>
+              <p className="text-xs text-gray-300 leading-relaxed italic border-l-2 border-purple-900 pl-2">
+                {stripMarkdown(levelNarrative)}
+              </p>
+            </div>
+          )}
+
+          {level.timestamp && (
+            <div className="text-xs text-gray-700 text-right">{level.timestamp}</div>
           )}
         </div>
       )}
