@@ -147,7 +147,7 @@ export default function PreSession() {
   const [mode, setMode]           = useState('REST')
   const [magnetStreak, setMagnetStreak]     = useState(null)
   const [lastRescoreAt, setLastRescoreAt]   = useState(null)
-  const [briefExpanded, setBriefExpanded]   = useState(false)
+  const [briefExpanded, setBriefExpanded]   = useState(true)
   const [levelNarratives, setLevelNarratives] = useState({})
   const [sessionBrief, setSessionBrief]       = useState(null)
   const [levelTouches, setLevelTouches]       = useState({})
