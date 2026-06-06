@@ -33,15 +33,22 @@ export default function EvidenceMeter({ levels, etfDirection }) {
           const barColor = isBull ? 'bg-green-500' : isBear ? 'bg-red-500' : 'bg-gray-500'
           return (
             <div key={m.label} className="flex items-center gap-3">
-              <span className="text-xs text-gray-500 w-20 shrink-0">{m.label}</span>
-              <div className="flex-1 relative h-1.5 bg-gray-800 rounded">
-                <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gray-600" />
+              <span style={{ minWidth: '80px', flexShrink: 0 }}
+                    className="text-xs text-gray-500 whitespace-nowrap">
+                {m.label}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}
+                   className="relative h-1.5 bg-gray-800 rounded overflow-hidden">
+                <div className="absolute inset-y-0 left-1/2 w-px bg-gray-600 z-10" />
                 {m.pct >= 50
-                  ? <div className={`absolute top-0 bottom-0 left-1/2 rounded-r ${barColor}`} style={{ width: `${(m.pct - 50) * 2}%` }} />
-                  : <div className={`absolute top-0 bottom-0 right-1/2 rounded-l ${barColor}`} style={{ width: `${(50 - m.pct) * 2}%` }} />
+                  ? <div className={`absolute inset-y-0 left-1/2 rounded-r ${barColor}`} style={{ width: `${(m.pct - 50) * 2}%` }} />
+                  : <div className={`absolute inset-y-0 right-1/2 rounded-l ${barColor}`} style={{ width: `${(50 - m.pct) * 2}%` }} />
                 }
               </div>
-              <span className="text-xs font-mono text-gray-500 w-16 text-right shrink-0">{m.value}</span>
+              <span style={{ minWidth: '64px', flexShrink: 0, textAlign: 'right' }}
+                    className="text-xs font-mono text-gray-500 whitespace-nowrap">
+                {m.value}
+              </span>
             </div>
           )
         })}

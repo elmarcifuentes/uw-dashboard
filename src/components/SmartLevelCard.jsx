@@ -93,32 +93,41 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
       {/* Evidence bars */}
       <div className="px-4 py-3 space-y-2">
 
-        {/* Dark Pool bar */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 shrink-0 whitespace-nowrap" style={{ minWidth: '60px' }}>Dark Pool</span>
-          <div className="flex-1 h-1.5 bg-gray-800 rounded relative min-w-0">
-            <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gray-700" />
+        {/* Dark Pool row */}
+        <div className="flex items-center gap-2 mb-2">
+          <span style={{ minWidth: '64px', flexShrink: 0 }}
+                className="text-xs text-gray-600 whitespace-nowrap">
+            Dark Pool
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}
+               className="h-1.5 bg-gray-800 rounded overflow-hidden relative">
+            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700 z-10" />
             {(() => {
               const dp  = level.dark_pool || 0
               const pct = ((dp + 1) / 2) * 100
               return pct >= 50 ? (
-                <div className="absolute top-0 bottom-0 left-1/2 bg-green-500 rounded-r"
+                <div className="absolute inset-y-0 left-1/2 bg-green-500 rounded-r"
                      style={{ width: `${(pct - 50) * 2}%` }} />
               ) : (
-                <div className="absolute top-0 bottom-0 right-1/2 bg-red-500 rounded-l"
+                <div className="absolute inset-y-0 right-1/2 bg-red-500 rounded-l"
                      style={{ width: `${(50 - pct) * 2}%` }} />
               )
             })()}
           </div>
-          <span className="text-xs font-mono text-gray-400 text-right shrink-0 whitespace-nowrap" style={{ minWidth: '48px' }}>
+          <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
+                className="text-xs font-mono text-gray-400 whitespace-nowrap">
             {level.dark_pool?.toFixed(3)}
           </span>
         </div>
 
-        {/* Score bar */}
+        {/* Score row */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 shrink-0 whitespace-nowrap" style={{ minWidth: '60px' }}>Score</span>
-          <div className="flex-1 h-1.5 bg-gray-800 rounded overflow-hidden min-w-0">
+          <span style={{ minWidth: '64px', flexShrink: 0 }}
+                className="text-xs text-gray-600 whitespace-nowrap">
+            Score
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}
+               className="h-1.5 bg-gray-800 rounded overflow-hidden">
             <div className={`h-full rounded ${
               level.classification === 'sell_resistance' ? 'bg-red-500'
                 : level.classification === 'buy_support' ? 'bg-green-500'
@@ -126,14 +135,15 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
             }`}
                  style={{ width: `${Math.min(level.score || 0, 100)}%` }} />
           </div>
-          <span className="text-xs font-mono text-gray-400 text-right shrink-0 whitespace-nowrap" style={{ minWidth: '48px' }}>
+          <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
+                className="text-xs font-mono text-gray-400 whitespace-nowrap">
             {level.score || 0}/100
           </span>
         </div>
 
-        {/* Sparkline below bars — not inline, so it can't squeeze labels */}
-        {dpHistory?.[level.id] && (
-          <div className="mt-0.5">
+        {/* Sparkline on its own row — not competing for flex space */}
+        {dpHistory?.[level.id]?.length > 1 && (
+          <div className="mt-1.5" style={{ marginLeft: '72px' }}>
             <DpSparkline history={dpHistory[level.id]} />
           </div>
         )}
