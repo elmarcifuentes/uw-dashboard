@@ -1,5 +1,6 @@
-import { memo, useState } from 'react'
+import { memo, useState, useRef, useEffect } from 'react'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
+import { getLevelProximity, getProximityStyles } from '../../utils/proximity'
 
 const LEVEL_DESCRIPTIONS = {
   buy_support:     'Institutional buying below — price expected to be drawn upward',
@@ -13,6 +14,14 @@ const CLASS_COLORS = {
   sell_resistance: { border: '#C0392B', bg: '#2a0a0a', text: '#f87171' },
   no_edge:         { border: '#6B7280', bg: '#111827', text: '#9ca3af' },
   continuation:    { border: '#7C3AED', bg: '#1a1040', text: '#a78bfa' },
+}
+
+function getClassificationBg(cls) {
+  return { buy_support: 'bg-green-950', sell_resistance: 'bg-red-950', no_edge: 'bg-gray-900', continuation: 'bg-purple-950' }[cls] || 'bg-gray-900'
+}
+
+function getBaseBorderCls(cls) {
+  return { buy_support: 'border border-green-900', sell_resistance: 'border border-red-900', no_edge: 'border border-gray-700', continuation: 'border border-purple-900' }[cls] || 'border border-gray-700'
 }
 
 function StructureBreakBar({ sb, currentPrice }) {
@@ -104,6 +113,23 @@ const formatTime = (iso) => {
 
 export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {} }) {
   const [expandedLevel, setExpandedLevel] = useState(null)
+  const [flashLevel, setFlashLevel]       = useState(null)
+  const prevPriceRef = useRef(currentPrice)
+  const sorted = result ? [...result.levels].sort((a, b) => b.price - a.price) : []
+
+  useEffect(() => {
+    if (!currentPrice || !prevPriceRef.current || !sorted.length) return
+    const prev = prevPriceRef.current
+    sorted.forEach(level => {
+      const crossed = (prev < level.price && currentPrice >= level.price) ||
+                      (prev >= level.price && currentPrice < level.price)
+      if (crossed) {
+        setFlashLevel(level.id)
+        setTimeout(() => setFlashLevel(null), 3000)
+      }
+    })
+    prevPriceRef.current = currentPrice
+  }, [currentPrice])
 
   if (!result) {
     return (
@@ -113,7 +139,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
     )
   }
 
-  const levels = [...result.levels].sort((a, b) => b.price - a.price)
+  const cp = currentPrice != null ? Number(currentPrice) : null
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -124,23 +150,48 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         </div>
       )}
 
-      <StructureBreakBar sb={result.structure_break} currentPrice={currentPrice} />
+      <StructureBreakBar sb={result.structure_break} currentPrice={cp} />
 
-      {levels.map(level => {
-        const colors   = CLASS_COLORS[level.classification] || CLASS_COLORS.no_edge
-        const dist       = currentPrice != null ? (currentPrice - level.price) : null
-        const distStr    = dist != null ? (dist >= 0 ? `+${dist?.toFixed(2) ?? '—'}` : dist?.toFixed(2)) : null
+      {/* Price above all levels */}
+      {cp != null && !isNaN(cp) && sorted.length > 0 && cp > sorted[0].price && (
+        <div className="flex items-center gap-2 px-2 py-1">
+          <div className="flex-1 h-px bg-yellow-400/60" />
+          <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse">
+            ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''} — above structure
+          </span>
+          <div className="flex-1 h-px bg-yellow-400/60" />
+        </div>
+      )}
+
+      {sorted.map((level, i) => {
+        const nextLevel  = sorted[i + 1]
+        const colors     = CLASS_COLORS[level.classification] || CLASS_COLORS.no_edge
+        const dist       = cp != null ? (cp - level.price) : null
+        const distStr    = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
         const nqDist     = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio) : null
         const nqDistStr  = nqDist != null ? `${dist >= 0 ? '+' : '-'}${nqDist}` : null
-        const isNear     = dist != null && Math.abs(dist) <= 0.50
         const isAbove    = dist != null && dist > 0
+        const isFlashing = flashLevel === level.id
+
+        const proximity = getLevelProximity(cp, level.price)
+        const styles    = getProximityStyles(proximity, level.classification)
+        const isProximate = proximity && proximity.zone !== 'away'
+        const borderCls = isProximate ? styles.border : getBaseBorderCls(level.classification)
+        const bgCls     = getClassificationBg(level.classification)
 
         return (
+          <>
           <div
             key={level.id}
-            style={{ borderColor: colors.border, backgroundColor: colors.bg }}
-            className={`border rounded px-3 py-2 transition-all ${isNear ? 'ring-1 ring-yellow-400' : ''}`}
+            className={`rounded px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''}`}
           >
+            {/* Proximity label */}
+            {styles.label && (
+              <div className={`text-xs font-medium mb-1.5 ${styles.labelColor}`}>{styles.label}</div>
+            )}
+            {isFlashing && (
+              <div className="text-xs text-white font-bold mb-1 animate-bounce">⚡ CROSSED {level.id}</div>
+            )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-sm w-8" style={{ color: colors.text }}>
@@ -266,14 +317,37 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
               </span>
             )}
           </div>
+
+          {/* Yellow crosshair — between this level and the next */}
+          {nextLevel && cp != null && !isNaN(cp) && cp < level.price && cp > nextLevel.price && (
+            <div className="flex items-center gap-2 px-2 py-0.5">
+              <div className="flex-1 h-px bg-yellow-400/60" />
+              <span className="text-xs text-yellow-400 font-mono font-bold shrink-0">
+                ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''}
+              </span>
+              <div className="flex-1 h-px bg-yellow-400/60" />
+            </div>
+          )}
+          </>
         )
       })}
+
+      {/* Price below all levels */}
+      {cp != null && !isNaN(cp) && sorted.length > 0 && cp < sorted[sorted.length - 1].price && (
+        <div className="flex items-center gap-2 px-2 py-1">
+          <div className="flex-1 h-px bg-yellow-400/60" />
+          <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse">
+            ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''} — below structure
+          </span>
+          <div className="flex-1 h-px bg-yellow-400/60" />
+        </div>
+      )}
 
       {currentPrice != null && (() => {
         const cp = Number(currentPrice)
         if (isNaN(cp)) return null
-        const nearest = levels.length > 0
-          ? levels.reduce((a, b) => Math.abs(cp - a.price) < Math.abs(cp - b.price) ? a : b)
+        const nearest = sorted.length > 0
+          ? sorted.reduce((a, b) => Math.abs(cp - a.price) < Math.abs(cp - b.price) ? a : b)
           : null
         const nearDist = nearest ? (cp - nearest.price).toFixed(2) : null
         const nqPrice  = nqRatio ? Math.round(cp * nqRatio).toLocaleString() : null

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import SignalBadge from './SignalBadge'
+import { getLevelProximity, getProximityStyles } from '../utils/proximity'
 import DpBar from './DpBar'
 import GexBar from './GexBar'
 import { dpConditionLabel, midDpWarning } from '../utils/dpLabels'
@@ -70,8 +71,10 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt, levelNarrative }) {
+export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt, levelNarrative, currentPrice }) {
   const [expanded, setExpanded] = useState(false)
+  const proximity  = getLevelProximity(currentPrice, level.price)
+  const proxStyles = getProximityStyles(proximity, level.classification)
   const classKey    = level.classification === 'mid' ? 'mid' : level.classification
   const borderColor = BORDER_COLOR[classKey] || '#6B7280'
   const nqPrice  = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : '—'
@@ -83,8 +86,17 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
   const dpCondition  = dpConditionLabel(level.dark_pool, level.type, level.classification)
   const midWarning   = level.id === 'MID' ? midDpWarning(level.dark_pool) : { show: false }
 
+  const isProximate = proximity && proximity.zone !== 'away'
+
   return (
-    <div style={{ borderColor }} className="rounded border bg-gray-900/60 p-3 space-y-2">
+    <div
+      style={isProximate ? undefined : { borderColor }}
+      className={`rounded p-3 space-y-2 bg-gray-900/60 ${isProximate ? proxStyles.border : 'border'} ${proxStyles.pulse ? 'animate-pulse' : ''}`}
+    >
+      {/* Proximity label — subtle on Tab 1 */}
+      {proxStyles.label && (
+        <div className={`text-xs ${proxStyles.labelColor}`}>{proxStyles.label}</div>
+      )}
       {/* Row 1: Level ID + prices */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

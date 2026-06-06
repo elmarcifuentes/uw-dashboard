@@ -455,6 +455,7 @@ export default function PreSession() {
               dpHistory={providerStatus?.dpHistory?.[level.id] || []}
               scoredAt={data?.scored_at || data?._received_at}
               levelNarrative={levelNarratives[level.id]}
+              currentPrice={data?.current_price}
             />
           ))
         })()}
