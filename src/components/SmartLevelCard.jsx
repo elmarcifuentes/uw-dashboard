@@ -95,8 +95,8 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
 
         {/* Dark Pool bar */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 w-16 shrink-0 whitespace-nowrap">Dark Pool</span>
-          <div className="flex-1 h-1.5 bg-gray-800 rounded relative">
+          <span className="text-xs text-gray-600 shrink-0 whitespace-nowrap" style={{ minWidth: '60px' }}>Dark Pool</span>
+          <div className="flex-1 h-1.5 bg-gray-800 rounded relative min-w-0">
             <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gray-700" />
             {(() => {
               const dp  = level.dark_pool || 0
@@ -110,16 +110,15 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
               )
             })()}
           </div>
-          <span className="text-xs font-mono text-gray-400 w-14 text-right shrink-0">
+          <span className="text-xs font-mono text-gray-400 text-right shrink-0 whitespace-nowrap" style={{ minWidth: '48px' }}>
             {level.dark_pool?.toFixed(3)}
           </span>
-          <DpSparkline history={dpHistory?.[level.id]} />
         </div>
 
         {/* Score bar */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 w-16 shrink-0 whitespace-nowrap">Score</span>
-          <div className="flex-1 h-1.5 bg-gray-800 rounded overflow-hidden">
+          <span className="text-xs text-gray-600 shrink-0 whitespace-nowrap" style={{ minWidth: '60px' }}>Score</span>
+          <div className="flex-1 h-1.5 bg-gray-800 rounded overflow-hidden min-w-0">
             <div className={`h-full rounded ${
               level.classification === 'sell_resistance' ? 'bg-red-500'
                 : level.classification === 'buy_support' ? 'bg-green-500'
@@ -127,10 +126,17 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
             }`}
                  style={{ width: `${Math.min(level.score || 0, 100)}%` }} />
           </div>
-          <span className="text-xs font-mono text-gray-400 w-14 text-right shrink-0">
+          <span className="text-xs font-mono text-gray-400 text-right shrink-0 whitespace-nowrap" style={{ minWidth: '48px' }}>
             {level.score || 0}/100
           </span>
         </div>
+
+        {/* Sparkline below bars — not inline, so it can't squeeze labels */}
+        {dpHistory?.[level.id] && (
+          <div className="mt-0.5">
+            <DpSparkline history={dpHistory[level.id]} />
+          </div>
+        )}
       </div>
 
       {/* dp_condition label */}
