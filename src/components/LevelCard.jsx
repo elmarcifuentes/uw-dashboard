@@ -81,10 +81,6 @@ export default function LevelCard({
           <div className={`text-xs mb-1.5 ${styles.labelColor}`}>{styles.label}</div>
         )}
 
-        {level.dp_condition && (
-          <p className={`text-xs mb-2 ${classColor}`}>{level.dp_condition}</p>
-        )}
-
         <div className="flex items-center gap-2">
           <span style={{ minWidth: '20px', flexShrink: 0 }} className="text-xs text-gray-600">DP</span>
           <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-gray-800 rounded relative overflow-hidden">
@@ -136,6 +132,10 @@ export default function LevelCard({
       {/* LAYER 3 — EVIDENCE */}
       {expanded && (
         <div className="border-t border-gray-800/50 px-4 py-3 space-y-2 bg-[#0d1424]/50">
+
+          {level.dp_condition && (
+            <p className={`text-xs font-medium mb-2 ${classColor}`}>{level.dp_condition}</p>
+          )}
 
           <div className="flex items-center gap-2">
             <span style={{ minWidth: '44px', flexShrink: 0 }} className="text-xs text-gray-600 whitespace-nowrap">
