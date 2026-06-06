@@ -110,7 +110,7 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
   return (
     <div
       style={isProximate ? undefined : { borderColor }}
-      className={`rounded p-3 space-y-2 bg-gray-900/60 ${isProximate ? proxStyles.border : 'border'} ${proxStyles.pulse ? 'animate-pulse' : ''}`}
+      className={`rounded p-3 space-y-2 bg-[#111827] ${isProximate ? proxStyles.border : 'border'} ${proxStyles.pulse ? 'animate-pulse' : ''}`}
     >
       {/* Proximity label — subtle on Tab 1 */}
       {proxStyles.label && (

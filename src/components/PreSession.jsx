@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import LevelCard from './LevelCard'
-import CascadeBanner from './CascadeBanner'
 import EarningsWarning from './EarningsWarning'
 import EconomicCalendar from './EconomicCalendar'
 import SectorETF from './SectorETF'
@@ -9,9 +8,11 @@ import TopNetImpact from './TopNetImpact'
 import GexByExpiry from './GexByExpiry'
 import ZeroDteFlow from './ZeroDteFlow'
 import GreekFlow from './GreekFlow'
-import SentimentBadge from './SentimentBadge'
-import SessionBrief from './SessionBrief'
 import SignalStrengthBar from './SignalStrengthBar'
+import CollapsibleSection from './CollapsibleSection'
+import MarketStateCard from './pre/MarketStateCard'
+import SessionHeaderCard from './pre/SessionHeaderCard'
+import AlertsCard from './pre/AlertsCard'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const POLL_MS        = 30_000
@@ -24,8 +25,6 @@ function msToLabel(ms) {
   return `${ms / 1000}s`
 }
 
-const ETF_LABEL = { bullish: 'BULLISH', bearish: 'BEARISH', neutral: 'NEUTRAL', 'no data': 'NO DATA' }
-const ETF_COLOR = { bullish: 'text-green-400 bg-green-900/40 border-green-700', bearish: 'text-red-400 bg-red-900/40 border-red-700', neutral: 'text-gray-400 bg-gray-800 border-gray-600', 'no data': 'text-gray-500 bg-gray-800 border-gray-700' }
 const ETF_DESCRIPTION = {
   bullish:  'Institutions buying calls — bullish session tone. Confirms long setups.',
   bearish:  'Institutions selling calls or buying puts — bearish tone. Fades long setups.',
@@ -33,66 +32,12 @@ const ETF_DESCRIPTION = {
   'no data': 'No ETF tide data available for this session.',
 }
 
-function StructureBreakBar({ sb, nqRatio }) {
-  const toR2   = sb?.distance_to_r2 ?? null
-  const toS2   = sb?.distance_to_s2 ?? null
-  const active = sb?.active ?? false
-  const isImminent = !active && (
-    (toR2 !== null && toR2 <= 0.50) || (toS2 !== null && toS2 <= 0.50)
-  )
-
-  const r2NqDist = nqRatio && toR2 != null ? Math.round(toR2 * nqRatio) : null
-  const s2NqDist = nqRatio && toS2 != null ? Math.round(toS2 * nqRatio) : null
-
-  if (active) {
-    const dir  = sb.direction === 'upside' ? '▲' : '▼'
-    const r3nq = nqRatio && sb.r3 ? Math.round(sb.r3 * nqRatio).toLocaleString() : null
-    return (
-      <div className="px-3 py-2 rounded border bg-red-900/50 border-red-600">
-        <div className="text-sm font-medium text-red-300">
-          ⚠ STRUCTURE BREAK {dir} {sb.direction?.toUpperCase() ?? ''}
-          {sb.r3 && (
-            <> — {sb.direction === 'upside' ? 'R3' : 'S3'}:{' '}
-              <span className="text-white">${sb.r3}</span>
-              {r3nq && <span className="text-gray-400"> / NQ {r3nq}</span>}
-            </>
-          )}
-        </div>
-        <div className="text-xs mt-0.5 text-red-300/70">
-          Price has moved outside the defined structure — GEX extension scanning for next level
-        </div>
-      </div>
-    )
-  }
-
-  if (isImminent) {
-    const imminentR2 = toR2 !== null && toR2 <= 0.50
-    const dist = imminentR2 ? toR2 : toS2
-    const nqD  = imminentR2 ? r2NqDist : s2NqDist
-    const label = imminentR2 ? 'R2' : 'S2'
-    return (
-      <div className="px-3 py-2 rounded border bg-amber-900/50 border-amber-600">
-        <div className="text-sm font-medium text-amber-300">
-          ⚠ {label} <span className="text-white">${dist?.toFixed(2)}</span>
-          {nqD && <span className="text-gray-400"> / {nqD} NQ</span>}
-          {' '}— BREAK IMMINENT
-        </div>
-        <div className="text-xs mt-0.5 text-amber-300/70">Price is within the defined structure range</div>
-      </div>
-    )
-  }
-
+function StatCard({ label, value, sub, color = 'text-white' }) {
   return (
-    <div className="px-3 py-2 rounded border bg-gray-800 border-gray-700">
-      <div className="text-sm font-medium text-gray-400">
-        R2 <span className="text-white">${toR2?.toFixed(2) ?? '—'}</span>
-        {r2NqDist && <span className="text-gray-400"> / {r2NqDist} NQ</span>}
-        <span className="text-gray-600 mx-2">|</span>
-        S2 <span className="text-white">${toS2?.toFixed(2) ?? '—'}</span>
-        {s2NqDist && <span className="text-gray-400"> / {s2NqDist} NQ</span>}
-        <span className="text-gray-500 ml-1">away</span>
-      </div>
-      <div className="text-xs mt-0.5 text-gray-600">Price is within the defined structure range</div>
+    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
+      <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">{label}</div>
+      <div className={`text-xl font-bold ${color}`}>{value ?? '—'}</div>
+      {sub && <div className="text-xs text-gray-600 mt-1">{sub}</div>}
     </div>
   )
 }
@@ -107,28 +52,26 @@ function GexCageSummary({ levels }) {
   const hasExpansion = withGex.some(l => l.gex.net_gex < 0)
 
   return (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 space-y-2">
+    <div className="space-y-2 mb-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">GEX Cage</span>
+        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">GEX Cage</span>
         {hasExpansion && <span className="text-xs text-orange-400 font-medium">⚡ EXPANSION</span>}
       </div>
       <div className="space-y-1.5">
         {withGex.map(l => {
-          const pct = maxAbs > 0 ? Math.abs(l.gex.net_gex) / maxAbs * 100 : 0
+          const pct     = maxAbs > 0 ? Math.abs(l.gex.net_gex) / maxAbs * 100 : 0
           const pinning = l.gex.net_gex >= 0
-          const isPeak = l.id === peak.id
+          const isPeak  = l.id === peak.id
           return (
             <div key={l.id} className="flex items-center gap-2">
               <span className="text-xs text-gray-400 w-8">{l.id}</span>
-              <div className="flex-1 relative h-[10px] bg-gray-800 rounded overflow-hidden">
+              <div className="flex-1 relative h-[8px] bg-gray-800 rounded overflow-hidden">
                 <div
                   className={`absolute left-0 top-0 h-full rounded ${pinning ? 'bg-blue-500' : 'bg-orange-500'}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              {isPeak && (
-                <span className="text-xs text-blue-300 font-medium whitespace-nowrap">MECH CTR</span>
-              )}
+              {isPeak && <span className="text-xs text-blue-300 font-medium whitespace-nowrap">MECH CTR</span>}
             </div>
           )
         })}
@@ -138,16 +81,15 @@ function GexCageSummary({ levels }) {
 }
 
 export default function PreSession() {
-  const [data, setData]           = useState(null)
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState(null)
+  const [data, setData]             = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
   const [lastPolled, setLastPolled] = useState(null)
   const [providerStatus, setProviderStatus] = useState(null)
-  const [budget, setBudget]       = useState(null)
-  const [mode, setMode]           = useState('REST')
+  const [budget, setBudget]         = useState(null)
+  const [mode, setMode]             = useState('REST')
   const [magnetStreak, setMagnetStreak]     = useState(null)
   const [lastRescoreAt, setLastRescoreAt]   = useState(null)
-  const [briefExpanded, setBriefExpanded]   = useState(true)
   const [levelNarratives, setLevelNarratives] = useState({})
   const [sessionBrief, setSessionBrief]       = useState(null)
   const [levelTouches, setLevelTouches]       = useState({})
@@ -224,7 +166,6 @@ export default function PreSession() {
       .catch(() => {})
   }, [])
 
-  // SSE listener — rescore timestamp + level narratives
   useEffect(() => {
     fetch(`${API}/level-narratives`)
       .then(r => r.json())
@@ -297,7 +238,6 @@ export default function PreSession() {
     : '—'
   const sessionMaxGex = Math.max(...levels.map(l => Math.abs(l.gex?.net_gex ?? 0)), 1)
 
-  // Compute passive target deltas
   const enriched = levels.map(l => {
     if (!l.passive_target || !l.passive_target_from) return l
     const target = levels.find(t => t.id === l.passive_target_from)
@@ -305,277 +245,155 @@ export default function PreSession() {
     return { ...l, _target_delta: delta }
   })
 
-  // Last fetch time — SSE rescore timestamp takes priority, then polling fallbacks
+  const LEVEL_ORDER = ['R2', 'R1', 'MID', 'S1', 'S2']
+  const sortedLevels = [...enriched].sort(
+    (a, b) => LEVEL_ORDER.indexOf(a.id) - LEVEL_ORDER.indexOf(b.id)
+  )
+
   const fmtET = iso => {
     if (!iso) return null
     const d = new Date(iso)
     if (isNaN(d.getTime())) return null
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }) + ' ET'
+    return d.toLocaleTimeString('en-US', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York',
+    }) + ' ET'
   }
   const lastFetch = fmtET(lastRescoreAt || providerStatus?.lastPriceCheck || data?._received_at || data?.scored_at)
 
-  // Session type label based on current ET hour
   const sessionType = (() => {
-    const etHour = parseInt(new Date().toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/New_York' }))
+    const etHour = parseInt(new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit', hour12: false, timeZone: 'America/New_York',
+    }))
     if (etHour >= 9 && etHour < 16) return 'LIVE'
     if (etHour >= 4 && etHour < 9)  return 'PRE-MARKET'
     return 'AFTER-HOURS'
   })()
 
-  // Fix 3: use /budget endpoint callsToday, fall back to 0 not null
-  const apiUsed  = budget?.callsToday ?? 0
-  const apiMax   = 14000
-  const apiPct   = apiUsed / apiMax
+  const sentiment  = data?._sentiment || null
+  const cascade    = data.cascade || null
+  const structureBreak = data.structure_break || null
 
-  // Fix 4: etf_tide not in payload — direction is in levels[0].etf_direction
-  // net premiums come from the scoring engine's ETF tide calculation stored separately
-  const tide = {}
-  const netCall = null  // not available in /latest payload
-  const netPut  = null
-  const fmt = v => v != null ? `$${(Math.abs(v) / 1e6).toFixed(2)}M` : '—'
-  const sentiment = data?._sentiment || null
+  const streak     = magnetStreak ?? providerStatus?.allPinningSessions ?? 0
+  const etfTide    = { direction: etfDir, description: ETF_DESCRIPTION[etfDir] || ETF_DESCRIPTION.neutral }
+  const gexRegime  = {
+    label:  providerStatus?.expansionGexActive ? 'EXPANSION' : (data?.gex_regime?.label || 'PINNING'),
+    active: providerStatus?.expansionGexActive ?? false,
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Sentiment badge — first element */}
-      <SentimentBadge sentiment={sentiment} compact={false} />
-      {sessionBrief && providerStatus?.narrativeMode === 'claude' && (
-        <div className="border border-purple-900/50 bg-purple-950/10 rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg height="0.9em" width="0.9em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="inline shrink-0">
-                <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
-              </svg>
-              <span className="text-xs text-purple-500">Session Brief</span>
-              <span className="text-xs text-gray-600">Claude Haiku</span>
-            </div>
-            <button onClick={() => setBriefExpanded(e => !e)} className="text-xs text-gray-600 hover:text-gray-400">
-              {briefExpanded ? '▲ collapse' : '▼ expand'}
-            </button>
-          </div>
-          {briefExpanded
-            ? <p className="text-xs text-gray-300 mt-2 leading-relaxed">{sessionBrief}</p>
-            : <p className="text-xs text-gray-500 mt-1 line-clamp-1">{sessionBrief?.slice(0, 120)}…</p>
-          }
-        </div>
-      )}
-      <SignalStrengthBar levels={levels} />
+    <div className="space-y-3 py-3">
 
-      {/* Session header */}
-      <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center gap-3">
-              <span className="text-gray-300 font-medium">{data.session}</span>
-              <span className="text-xs text-gray-500 uppercase">{sessionType}</span>
-            </div>
-            <div className="text-xs text-gray-500">
-              Last fetch: {lastFetch || data.fetched_at || '—'}
-            </div>
-            <div className="flex items-center gap-3 text-sm mt-1">
-              <span className="text-white font-medium">${data.current_price?.toFixed(2) ?? '—'}</span>
-              <span className="text-gray-400 font-medium">/ NQ {nqPrice}</span>
-              {nqRatio && <span className="text-xs text-gray-500">ratio {nqRatio?.toFixed(3)}</span>}
-              {!nqRatio && <span className="text-xs text-gray-600">ratio —</span>}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={toggleMode}
-              className={`px-2 py-1 rounded text-xs font-mono font-bold transition-colors ${
-                mode === 'REST'
-                  ? 'bg-green-800 text-green-200 border border-green-600'
-                  : 'bg-blue-800 text-blue-200 border border-blue-600'
-              }`}
-            >
-              {mode === 'REST' ? '● REST' : '○ WS'}
-            </button>
-            <button
-              onClick={fetchLatest}
-              className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 rounded border border-gray-600 text-gray-300 transition-colors"
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* Budget bar */}
-        {budget && (
-          <div className="mt-2 space-y-0.5">
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>API Budget</span>
-              <span className={
-                budget.status === 'red' ? 'text-red-400' :
-                budget.status === 'amber' ? 'text-amber-400' : 'text-green-400'
-              }>
-                {budget.callsToday.toLocaleString()} / {budget.workingBudget.toLocaleString()} ({budget.percentUsed}%)
-              </span>
-            </div>
-            <div className="h-1 bg-gray-800 rounded overflow-hidden">
-              <div
-                className={`h-full rounded transition-all ${
-                  budget.status === 'red' ? 'bg-red-500' :
-                  budget.status === 'amber' ? 'bg-amber-500' : 'bg-green-500'
-                }`}
-                style={{ width: `${Math.min(100, parseFloat(budget.percentUsed))}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Polling status */}
-        {providerStatus && (
-          <div className="mt-2 pt-2 border-t border-gray-800 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-gray-600">
-            <span>
-              <span className={providerStatus.pollingActive ? 'text-green-500' : 'text-gray-500'}>
-                {providerStatus.pollingActive ? '▸' : '■'}
-              </span>
-              {' '}{providerStatus.mode} · interval {msToLabel(providerStatus.currentInterval)}
-            </span>
-            <span>
-              {providerStatus.lastPriceCheck
-                ? `price checked ${new Date(providerStatus.lastPriceCheck).toLocaleTimeString()}`
-                : 'no price check yet'}
-            </span>
-            {providerStatus.lastRescore && (
-              <span className="col-span-2 text-gray-700">
-                last rescore {new Date(providerStatus.lastRescore).toLocaleTimeString()}
-                {providerStatus.lastRescoreReason ? ` — ${providerStatus.lastRescoreReason}` : ''}
-              </span>
-            )}
-          </div>
-        )}
-
-        {lastPolled && (
-          <div className="text-xs text-gray-700 mt-1">
-            data polled {lastPolled.toLocaleTimeString()} · auto every 30s
-          </div>
-        )}
+      {/* Row 1 — Three hero cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <MarketStateCard
+          sentiment={sentiment}
+          sessionBrief={sessionBrief}
+          narrativeMode={providerStatus?.narrativeMode}
+        />
+        <SessionHeaderCard
+          date={data.session}
+          sessionType={sessionType}
+          price={data.current_price}
+          nqPrice={nqPrice}
+          nqRatio={nqRatio}
+          lastFetch={lastFetch}
+          budget={budget}
+          mode={mode}
+          onToggleMode={toggleMode}
+          onRefresh={fetchLatest}
+          providerStatus={providerStatus}
+          lastPolled={lastPolled}
+        />
+        <AlertsCard
+          cascade={cascade}
+          structureBreak={structureBreak}
+          levels={levels}
+          currentPrice={data.current_price}
+        />
       </div>
 
-      {/* Earnings warning + Economic calendar */}
+      {/* Earnings warning — conditional, not collapsible */}
       <EarningsWarning apiUrl={API} />
-      <EconomicCalendar apiUrl={API} />
 
-      {/* Structure break bar */}
-      <StructureBreakBar sb={data.structure_break} nqRatio={nqRatio} />
+      {/* Row 2 — Economic events (collapsible) */}
+      <CollapsibleSection title="Economic Calendar" defaultOpen={true}>
+        <EconomicCalendar apiUrl={API} />
+      </CollapsibleSection>
 
-      {/* Cascade banner */}
-      <CascadeBanner
-        cascade={data.cascade}
-        midPrice={levels.find(l => l.id === 'MID')?.price ?? null}
-        nqRatio={nqRatio}
-      />
+      {/* Row 3 — Signal strength + stats */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="col-span-1">
+          <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 h-full">
+            <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Signal Strength</div>
+            <SignalStrengthBar levels={levels} />
+          </div>
+        </div>
+        <StatCard
+          label="Streak"
+          value={streak}
+          sub="consecutive sessions"
+        />
+        <StatCard
+          label="ETF Tide"
+          value={etfTide.direction?.toUpperCase()}
+          sub={etfTide.description?.slice(0, 48)}
+          color={
+            etfTide.direction === 'bullish' ? 'text-green-400'
+              : etfTide.direction === 'bearish' ? 'text-red-400'
+              : 'text-gray-400'
+          }
+        />
+        <StatCard
+          label="GEX Regime"
+          value={gexRegime.label}
+          sub={gexRegime.active ? 'no pinning friction' : `${providerStatus?.allPinningSessions ?? '—'} sessions`}
+          color={gexRegime.active ? 'text-red-400' : 'text-green-400'}
+        />
+      </div>
 
-      {/* Level cards */}
+      {/* Row 4 — Five level cards */}
       <div className="space-y-2">
-        {(() => {
-          const LEVEL_ORDER = ['R2', 'R1', 'MID', 'S1', 'S2']
-          return [...enriched].sort((a, b) =>
-            LEVEL_ORDER.indexOf(a.id) - LEVEL_ORDER.indexOf(b.id)
-          ).map(level => (
-            <LevelCard
-              key={level.id}
-              level={level}
-              sessionMaxGex={sessionMaxGex}
-              nqRatio={nqRatio}
-              dpHistory={providerStatus?.dpHistory?.[level.id] || []}
-              scoredAt={data?.scored_at || data?._received_at}
-              levelNarrative={levelNarratives[level.id]}
-              currentPrice={data?.current_price}
-              levelTouch={levelTouches[level.id]}
-            />
-          ))
-        })()}
+        {sortedLevels.map(level => (
+          <LevelCard
+            key={level.id}
+            level={level}
+            sessionMaxGex={sessionMaxGex}
+            nqRatio={nqRatio}
+            dpHistory={providerStatus?.dpHistory?.[level.id] || []}
+            scoredAt={data?.scored_at || data?._received_at}
+            levelNarrative={levelNarratives[level.id]}
+            currentPrice={data?.current_price}
+            levelTouch={levelTouches[level.id]}
+          />
+        ))}
       </div>
 
-      {/* GEX cage */}
-      <GexCageSummary levels={levels} />
+      {/* Row 5 — GEX by expiry (collapsible, includes cage) */}
+      <CollapsibleSection title="GEX by Expiry" defaultOpen={true}>
+        <GexCageSummary levels={levels} />
+        <GexByExpiry apiUrl={API} />
+      </CollapsibleSection>
 
-      {/* GEX by expiry */}
-      <GexByExpiry apiUrl={API} />
-
-      {/* Stat boxes */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Resistance magnet streak */}
-        <div className="bg-gray-900/60 rounded border border-gray-700 p-3 text-center">
-          <div className="text-3xl font-bold text-white">
-            {magnetStreak ?? providerStatus?.allPinningSessions ?? 0}
-          </div>
-          <div className="text-xs text-gray-400 mt-1">Consecutive Sessions</div>
-          <div className="text-xs text-gray-600 mt-0.5">Zero failures</div>
-        </div>
-
-        {/* ETF tide */}
-        <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">ETF Tide</div>
-          <div className={`inline-block px-2 py-0.5 rounded border text-xs font-bold mb-2 ${ETF_COLOR[etfDir] || ETF_COLOR.neutral}`}>
-            {ETF_LABEL[etfDir] || 'NEUTRAL'}
-          </div>
-          <div className="text-xs text-gray-500 mt-1 italic">
-            {ETF_DESCRIPTION[etfDir] || ETF_DESCRIPTION.neutral}
-          </div>
-          {data.run_type?.includes('overnight') && (
-            <div className="text-xs text-gray-600 mt-1">carry-forward</div>
-          )}
-        </div>
-
-        {/* API budget */}
-        <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">API Budget</div>
-          <div className="text-sm text-gray-300">
-            {apiUsed.toLocaleString()} / {apiMax.toLocaleString()}
-          </div>
-          {(
-            <div className="mt-2">
-              <div className="h-1.5 bg-gray-800 rounded overflow-hidden">
-                <div
-                  className={`h-full rounded transition-all ${apiPct < 0.5 ? 'bg-green-500' : apiPct < 0.8 ? 'bg-amber-500' : 'bg-red-500'}`}
-                  style={{ width: `${apiPct * 100}%` }}
-                />
-              </div>
-              <div className={`text-xs mt-1 ${apiPct < 0.5 ? 'text-green-400' : apiPct < 0.8 ? 'text-amber-400' : 'text-red-400'}`}>
-                {((apiPct || 0) * 100).toFixed(1)}% used
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* GEX regime */}
-        <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">GEX Regime</div>
-          {providerStatus?.expansionGexActive ? (
-            <>
-              <div className="text-lg font-bold text-red-400 animate-pulse">EXPANSION</div>
-              <div className="text-xs text-red-300 mt-1">
-                {(providerStatus.expansionGexLevels || []).map(l => l.level).join(', ')}
-                {' '}— no pinning friction
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-lg font-bold text-green-400">
-                {data?.gex_regime?.label || 'PINNING'}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">
-                {providerStatus?.allPinningSessions ?? '—'} consecutive sessions
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Sector flow + top movers */}
+      {/* Row 6 — Market context grid */}
       <div className="grid grid-cols-2 gap-3">
-        <SectorETF apiUrl={API} />
-        <TopNetImpact apiUrl={API} />
+        <CollapsibleSection title="Sector Flow" defaultOpen={true}>
+          <SectorETF apiUrl={API} />
+        </CollapsibleSection>
+        <CollapsibleSection title="Top Movers" defaultOpen={true}>
+          <TopNetImpact apiUrl={API} />
+        </CollapsibleSection>
       </div>
 
-      {/* 0DTE + Greek flow */}
+      {/* Row 7 — Flow signals grid */}
       <div className="grid grid-cols-2 gap-3">
-        <ZeroDteFlow apiUrl={API} />
-        <GreekFlow apiUrl={API} />
+        <CollapsibleSection title="0DTE Flow" defaultOpen={false}>
+          <ZeroDteFlow apiUrl={API} />
+        </CollapsibleSection>
+        <CollapsibleSection title="Greek Flow" defaultOpen={false}>
+          <GreekFlow apiUrl={API} />
+        </CollapsibleSection>
       </div>
+
     </div>
   )
 }
