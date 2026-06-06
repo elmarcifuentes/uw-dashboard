@@ -16,6 +16,7 @@ export function useSSE(url) {
   const [sentiment, setSentiment]             = useState(null)
   const [narrativeMode, setNarrativeMode]     = useState('template')
   const [pendingLevels, setPendingLevels]     = useState(null)
+  const [levelNarratives, setLevelNarratives] = useState({})
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
 
@@ -39,6 +40,16 @@ export function useSSE(url) {
             if (data?.narrativeMode) {
               console.log('[SSE] narrative mode restored from status:', data.narrativeMode)
               setNarrativeMode(data.narrativeMode)
+            }
+          })
+          .catch(() => {})
+        // Restore level narratives
+        fetch(`${apiBase}/level-narratives`)
+          .then(r => r.json())
+          .then(data => {
+            if (data?.narratives && Object.keys(data.narratives).length > 0) {
+              console.log('[SSE] restored level narratives:', Object.keys(data.narratives))
+              setLevelNarratives(data.narratives)
             }
           })
           .catch(() => {})
@@ -106,6 +117,11 @@ export function useSSE(url) {
           setPinningSessions(data.consecutivePinningSessions ?? 0)
           return
         }
+        if (data.type === 'level_narratives_update') {
+          console.log('[SSE] level narratives updated:', Object.keys(data.narratives || {}))
+          setLevelNarratives(data.narratives || {})
+          return
+        }
         if (data.type === 'levels_pending')   { setPendingLevels(data.levels); return }
         if (data.type === 'levels_dismissed') { setPendingLevels(null);        return }
         if (data.type === 'levels_updated')   { setPendingLevels(null);        return }
@@ -141,5 +157,6 @@ export function useSSE(url) {
     narrativeMode,
     pendingLevels,
     clearPendingLevels: () => setPendingLevels(null),
+    levelNarratives,
   }
 }

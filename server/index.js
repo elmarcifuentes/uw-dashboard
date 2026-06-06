@@ -51,9 +51,11 @@ let latest            = null
 let previousResult    = null
 let chartSynced       = true
 let lastWebhookPayload = null
-let lastNarrative     = []
-let lastNarrativeHash = null
-let lastNarrativeMode = null
+let lastNarrative           = []
+let lastNarrativeHash       = null
+let lastNarrativeMode       = null
+let lastLevelNarratives     = {}
+let lastLevelNarrativeHashes = {}
 const history         = []
 const MAX_HISTORY     = 20
 
@@ -77,6 +79,113 @@ if (!process.env.NARRATIVE_MODE) {
   } catch { /* settings table may not exist on first boot — db.exec creates it */ }
 }
 console.log('[server] Narrative mode initialized:', narrativeMode, `(${narrativeModeSource})`)
+
+function hashLevel(level) {
+  if (!level) return null
+  const key = {
+    id:             level.id,
+    classification: level.classification,
+    dp:             level.dark_pool?.toFixed(2),
+    score:          Math.round((level.score || 0) / 5) * 5,
+    full_stack:     level.full_stack,
+    confidence:     level.confidence,
+    etf_direction:  level.etf_direction,
+    expansion_gex:  (level.net_gex || 0) < 0,
+    dp_condition:   level.dp_condition,
+  }
+  return crypto.createHash('md5').update(JSON.stringify(key)).digest('hex')
+}
+
+function nqPrice(qqqPrice, nqRatio) {
+  if (!qqqPrice || !nqRatio) return null
+  return Math.round(qqqPrice * nqRatio)
+}
+
+function formatPrice(qqq, nqRatio) {
+  const nq = nqPrice(qqq, nqRatio)
+  return nq ? `$${qqq?.toFixed(2)} (NQ ${nq.toLocaleString()})` : `$${qqq?.toFixed(2)}`
+}
+
+async function generateLevelNarratives(result) {
+  if (narrativeMode !== 'claude') return {}
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return {}
+
+  const levels       = result?.levels || []
+  const nqRatio      = result?.nq_ratio
+  const currentPrice = result?.current_price
+  const cascade      = result?.cascade
+
+  const narratives = { ...lastLevelNarratives }
+  let anyUpdated = false
+
+  for (const level of levels) {
+    const hash = hashLevel(level)
+    if (hash && hash === lastLevelNarrativeHashes[level.id]) {
+      console.log(`[level-narrative] ${level.id} cache hit`)
+      continue
+    }
+    console.log(`[level-narrative] generating for ${level.id}`)
+    const nq       = nqPrice(level.price, nqRatio)
+    const distQqq  = currentPrice != null ? (currentPrice - level.price).toFixed(2) : null
+    const distNq   = distQqq && nqRatio ? Math.round(Math.abs(distQqq) * nqRatio) : null
+    const above    = distQqq != null ? parseFloat(distQqq) > 0 : null
+
+    const otherLevels = levels.filter(l => l.id !== level.id).map(l =>
+      `${l.id}: ${formatPrice(l.price, nqRatio)} — ${l.classification} (DP ${l.dark_pool?.toFixed(3)}, score ${l.score})`
+    ).join('\n')
+
+    const prompt = `You are a professional QQQ/NQ futures trading analyst.
+
+Analyze this specific level and provide actionable trading guidance.
+
+CURRENT LEVEL — ${level.id}:
+  Price: ${formatPrice(level.price, nqRatio)}
+  Classification: ${level.classification}
+  Confidence: ${level.confidence}
+  Score: ${level.score}
+  Dark Pool: ${level.dark_pool?.toFixed(4)}
+  Full Stack: ${level.full_stack ? 'YES ★' : 'no'}
+  ETF Direction: ${level.etf_direction || 'none'}
+  ${(level.net_gex || 0) < 0 ? '⚠ EXPANSION GEX — no mechanical friction' : 'GEX pinning active'}
+
+CURRENT PRICE:
+  ${currentPrice ? `QQQ: $${currentPrice.toFixed(2)}` : ''}
+  ${distNq ? `${above ? '+' : '-'}$${Math.abs(distQqq)} / ${distNq} NQ ${above ? 'above' : 'below'} this level` : ''}
+
+OTHER LEVELS:
+${otherLevels}
+
+CASCADE: ${cascade?.active ? 'ACTIVE ⚠' : cascade?.conditions?.[0] ? 'ARMED (condition 1 met)' : 'inactive'}
+STRUCTURE BREAK: ${result?.structure_break?.active ? 'ACTIVE — ' + result.structure_break.direction : 'intact'}
+
+Write 3-4 sentences: what the classification/DP means, what to watch for, retest scenario, target on confirmation.
+Always include NQ price in parentheses: $703.54 (NQ 28,945).
+Plain English, no bullets. Return ONLY the analysis text.`
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, messages: [{ role: 'user', content: prompt }] }),
+        signal: AbortSignal.timeout(15000),
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text
+      if (text) {
+        narratives[level.id] = text
+        lastLevelNarrativeHashes[level.id] = hash
+        anyUpdated = true
+        console.log(`[level-narrative] ${level.id} generated`)
+      }
+    } catch (err) {
+      console.warn(`[level-narrative] ${level.id} failed:`, err.message)
+    }
+  }
+
+  if (anyUpdated) lastLevelNarratives = narratives
+  return narratives
+}
 
 function hashScoringResult(result) {
   if (!result) return null
@@ -470,6 +579,15 @@ provider.onRescore(async ({ price, reason }) => {
         }
       })
       .catch(err => console.warn('[narrative] async failed:', err.message))
+    generateLevelNarratives(result)
+      .then(levelNarratives => {
+        if (Object.keys(levelNarratives).length > 0) {
+          lastLevelNarratives = levelNarratives
+          sseEmitter.emit('event', { type: 'level_narratives_update', narratives: levelNarratives, timestamp: new Date().toISOString() })
+          console.log('[level-narrative] SSE emitted')
+        }
+      })
+      .catch(err => console.warn('[level-narrative] failed:', err.message))
   } catch (err) {
     console.error('[server] Auto-rescore failed:', err.message)
   }
@@ -621,6 +739,15 @@ app.post("/update", async (req, res) => {
       }
     })
     .catch(err => console.warn('[narrative] async failed:', err.message))
+  generateLevelNarratives(result)
+    .then(levelNarratives => {
+      if (Object.keys(levelNarratives).length > 0) {
+        lastLevelNarratives = levelNarratives
+        sseEmitter.emit('event', { type: 'level_narratives_update', narratives: levelNarratives, timestamp: new Date().toISOString() })
+        console.log('[level-narrative] SSE emitted')
+      }
+    })
+    .catch(err => console.warn('[level-narrative] failed:', err.message))
 })
 
 app.get('/latest', (req, res) => {
@@ -892,6 +1019,15 @@ app.post('/rescore', async (req, res) => {
         }
       })
       .catch(err => console.warn('[narrative] async failed:', err.message))
+    generateLevelNarratives(result)
+      .then(levelNarratives => {
+        if (Object.keys(levelNarratives).length > 0) {
+          lastLevelNarratives = levelNarratives
+          sseEmitter.emit('event', { type: 'level_narratives_update', narratives: levelNarratives, timestamp: new Date().toISOString() })
+          console.log('[level-narrative] SSE emitted')
+        }
+      })
+      .catch(err => console.warn('[level-narrative] failed:', err.message))
   } catch (err) {
     console.error('[server] Manual rescore failed:', err.message)
     res.status(500).json({ error: err.message })
@@ -1177,6 +1313,11 @@ app.post('/webhook/dismiss', (req, res) => {
     sseEmitter.emit('event', { type: 'levels_dismissed', timestamp: new Date().toISOString() })
     res.json({ success: true })
   } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// GET /level-narratives — return per-level Claude narratives (for reconnect restore)
+app.get('/level-narratives', (req, res) => {
+  res.json({ narratives: lastLevelNarratives, timestamp: new Date().toISOString() })
 })
 
 // GET /narrative — return last generated narrative (for reconnect restore)

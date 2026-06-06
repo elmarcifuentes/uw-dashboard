@@ -143,8 +143,9 @@ export default function PreSession() {
   const [providerStatus, setProviderStatus] = useState(null)
   const [budget, setBudget]       = useState(null)
   const [mode, setMode]           = useState('REST')
-  const [magnetStreak, setMagnetStreak] = useState(null)
-  const [lastRescoreAt, setLastRescoreAt] = useState(null)
+  const [magnetStreak, setMagnetStreak]     = useState(null)
+  const [lastRescoreAt, setLastRescoreAt]   = useState(null)
+  const [levelNarratives, setLevelNarratives] = useState({})
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -218,13 +219,18 @@ export default function PreSession() {
       .catch(() => {})
   }, [])
 
-  // SSE listener — update last fetch time on every rescore without re-polling
+  // SSE listener — rescore timestamp + level narratives
   useEffect(() => {
+    fetch(`${API}/level-narratives`)
+      .then(r => r.json())
+      .then(d => { if (d?.narratives && Object.keys(d.narratives).length > 0) setLevelNarratives(d.narratives) })
+      .catch(() => {})
     const es = new EventSource(`${API}/stream`)
     es.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data)
         if (d.type === 'rescore') setLastRescoreAt(new Date().toISOString())
+        if (d.type === 'level_narratives_update') setLevelNarratives(d.narratives || {})
       } catch {}
     }
     return () => es.close()
@@ -440,6 +446,7 @@ export default function PreSession() {
               nqRatio={nqRatio}
               dpHistory={providerStatus?.dpHistory?.[level.id] || []}
               scoredAt={data?.scored_at || data?._received_at}
+              levelNarrative={levelNarratives[level.id]}
             />
           ))
         })()}

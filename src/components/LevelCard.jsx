@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import SignalBadge from './SignalBadge'
 import DpBar from './DpBar'
 import GexBar from './GexBar'
@@ -69,7 +70,8 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt }) {
+export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [], scoredAt, levelNarrative }) {
+  const [expanded, setExpanded] = useState(false)
   const classKey    = level.classification === 'mid' ? 'mid' : level.classification
   const borderColor = BORDER_COLOR[classKey] || '#6B7280'
   const nqPrice  = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : '—'
@@ -218,6 +220,27 @@ export default function LevelCard({ level, sessionMaxGex, nqRatio, dpHistory = [
       {scoredAt && (
         <div className="flex justify-end mt-1">
           <span className="text-gray-600 text-xs font-mono">{formatTime(scoredAt)}</span>
+        </div>
+      )}
+
+      {/* Claude level analysis — expandable */}
+      {levelNarrative && (
+        <div className="border-t border-gray-700 pt-2">
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            <span>{expanded ? '▼' : '▶'}</span>
+            <svg height="0.85em" width="0.85em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="inline">
+              <path clipRule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fillRule="evenodd" />
+            </svg>
+            <span>Claude Analysis</span>
+          </button>
+          {expanded && (
+            <p className="text-xs text-gray-300 mt-1.5 leading-relaxed italic">
+              {levelNarrative}
+            </p>
+          )}
         </div>
       )}
     </div>
