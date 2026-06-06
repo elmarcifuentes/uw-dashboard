@@ -62,6 +62,8 @@ let lastLevelNarrativeHashes = {}
 let lastSessionBrief         = null
 let lastSessionBriefHash     = null
 let lastTacticalBrief        = null
+let lastAssistantRead        = null
+let lastAssistantReadHash    = null
 const history         = []
 const MAX_HISTORY     = 20
 
@@ -315,6 +317,105 @@ Plain English, no bullets. Return ONLY the analysis text.`
 
   if (anyUpdated) lastLevelNarratives = narratives
   return narratives
+}
+
+function generateTemplateAssistantRead(result) {
+  const levels  = result?.levels || []
+  const price   = result?.current_price
+  const cascade = result?.cascade
+  const mid     = levels.find(l => l.id === 'MID')
+  const nqRatio = result?.nq_ratio
+  const nq      = p => nqRatio ? ` (NQ ${Math.round(p * nqRatio).toLocaleString()})` : ''
+  if (!levels.length || price == null) return null
+
+  const nearest  = levels.reduce((n, l) => Math.abs(price - l.price) < Math.abs(price - n.price) ? l : n)
+  const sellLvls = levels.filter(l => l.classification === 'sell_resistance')
+  const buyLvls  = levels.filter(l => l.classification === 'buy_support')
+  const gap      = mid?.dark_pool != null ? Math.abs(-0.700 - mid.dark_pool).toFixed(3) : null
+
+  return {
+    now: `Price $${price.toFixed(2)}${nq(price)} ${price > nearest.price ? 'above' : 'below'} ${nearest.id} $${nearest.price.toFixed(2)}${nq(nearest.price)}.`,
+    next: sellLvls.length > 0
+      ? `Watch ${sellLvls[0].id} $${sellLvls[0].price.toFixed(2)}${nq(sellLvls[0].price)} for rejection.`
+      : buyLvls.length > 0
+      ? `Watch ${buyLvls[0].id} $${buyLvls[0].price.toFixed(2)}${nq(buyLvls[0].price)} for support.`
+      : 'No classified levels — monitor for development.',
+    risk: cascade?.active
+      ? 'CASCADE ACTIVE — no institutional floor below MID.'
+      : gap && mid?.dark_pool <= -0.500
+      ? `MID dark pool ${mid.dark_pool.toFixed(3)} — ${gap} from cascade trigger.`
+      : result?.structure_break?.active
+      ? `Structure break ${result.structure_break.direction} — GEX extension active.`
+      : 'No immediate risk signal.',
+    invalidation: sellLvls.length > 0
+      ? `Sustained close above $${sellLvls[0].price.toFixed(2)}${nq(sellLvls[0].price)} weakens bearish read.`
+      : buyLvls.length > 0
+      ? `Break below $${buyLvls[0].price.toFixed(2)}${nq(buyLvls[0].price)} invalidates support.`
+      : 'Watch for classification change on any level.',
+  }
+}
+
+async function generateAssistantRead(result) {
+  const fallback = generateTemplateAssistantRead(result)
+  if (!fallback) return null
+  if (narrativeMode !== 'claude') return fallback
+
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return fallback
+
+  const hash = hashScoringResult(result)
+  if (hash && hash === lastAssistantReadHash && lastAssistantRead) {
+    console.log('[assistant] cache hit')
+    return lastAssistantRead
+  }
+
+  const levels       = result?.levels || []
+  const nqRatio      = result?.nq_ratio
+  const currentPrice = result?.current_price
+  const cascade      = result?.cascade
+  const mid          = levels.find(l => l.id === 'MID')
+
+  const levelSummary = levels.map(l => {
+    const nq = nqRatio ? ` (NQ ${Math.round(l.price * nqRatio).toLocaleString()})` : ''
+    return `${l.id} $${l.price?.toFixed(2)}${nq} — ${l.classification} DP ${l.dark_pool?.toFixed(3)}${l.full_stack ? ' FULL STACK ★' : ''}`
+  }).join('\n')
+
+  const prompt = `You are analyzing live QQQ/NQ institutional flow.
+
+Price: $${currentPrice?.toFixed(2)}${nqRatio ? ` (NQ ${Math.round(currentPrice * nqRatio).toLocaleString()})` : ''}
+
+Levels:
+${levelSummary}
+
+Cascade: ${cascade?.active ? 'ACTIVE' : mid?.dark_pool <= -0.700 ? 'threshold met — monitoring S1/S2' : `${Math.abs(-0.700 - (mid?.dark_pool || 0)).toFixed(3)} from trigger`}
+Structure: ${result?.structure_break?.active ? 'BREAK ' + result.structure_break.direction : 'intact'}
+
+Return ONLY valid JSON with exactly these four fields. Each value must be ONE sentence maximum.
+Always include NQ prices in parentheses. No markdown, no explanation, just the JSON object.
+
+{"now":"one sentence — what is happening right now","next":"one sentence — most likely next price test or move","risk":"one sentence — primary risk to current thesis","invalidation":"one sentence — what would change the read"}`
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, messages: [{ role: 'user', content: prompt }] }),
+      signal: AbortSignal.timeout(10000),
+    })
+    const data = await response.json()
+    const text = data.content?.[0]?.text?.trim()
+    if (!text) throw new Error('No response')
+    const clean  = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const parsed = JSON.parse(clean)
+    if (!parsed.now || !parsed.next || !parsed.risk || !parsed.invalidation) throw new Error('Missing fields')
+    lastAssistantRead     = parsed
+    lastAssistantReadHash = hash
+    console.log('[assistant] read generated:', parsed.now.slice(0, 60) + '...')
+    return parsed
+  } catch (err) {
+    console.warn('[assistant] Claude failed:', err.message)
+    return fallback
+  }
 }
 
 function hashScoringResult(result) {
@@ -755,6 +856,14 @@ provider.onRescore(async ({ price, reason }) => {
         }
       })
       .catch(err => console.warn('[session-brief] failed:', err.message))
+    generateAssistantRead(result)
+      .then(read => {
+        if (read) {
+          lastAssistantRead = read
+          sseEmitter.emit('event', { type: 'assistant_read_update', assistantRead: read, timestamp: new Date().toISOString() })
+        }
+      })
+      .catch(err => console.warn('[assistant] failed:', err.message))
   } catch (err) {
     console.error('[server] Auto-rescore failed:', err.message)
   }
@@ -926,6 +1035,14 @@ app.post("/update", async (req, res) => {
       }
     })
     .catch(err => console.warn('[session-brief] failed:', err.message))
+  generateAssistantRead(result)
+    .then(read => {
+      if (read) {
+        lastAssistantRead = read
+        sseEmitter.emit('event', { type: 'assistant_read_update', assistantRead: read, timestamp: new Date().toISOString() })
+      }
+    })
+    .catch(err => console.warn('[assistant] failed:', err.message))
 })
 
 app.get('/latest', (req, res) => {
@@ -1214,6 +1331,14 @@ app.post('/rescore', async (req, res) => {
         }
       })
       .catch(err => console.warn('[session-brief] failed:', err.message))
+    generateAssistantRead(result)
+      .then(read => {
+        if (read) {
+          lastAssistantRead = read
+          sseEmitter.emit('event', { type: 'assistant_read_update', assistantRead: read, timestamp: new Date().toISOString() })
+        }
+      })
+      .catch(err => console.warn('[assistant] failed:', err.message))
   } catch (err) {
     console.error('[server] Manual rescore failed:', err.message)
     res.status(500).json({ error: err.message })
@@ -1526,6 +1651,11 @@ app.get('/level-touches', (req, res) => {
     rows.forEach(r => { touches[r.level_id] = r })
     res.json({ touches, date: today })
   } catch { res.json({ touches: {}, date: today }) }
+})
+
+// GET /assistant-read — return structured NOW/NEXT/RISK/IF-WRONG read
+app.get('/assistant-read', (req, res) => {
+  res.json({ assistantRead: lastAssistantRead, timestamp: new Date().toISOString() })
 })
 
 // GET /session-brief — return last session + tactical brief (for reconnect restore)

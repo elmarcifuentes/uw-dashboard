@@ -19,6 +19,7 @@ export function useSSE(url) {
   const [levelNarratives, setLevelNarratives] = useState({})
   const [sessionBrief, setSessionBrief]       = useState(null)
   const [tacticalBrief, setTacticalBrief]     = useState(null)
+  const [assistantRead, setAssistantRead]     = useState(null)
   const [priceVelocity, setPriceVelocity]     = useState(0)
   const [levelTouches, setLevelTouches]       = useState({})
   const [priceHistory, setPriceHistory]       = useState([])
@@ -48,6 +49,11 @@ export function useSSE(url) {
               setNarrativeMode(data.narrativeMode)
             }
           })
+          .catch(() => {})
+        // Restore assistant read
+        fetch(`${apiBase}/assistant-read`)
+          .then(r => r.json())
+          .then(data => { if (data?.assistantRead) setAssistantRead(data.assistantRead) })
           .catch(() => {})
         // Restore session + tactical brief
         fetch(`${apiBase}/session-brief`)
@@ -155,6 +161,10 @@ export function useSSE(url) {
           setPinningSessions(data.consecutivePinningSessions ?? 0)
           return
         }
+        if (data.type === 'assistant_read_update') {
+          if (data.assistantRead) setAssistantRead(data.assistantRead)
+          return
+        }
         if (data.type === 'session_brief_update') {
           if (data.session)  setSessionBrief(data.session)
           if (data.tactical) setTacticalBrief(data.tactical)
@@ -203,6 +213,7 @@ export function useSSE(url) {
     levelNarratives,
     sessionBrief,
     tacticalBrief,
+    assistantRead,
     priceVelocity,
     levelTouches,
     priceHistory,

@@ -1,0 +1,127 @@
+import { useState, useEffect, useMemo } from 'react'
+import { useSSE } from '../hooks/useSSE'
+import SentimentBadge from './SentimentBadge'
+import ImmediateRiskCard from './ImmediateRiskCard'
+import EvidenceMeter from './EvidenceMeter'
+import SmartLevelCard from './SmartLevelCard'
+import NewsHeadlines from './intraday/NewsHeadlines'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+function StatCard({ label, value, sub, color = 'text-white' }) {
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-lg p-3">
+      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</div>
+      <div className={`text-lg font-bold font-mono ${color}`}>{value ?? '—'}</div>
+      {sub && <div className="text-xs text-gray-600 mt-0.5">{sub}</div>}
+    </div>
+  )
+}
+
+export default function OverviewTab() {
+  const {
+    rescoreData, priceData, connected,
+    sentiment, sessionBrief, levelNarratives,
+    dpHistory, levelTouches, priceVelocity,
+  } = useSSE(`${API_URL}/stream`)
+
+  const [status, setStatus]   = useState(null)
+  const [budget, setBudget]   = useState(null)
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API_URL}/status`).then(r => r.json()).catch(() => null),
+      fetch(`${API_URL}/budget`).then(r => r.json()).catch(() => null),
+    ]).then(([s, b]) => { if (s) setStatus(s); if (b) setBudget(b) })
+    const t = setInterval(() => {
+      fetch(`${API_URL}/status`).then(r => r.json()).then(s => setStatus(s)).catch(() => {})
+    }, 30000)
+    return () => clearInterval(t)
+  }, [])
+
+  const result       = useMemo(() => rescoreData?.result ?? null, [rescoreData])
+  const levels       = result?.levels || []
+  const nqRatio      = result?.nq_ratio ? Number(result.nq_ratio) : null
+  const currentPrice = priceData?.price ?? result?.current_price
+  const nqPrice      = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio) : null
+  const cascade      = result?.cascade ?? null
+  const sb           = result?.structure_break ?? null
+
+  const bearLevel  = [...levels].filter(l => l.classification === 'sell_resistance').sort((a, b) => (b.score || 0) - (a.score || 0))[0] ?? null
+  const bullLevel  = [...levels].filter(l => l.classification === 'buy_support').sort((a, b)    => (b.score || 0) - (a.score || 0))[0] ?? null
+  const focusLevel = levels.length > 0 && currentPrice != null
+    ? levels.reduce((n, l) => Math.abs(currentPrice - l.price) < Math.abs(currentPrice - n.price) ? l : n)
+    : null
+
+  const etfDir   = levels[0]?.etf_direction || 'neutral'
+  const streak   = status?.allPinningSessions ?? '—'
+  const apiCalls = budget?.callsToday ?? '—'
+
+  return (
+    <div className="space-y-4 py-4">
+
+      {/* Hero — 3 columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+        {/* Market state */}
+        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Market State</div>
+          <SentimentBadge sentiment={sentiment} compact={false} />
+          {sessionBrief && (
+            <p className="text-xs text-gray-400 mt-3 leading-relaxed line-clamp-3">{sessionBrief}</p>
+          )}
+        </div>
+
+        {/* Price hero */}
+        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 flex flex-col items-center justify-center">
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Live Price</div>
+          <div className="text-4xl font-bold text-white font-mono tabular-nums">
+            ${currentPrice?.toFixed(2) ?? '—'}
+          </div>
+          <div className="text-lg text-gray-400 font-mono mt-1">
+            NQ {nqPrice?.toLocaleString() ?? '—'}
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+            <span className="text-xs text-gray-500">{connected ? 'LIVE' : 'DISCONNECTED'}</span>
+            {priceVelocity != null && (() => {
+              const abs = Math.abs(priceVelocity), up = priceVelocity > 0
+              const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : '→'
+              const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : 'text-gray-600'
+              return <span className={`text-xs font-bold ${color}`}>{arrow}</span>
+            })()}
+          </div>
+          {focusLevel && currentPrice != null && (
+            <div className="text-xs text-gray-500 mt-2">
+              {Math.abs(currentPrice - focusLevel.price).toFixed(2)} from {focusLevel.id}
+            </div>
+          )}
+        </div>
+
+        {/* Immediate risk */}
+        <ImmediateRiskCard cascade={cascade} levels={levels} structureBreak={sb} />
+      </div>
+
+      {/* Strongest levels */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <SmartLevelCard level={bearLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bearLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bearLevel?.id]}  label="Strongest Resistance" />
+        <SmartLevelCard level={focusLevel} currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[focusLevel?.id]} dpHistory={dpHistory} touches={levelTouches?.[focusLevel?.id]} label="Current Focus" />
+        <SmartLevelCard level={bullLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bullLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bullLevel?.id]}  label="Strongest Support" />
+      </div>
+
+      {/* Evidence meter */}
+      <EvidenceMeter levels={levels} />
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Streak"     value={`${streak}`}    sub="consecutive sessions"                          color="text-green-400" />
+        <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} />
+        <StatCard label="API Budget" value={apiCalls}        sub={`/ ${budget?.workingBudget?.toLocaleString() ?? '14,000'}`} />
+        <StatCard label="GEX Regime" value={status?.expansionGexActive ? 'EXPANSION' : 'PINNING'} sub={`${status?.allPinningSessions ?? '—'} sessions`} color={status?.expansionGexActive ? 'text-red-400' : 'text-green-400'} />
+      </div>
+
+      {/* News */}
+      <NewsHeadlines apiUrl={API_URL} />
+    </div>
+  )
+}
