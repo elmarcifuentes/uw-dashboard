@@ -3,7 +3,9 @@ const TABS = [
   { id: 'Pre-Session',   label: 'Pre-Session'  },
   { id: 'Intraday',      label: 'Intraday',    live: true },
   { id: 'Post-Session',  label: 'Post-Session' },
-  { id: 'Levels',        label: 'Levels',      icon: '⚙' },
+  { id: 'News',          label: 'News'         },
+  { id: 'Levels',        label: 'Levels'       },
+  { id: 'Controls',      label: 'Controls'     },
   { id: 'Guide',         label: 'Guide'        },
 ]
 

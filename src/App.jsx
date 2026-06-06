@@ -6,6 +6,8 @@ import OverviewTab from './components/OverviewTab'
 import PreSession from './components/PreSession'
 import Intraday from './components/Intraday'
 import PostSession from './components/PostSession'
+import NewsTab from './components/NewsTab'
+import ControlsTab from './components/ControlsTab'
 import Guide from './components/Guide'
 import LockModal from './components/LockModal'
 import RestartBanner from './components/RestartBanner'
@@ -57,11 +59,13 @@ function AppInner() {
         <RestartBanner restarted={restarted} hasData={hasData} onDismiss={dismiss} />
 
         <div className="mt-4">
-          {activeTab === 'Overview'     && <OverviewTab />}
+          {activeTab === 'Overview'     && <OverviewTab onNavigate={setActiveTab} />}
           {activeTab === 'Pre-Session'  && <PreSession />}
           {activeTab === 'Intraday'     && <Intraday />}
           {activeTab === 'Post-Session' && <PostSession />}
+          {activeTab === 'News'         && <NewsTab />}
           {activeTab === 'Levels'       && <LevelsTab />}
+          {activeTab === 'Controls'     && <ControlsTab />}
           {activeTab === 'Guide'        && <Guide />}
         </div>
       </main>

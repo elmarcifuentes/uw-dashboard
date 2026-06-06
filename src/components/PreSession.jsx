@@ -93,6 +93,7 @@ export default function PreSession() {
   const [levelNarratives, setLevelNarratives] = useState({})
   const [sessionBrief, setSessionBrief]       = useState(null)
   const [levelTouches, setLevelTouches]       = useState({})
+  const [briefOpen, setBriefOpen]             = useState(true)
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -283,13 +284,37 @@ export default function PreSession() {
   return (
     <div className="space-y-3 py-3">
 
+      {/* Session Brief — full-width above hero */}
+      {sessionBrief && providerStatus?.narrativeMode === 'claude' && (
+        <div className="bg-[#111827] border border-purple-900/40 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-purple-500 text-xs">🤖</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider">Session Brief</span>
+              <span className="text-xs text-gray-700">Claude Haiku</span>
+            </div>
+            <button
+              onClick={() => setBriefOpen(!briefOpen)}
+              className="text-xs text-gray-600 hover:text-gray-400"
+            >
+              {briefOpen ? '▲ collapse' : '▼ expand'}
+            </button>
+          </div>
+          {briefOpen ? (
+            <p className="text-xs text-gray-300 leading-relaxed border-l-2 border-purple-900 pl-3">
+              {sessionBrief}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-600 italic line-clamp-1">
+              {sessionBrief.slice(0, 120)}...
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Row 1 — Three hero cards */}
       <div className="grid grid-cols-3 gap-3">
-        <MarketStateCard
-          sentiment={sentiment}
-          sessionBrief={sessionBrief}
-          narrativeMode={providerStatus?.narrativeMode}
-        />
+        <MarketStateCard sentiment={sentiment} />
         <SessionHeaderCard
           date={data.session}
           sessionType={sessionType}

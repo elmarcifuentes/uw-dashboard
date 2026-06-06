@@ -7,16 +7,14 @@ import PriceSparkline from './intraday/PriceSparkline'
 import DarkPoolChart from './intraday/DarkPoolChart'
 import EtfTideChart from './intraday/EtfTideChart'
 import RescoreLog from './intraday/RescoreLog'
-import Controls from './intraday/Controls'
 import ExpansionGexAlert from './intraday/ExpansionGexAlert'
 import CascadeProximityGauge from './intraday/CascadeProximityGauge'
 import NarrativeBlock from './intraday/NarrativeBlock'
-import NewsHeadlines from './intraday/NewsHeadlines'
 import LiveHeader from './intraday/LiveHeader'
 import RightRail from './intraday/RightRail'
 
-const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'News', 'Log', 'Controls']
-const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'News', 'Log', 'Ctrl']
+const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log']
+const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log']
 
 export default function Intraday() {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -212,9 +210,7 @@ export default function Intraday() {
             </>}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
             {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
-            {subTab === 3 && <NewsHeadlines apiUrl={API_URL} />}
-            {subTab === 4 && <RescoreLog history={history} compact={compact} />}
-            {subTab === 5 && <Controls compact={compact} />}
+            {subTab === 3 && <RescoreLog history={history} compact={compact} />}
           </div>
         </div>
 

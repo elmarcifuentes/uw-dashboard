@@ -52,37 +52,6 @@ export default function SessionHeaderCard({
         </div>
       </div>
 
-      <div className="space-y-1 border-t border-gray-800 pt-2">
-        <div className="flex justify-between text-xs">
-          <span className="text-gray-600">Last fetch</span>
-          <span className="text-gray-400 font-mono">{lastFetch || '—'}</span>
-        </div>
-        {budget && (
-          <div className="flex justify-between text-xs">
-            <span className="text-gray-600">API budget</span>
-            <span className={`font-mono ${
-              budget.status === 'red' ? 'text-red-400'
-                : budget.status === 'amber' ? 'text-amber-400'
-                : 'text-green-400'
-            }`}>
-              {budget.callsToday?.toLocaleString()} / {budget.workingBudget?.toLocaleString()} ({budget.percentUsed}%)
-            </span>
-          </div>
-        )}
-        {providerStatus && (
-          <div className="flex justify-between text-xs">
-            <span className="text-gray-600">Polling</span>
-            <span className="text-gray-400 font-mono">
-              {providerStatus.mode} · {msToLabel(providerStatus.currentInterval)}
-            </span>
-          </div>
-        )}
-        {lastPolled && (
-          <div className="text-xs text-gray-700">
-            polled {lastPolled.toLocaleTimeString()}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

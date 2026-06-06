@@ -3,7 +3,6 @@ import { useSSE } from '../hooks/useSSE'
 import ImmediateRiskCard from './ImmediateRiskCard'
 import EvidenceMeter from './EvidenceMeter'
 import SmartLevelCard from './SmartLevelCard'
-import NewsHeadlines from './intraday/NewsHeadlines'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -17,7 +16,7 @@ function StatCard({ label, value, sub, color = 'text-white' }) {
   )
 }
 
-export default function OverviewTab() {
+export default function OverviewTab({ onNavigate }) {
   const {
     rescoreData, priceData, connected,
     sentiment, sessionBrief, assistantRead, levelNarratives,
@@ -158,8 +157,16 @@ export default function OverviewTab() {
         <StatCard label="GEX Regime" value={status?.expansionGexActive ? 'EXPANSION' : 'PINNING'} sub={`${status?.allPinningSessions ?? '—'} sessions`} color={status?.expansionGexActive ? 'text-red-400' : 'text-green-400'} />
       </div>
 
-      {/* News */}
-      <NewsHeadlines apiUrl={API_URL} />
+      {/* News — link to News tab */}
+      <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 flex items-center justify-between">
+        <span className="text-xs text-gray-500">Market News</span>
+        <button
+          onClick={() => onNavigate?.('News')}
+          className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+        >
+          View all →
+        </button>
+      </div>
     </div>
   )
 }
