@@ -4,12 +4,12 @@ const TABS = [
   { id: 'Intraday',      label: 'Intraday',    live: true },
   { id: 'Post-Session',  label: 'Post-Session' },
   { id: 'News',          label: 'News'         },
-  { id: 'Levels',        label: 'Levels'       },
-  { id: 'Controls',      label: 'Controls'     },
+  { id: 'Levels',        label: 'Levels',      locked: true },
+  { id: 'Controls',      label: 'Controls',    locked: true },
   { id: 'Guide',         label: 'Guide'        },
 ]
 
-export default function TabNav({ active, onChange, connected }) {
+export default function TabNav({ active, onChange, connected, unlocked }) {
   return (
     <div className="flex border-b border-gray-800 bg-[#0a0f1e] sticky top-12 z-40 overflow-x-auto">
       {TABS.map(tab => (
@@ -25,7 +25,7 @@ export default function TabNav({ active, onChange, connected }) {
         >
           {tab.label}
           {tab.live && connected && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />}
-          {tab.icon && <span className="text-gray-600 text-xs">{tab.icon}</span>}
+          {tab.locked && <span className="text-xs">{unlocked ? '🔓' : '🔒'}</span>}
         </button>
       ))}
     </div>

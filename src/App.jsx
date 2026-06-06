@@ -51,7 +51,7 @@ function AppInner() {
         onLockClick={() => setShowModal(true)}
       />
 
-      <TabNav active={activeTab} onChange={setActiveTab} connected={connected} />
+      <TabNav active={activeTab} onChange={setActiveTab} connected={connected} unlocked={unlocked} />
 
       {showStrip && <AssistantStrip assistantRead={assistantRead} />}
 
