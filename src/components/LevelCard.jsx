@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { getLevelProximity, getProximityStyles } from '../utils/proximity'
 import DpSparkline from './DpSparkline'
 import { stripMarkdown } from '../utils/stripMarkdown'
+import { calculateTradeSetup } from '../utils/tradeSetup'
 
 const CLASS_COLOR = {
   sell_resistance: 'text-red-400',
@@ -18,7 +19,7 @@ const CLASS_BORDER = {
 }
 
 export default function LevelCard({
-  level, currentPrice, nqRatio,
+  level, allLevels, currentPrice, nqRatio,
   dpHistory, levelNarrative, levelTouches,
   onSelect,
 }) {
@@ -196,6 +197,60 @@ export default function LevelCard({
               </p>
             </div>
           )}
+
+          {(() => {
+            const setup = calculateTradeSetup(level, allLevels, currentPrice, nqRatio)
+            if (!setup) return null
+            const rrColor = setup.quality === 'excellent' ? 'text-green-400'
+              : setup.quality === 'good' ? 'text-green-500'
+              : setup.quality === 'acceptable' ? 'text-amber-400'
+              : 'text-red-400'
+            const dirColor = setup.direction === 'short' ? 'text-red-400' : 'text-green-400'
+            return (
+              <div className="border-t border-gray-800 pt-2 mt-1">
+                <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">📍 Trade Setup</div>
+                <div className={`text-xs font-bold mb-2 ${dirColor}`}>
+                  {setup.direction.toUpperCase()} from {setup.entry.level}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 w-12">Entry</span>
+                    <span className="text-white font-mono">${setup.entry.qqq?.toFixed(2)}</span>
+                    {setup.entry.nq && <span className="text-gray-500 font-mono">NQ {setup.entry.nq.toLocaleString()}</span>}
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 w-12">Target</span>
+                    <span className="text-green-400 font-mono">${setup.target.qqq?.toFixed(2)}</span>
+                    {setup.target.nq && <span className="text-green-600 font-mono">NQ {setup.target.nq.toLocaleString()}</span>}
+                    <span className="text-gray-600">← {setup.target.level}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 w-12">Stop</span>
+                    <span className="text-red-400 font-mono">${setup.stop.qqq?.toFixed(2)}</span>
+                    {setup.stop.nq && <span className="text-red-600 font-mono">NQ {setup.stop.nq.toLocaleString()}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800 text-xs">
+                  <div className="text-gray-600">Move <span className="text-gray-400 font-mono">${setup.move.qqq}{setup.move.nq ? ` / ${setup.move.nq} NQ` : ''}</span></div>
+                  <div className="text-gray-600">Risk <span className="text-gray-400 font-mono">${setup.risk.qqq}{setup.risk.nq ? ` / ${setup.risk.nq} NQ` : ''}</span></div>
+                  <div className={`font-mono font-bold ${rrColor}`}>{setup.rr}:1</div>
+                </div>
+                <div className={`text-xs mt-1 ${rrColor}`}>
+                  {setup.quality === 'excellent' && '✅ Excellent R/R'}
+                  {setup.quality === 'good'      && '✅ Good R/R'}
+                  {setup.quality === 'acceptable' && '⚠ Acceptable R/R'}
+                  {setup.quality === 'poor'      && '✗ Poor R/R — consider skip'}
+                </div>
+                {setup.flags.length > 0 && (
+                  <div className="mt-1.5 space-y-0.5">
+                    {setup.flags.map((f, i) => (
+                      <div key={i} className="text-xs text-gray-600">{f}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {level.timestamp && (
             <div className="text-xs text-gray-700 text-right">{level.timestamp}</div>

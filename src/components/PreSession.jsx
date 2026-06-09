@@ -400,6 +400,7 @@ export default function PreSession({ assistantRead }) {
           <LevelCard
             key={level.id}
             level={level}
+            allLevels={sortedLevels}
             nqRatio={nqRatio}
             dpHistory={providerStatus?.dpHistory || {}}
             levelNarrative={levelNarratives[level.id]}
