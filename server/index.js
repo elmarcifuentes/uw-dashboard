@@ -1852,6 +1852,24 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
       console.warn('[labs] NQ fetch failed:', nqErr.message)
     }
 
+    if (!nqLevels && qqqLevels) {
+      const ratio = latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
+      nqLevels = {
+        R2:      Math.round(qqqLevels.R2      * ratio * 4) / 4,
+        R1:      Math.round(qqqLevels.R1      * ratio * 4) / 4,
+        MID:     Math.round(qqqLevels.MID     * ratio * 4) / 4,
+        S1:      Math.round(qqqLevels.S1      * ratio * 4) / 4,
+        S2:      Math.round(qqqLevels.S2      * ratio * 4) / 4,
+        atr:     Math.round(qqqLevels.atr     * ratio * 4) / 4,
+        holdAtr: Math.round(qqqLevels.holdAtr * ratio * 4) / 4,
+        avgBase: Math.round(qqqLevels.avgBase * ratio * 4) / 4,
+        ticker: 'NQ', source: 'derived_from_qqq', interval,
+        derivedRatio: ratio,
+        note: 'Derived from QQQ × ratio (add POLYGON_API_KEY for native NQ)'
+      }
+      console.log(`[labs] NQ derived from QQQ: ratio=${ratio} R1=${nqLevels.R1} MID=${nqLevels.MID}`)
+    }
+
     labsAutoLevels = { qqq: qqqLevels, nq: nqLevels, lastCalculated: new Date().toISOString(), interval, settings: labsSettings }
     db.prepare(`
       INSERT INTO settings (key, value, updated_at)

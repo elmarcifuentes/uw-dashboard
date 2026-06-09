@@ -65,11 +65,17 @@ export default function LevelComparison({
         })}
       </div>
 
-      <div className="mt-3 pt-3 border-t border-gray-800">
+      <div className="mt-3 pt-3 border-t border-gray-800 space-y-1.5">
         <div className="text-xs text-gray-600">
           Predictive Ranges · {interval || autoLevels.interval || '1d'} bars · length=200 factor=6.0
           · {isNQ ? 'NQ' : 'QQQ'} · ATR {isNQ ? autoLevels.atr?.toFixed(0) : `$${autoLevels.atr?.toFixed(2)}`}
         </div>
+        {autoLevels?.source === 'derived_from_qqq' && (
+          <div className="text-xs text-amber-600 flex items-center gap-1">
+            <span>⚠</span>
+            <span>Derived from QQQ × {autoLevels.derivedRatio?.toFixed(2)} — add POLYGON_API_KEY for native NQ</span>
+          </div>
+        )}
       </div>
     </div>
   )
