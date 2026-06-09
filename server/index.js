@@ -111,6 +111,16 @@ try {
   }
 } catch {}
 
+// Auto-score toggle — default ON
+let autoScoreEnabled = true
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'auto_score_enabled'`).get()
+  if (saved?.value !== undefined) {
+    autoScoreEnabled = saved.value === 'true'
+    console.log('[scoring] auto-score restored:', autoScoreEnabled)
+  }
+} catch {}
+
 // Restore pause state from SQLite
 {
   try {
@@ -1121,6 +1131,7 @@ app.get('/status', (req, res) => {
       : null,
     levelSourceMode,
     nqOffsets,
+    autoScoreEnabled,
   })
 })
 
@@ -1997,8 +2008,8 @@ async function applyAutoLevelsIfEnabled() {
     levelData, timestamp: new Date().toISOString(),
   })
 
-  // Trigger rescore with the freshly-saved levels
-  if (runFullScore) {
+  // Trigger rescore with the freshly-saved levels (only if auto-score enabled)
+  if (autoScoreEnabled && runFullScore) {
     setTimeout(async () => {
       try {
         const levelsForScoring = getLevelsForScoring(db)
@@ -2191,6 +2202,19 @@ app.post('/labs/apply-to-main', async (req, res) => {
       console.error('[labs] apply rescore failed:', err.message)
     }
   }
+})
+
+app.post('/scoring/auto-score', (req, res) => {
+  const { enabled } = req.body
+  autoScoreEnabled = !!enabled
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('auto_score_enabled', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(String(autoScoreEnabled))
+  console.log('[scoring] auto-score:', autoScoreEnabled)
+  sseEmitter.emit('event', { type: 'auto_score_changed', enabled: autoScoreEnabled, timestamp: new Date().toISOString() })
+  res.json({ success: true, autoScoreEnabled })
 })
 
 app.post('/levels/source-mode', async (req, res) => {
