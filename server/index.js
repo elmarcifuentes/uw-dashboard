@@ -1903,13 +1903,60 @@ try {
 // Calculate fresh on startup (async, non-blocking)
 calculateLabsLevels(labsSettings.interval)
 
-// Schedule daily recalc at 6:30pm ET Mon-Fri via dynamic import
+// ─── LABS CRON HELPERS ───────────────────────────────────────────────────────
+
+let labsCron      = null  // cron module instance, set once import resolves
+let labsCronTasks = []    // cancelable task handles
+
+function levelsChanged(oldLevels, newLevels) {
+  if (!oldLevels || !newLevels) return false
+  return oldLevels.MID !== newLevels.MID ||
+         oldLevels.R1  !== newLevels.R1  ||
+         oldLevels.S1  !== newLevels.S1
+}
+
+function handleLabsUpdate(result) {
+  if (!result) return
+  const old = labsAutoLevels?.qqq
+  if (levelsChanged(old, result?.qqq)) {
+    console.log('[labs] ⚡ levels shifted')
+    sseEmitter.emit('event', { type: 'labs_levels_changed', levels: result, changedAt: new Date().toISOString() })
+  } else {
+    sseEmitter.emit('event', { type: 'labs_levels_update', levels: result, timestamp: new Date().toISOString() })
+  }
+}
+
+function setupLabsCron(cron, interval) {
+  labsCronTasks.forEach(t => { try { t.stop() } catch (e) {} })
+  labsCronTasks = []
+
+  const intraSchedule = interval === '1m'
+    ? '* 9-16 * * 1-5'
+    : interval === '5m'
+    ? '*/5 9-16 * * 1-5'
+    : '*/15 9-16 * * 1-5'
+
+  labsCronTasks.push(cron.schedule(intraSchedule, () => {
+    if (!systemPaused) calculateLabsLevels(labsSettings.interval).then(handleLabsUpdate)
+  }, { timezone: 'America/New_York' }))
+
+  labsCronTasks.push(cron.schedule('35 16 * * 1-5', () => {
+    console.log('[labs] end of day recalc')
+    calculateLabsLevels(labsSettings.interval).then(handleLabsUpdate)
+  }, { timezone: 'America/New_York' }))
+
+  labsCronTasks.push(cron.schedule('0 9 * * 1-5', () => {
+    console.log('[labs] pre-market recalc')
+    calculateLabsLevels(labsSettings.interval).then(handleLabsUpdate)
+  }, { timezone: 'America/New_York' }))
+
+  console.log(`[labs] crons set: intra=${intraSchedule} + 9:00am + 4:35pm ET`)
+}
+
+// Schedule via dynamic import (ESM-compatible, graceful if node-cron not installed)
 import('node-cron').then(({ default: cron }) => {
-  cron.schedule('30 18 * * 1-5', () => {
-    console.log('[labs] daily recalc triggered')
-    calculateLabsLevels(labsSettings.interval)
-  }, { timezone: 'America/New_York' })
-  console.log('[labs] daily cron scheduled for 6:30pm ET')
+  labsCron = cron
+  setupLabsCron(cron, labsSettings.interval)
 }).catch(e => {
   console.log('[labs] node-cron not available:', e.message)
 })
@@ -1934,6 +1981,7 @@ app.post('/labs/settings', async (req, res) => {
   const validIntervals = ['1m', '5m', '15m', '1h', '1d']
   if (interval && !validIntervals.includes(interval))
     return res.status(400).json({ error: 'Invalid interval' })
+  const prevInterval = labsSettings.interval
   if (interval) labsSettings.interval = interval
   if (length)   labsSettings.length   = parseInt(length)
   if (mult)     labsSettings.mult     = parseFloat(mult)
@@ -1943,6 +1991,9 @@ app.post('/labs/settings', async (req, res) => {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(JSON.stringify(labsSettings))
   console.log('[labs] settings updated:', labsSettings)
+  if (interval && interval !== prevInterval && labsCron) {
+    setupLabsCron(labsCron, labsSettings.interval)
+  }
   await calculateLabsLevels(labsSettings.interval)
   res.json({ success: true, settings: labsSettings, levels: labsAutoLevels })
 })
