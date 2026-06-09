@@ -18,7 +18,7 @@ function StatCard({ label, value, sub, color = 'text-white' }) {
   )
 }
 
-export default function OverviewTab({ onNavigate }) {
+export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
   const {
     rescoreData, priceData, connected,
     sentiment, sessionBrief, assistantRead, levelNarratives,
@@ -45,7 +45,7 @@ export default function OverviewTab({ onNavigate }) {
   const levels       = result?.levels || []
   const nqRatio      = result?.nq_ratio ? Number(result.nq_ratio) : null
   const currentPrice = priceData?.price ?? result?.current_price
-  const nqPrice      = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio) : null
+  const nqPrice      = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio * 4) / 4 : null
   const cascade      = result?.cascade ?? null
   const sb           = result?.structure_break ?? null
 
@@ -122,10 +122,14 @@ export default function OverviewTab({ onNavigate }) {
         <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 flex flex-col items-center justify-center">
           <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Live Price</div>
           <div className="text-4xl font-bold text-white font-mono tabular-nums">
-            ${currentPrice?.toFixed(2) ?? '—'}
+            {activeSymbol === 'NQ'
+              ? (nqPrice != null ? nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+              : `$${currentPrice?.toFixed(2) ?? '—'}`}
           </div>
           <div className="text-lg text-gray-400 font-mono mt-1">
-            NQ {nqPrice?.toLocaleString() ?? '—'}
+            {activeSymbol === 'NQ'
+              ? `QQQ $${currentPrice?.toFixed(2) ?? '—'}`
+              : `NQ ${nqPrice?.toLocaleString() ?? '—'}`}
           </div>
           <div className="flex items-center gap-2 mt-3">
             <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascade?.active ? 'animate-pulse' : ''}`} />
@@ -156,9 +160,9 @@ export default function OverviewTab({ onNavigate }) {
 
       {/* Strongest levels */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <SmartLevelCard level={bearLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bearLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bearLevel?.id]}  label="Strongest Resistance" />
-        <SmartLevelCard level={focusLevel} currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[focusLevel?.id]} dpHistory={dpHistory} touches={levelTouches?.[focusLevel?.id]} label="Current Focus" />
-        <SmartLevelCard level={bullLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bullLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bullLevel?.id]}  label="Strongest Support" />
+        <SmartLevelCard level={bearLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bearLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bearLevel?.id]}  label="Strongest Resistance" activeSymbol={activeSymbol} />
+        <SmartLevelCard level={focusLevel} currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[focusLevel?.id]} dpHistory={dpHistory} touches={levelTouches?.[focusLevel?.id]} label="Current Focus" activeSymbol={activeSymbol} />
+        <SmartLevelCard level={bullLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bullLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bullLevel?.id]}  label="Strongest Support" activeSymbol={activeSymbol} />
       </div>
 
       {/* Evidence meter */}

@@ -21,7 +21,7 @@ const CLASS_BORDER = {
 export default function LevelCard({
   level, allLevels, currentPrice, nqRatio,
   dpHistory, levelNarrative, levelTouches,
-  onSelect,
+  onSelect, activeSymbol = 'NQ',
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -47,12 +47,13 @@ export default function LevelCard({
       <div className="px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className={`text-base font-bold shrink-0 ${classColor}`}>{level.id}</span>
-          <span className="text-white font-mono font-semibold text-sm tabular-nums">
-            ${level.price?.toFixed(2)}
-          </span>
-          {nq && (
-            <span className="text-xs text-gray-600 font-mono hidden sm:inline">
-              NQ {nq.toLocaleString()}
+          {activeSymbol === 'NQ' ? (
+            <span className="text-white font-mono font-semibold text-sm tabular-nums">
+              NQ {nq?.toFixed(2) ?? '—'}
+            </span>
+          ) : (
+            <span className="text-white font-mono font-semibold text-sm tabular-nums">
+              ${level.price?.toFixed(2)}
             </span>
           )}
         </div>
@@ -67,11 +68,16 @@ export default function LevelCard({
         </div>
 
         <div className="text-right shrink-0">
-          {distStr && (
-            <div className="text-sm font-mono font-bold text-gray-300">{distStr}</div>
-          )}
-          {distNq && (
-            <div className="text-xs text-gray-600 font-mono">{distNq} NQ</div>
+          {activeSymbol === 'NQ' ? (
+            distNq != null && (
+              <div className="text-sm font-mono font-bold text-gray-300">
+                {dist >= 0 ? '+' : '-'}{distNq.toFixed(2)} NQ
+              </div>
+            )
+          ) : (
+            distStr && (
+              <div className="text-sm font-mono font-bold text-gray-300">{distStr}</div>
+            )
           )}
         </div>
       </div>
@@ -215,24 +221,37 @@ export default function LevelCard({
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 w-12">Entry</span>
-                    <span className="text-white font-mono">${setup.entry.qqq?.toFixed(2)}</span>
-                    {setup.entry.nq && <span className="text-gray-500 font-mono">NQ {setup.entry.nq.toLocaleString()}</span>}
+                    <span className="text-white font-mono">
+                      {activeSymbol === 'NQ'
+                        ? (setup.entry.nq ? `NQ ${setup.entry.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
+                        : `$${setup.entry.qqq?.toFixed(2)}`}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 w-12">Target</span>
-                    <span className="text-green-400 font-mono">${setup.target.qqq?.toFixed(2)}</span>
-                    {setup.target.nq && <span className="text-green-600 font-mono">NQ {setup.target.nq.toLocaleString()}</span>}
+                    <span className={`font-mono ${activeSymbol === 'NQ' ? 'text-green-600' : 'text-green-400'}`}>
+                      {activeSymbol === 'NQ'
+                        ? (setup.target.nq ? `NQ ${setup.target.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
+                        : `$${setup.target.qqq?.toFixed(2)}`}
+                    </span>
                     <span className="text-gray-600">← {setup.target.level}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 w-12">Stop</span>
-                    <span className="text-red-400 font-mono">${setup.stop.qqq?.toFixed(2)}</span>
-                    {setup.stop.nq && <span className="text-red-600 font-mono">NQ {setup.stop.nq.toLocaleString()}</span>}
+                    <span className={`font-mono ${activeSymbol === 'NQ' ? 'text-red-600' : 'text-red-400'}`}>
+                      {activeSymbol === 'NQ'
+                        ? (setup.stop.nq ? `NQ ${setup.stop.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
+                        : `$${setup.stop.qqq?.toFixed(2)}`}
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800 text-xs">
-                  <div className="text-gray-600">Move <span className="text-gray-400 font-mono">${setup.move.qqq}{setup.move.nq ? ` / ${setup.move.nq} NQ` : ''}</span></div>
-                  <div className="text-gray-600">Risk <span className="text-gray-400 font-mono">${setup.risk.qqq}{setup.risk.nq ? ` / ${setup.risk.nq} NQ` : ''}</span></div>
+                  <div className="text-gray-600">Move <span className="text-gray-400 font-mono">
+                    {activeSymbol === 'NQ' ? (setup.move.nq ? `${setup.move.nq} NQ` : '—') : `$${setup.move.qqq}`}
+                  </span></div>
+                  <div className="text-gray-600">Risk <span className="text-gray-400 font-mono">
+                    {activeSymbol === 'NQ' ? (setup.risk.nq ? `${setup.risk.nq} NQ` : '—') : `$${setup.risk.qqq}`}
+                  </span></div>
                   <div className={`font-mono font-bold ${rrColor}`}>{setup.rr}:1</div>
                 </div>
                 <div className={`text-xs mt-1 ${rrColor}`}>

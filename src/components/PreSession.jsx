@@ -81,7 +81,7 @@ function GexCageSummary({ levels }) {
   )
 }
 
-export default function PreSession({ assistantRead }) {
+export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
   const [data, setData]             = useState(null)
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
@@ -406,6 +406,7 @@ export default function PreSession({ assistantRead }) {
             levelNarrative={levelNarratives[level.id]}
             currentPrice={data?.current_price}
             levelTouches={levelTouches[level.id]}
+            activeSymbol={activeSymbol}
           />
         ))}
       </div>

@@ -114,7 +114,7 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel }) {
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel, activeSymbol = 'NQ' }) {
   const [expandedLevel, setExpandedLevel] = useState(null)
   const [flashLevel, setFlashLevel]       = useState(null)
   const prevPriceRef = useRef(currentPrice)
@@ -164,7 +164,9 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         <div className="flex items-center gap-2 px-2 py-1">
           <div className="flex-1 h-px bg-yellow-400/60" />
           <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse bg-yellow-400/10 px-2 py-0.5 rounded">
-            ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${(Math.round(cp * nqRatio * 4) / 4).toLocaleString()}` : ''} — above structure
+            {activeSymbol === 'NQ'
+              ? `▶ NQ ${nqRatio ? (Math.round(cp * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'} — above structure`
+              : `▶ QQQ $${cp.toFixed(2)} — above structure`}
           </span>
           <div className="flex-1 h-px bg-yellow-400/60" />
         </div>
@@ -205,28 +207,37 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                 <span className="font-mono font-bold text-sm w-8" style={{ color: colors.text }}>
                   {level.id}
                 </span>
-                <span className="text-white font-mono font-medium">
-                  ${level.price?.toFixed(2) ?? '—'}
-                </span>
-                {result.nq_ratio && (
-                  <span className="text-gray-400 font-mono font-medium">
-                    / NQ {(Math.round(level.price * result.nq_ratio * 4) / 4).toLocaleString()}
+                {activeSymbol === 'NQ' ? (
+                  <span className="text-white font-mono font-medium">
+                    NQ {result.nq_ratio ? (Math.round(level.price * result.nq_ratio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
                   </span>
+                ) : (
+                  <>
+                    <span className="text-white font-mono font-medium">
+                      ${level.price?.toFixed(2) ?? '—'}
+                    </span>
+                    {result.nq_ratio && (
+                      <span className="text-gray-500 font-mono text-xs">
+                        / NQ {(Math.round(level.price * result.nq_ratio * 4) / 4).toLocaleString()}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {level.full_stack  && <span className="text-yellow-400 text-xs font-bold">★</span>}
-                {distStr != null && (
-                  <div className="flex flex-col items-end">
+                {activeSymbol === 'NQ' ? (
+                  nqDistStr && (
+                    <span className={`text-xs font-mono tabular-nums ${isAbove ? 'text-green-400' : 'text-red-400'}`}>
+                      {nqDistStr} NQ
+                    </span>
+                  )
+                ) : (
+                  distStr != null && (
                     <span className={`text-xs font-mono tabular-nums ${isAbove ? 'text-green-400' : 'text-red-400'}`}>
                       {distStr}
                     </span>
-                    {nqDistStr && (
-                      <span className={`text-xs font-mono tabular-nums ${isAbove ? 'text-green-300' : 'text-red-300'}`}>
-                        {nqDistStr} NQ
-                      </span>
-                    )}
-                  </div>
+                  )
                 )}
               </div>
             </div>
@@ -423,7 +434,9 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
             <div className="flex items-center gap-2 px-2 py-0.5">
               <div className="flex-1 h-px bg-yellow-400/60" />
               <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 bg-yellow-400/10 px-2 py-0.5 rounded">
-                ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${(Math.round(cp * nqRatio * 4) / 4).toLocaleString()}` : ''}
+                {activeSymbol === 'NQ'
+                  ? `▶ NQ ${nqRatio ? (Math.round(cp * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}`
+                  : `▶ QQQ $${cp.toFixed(2)}`}
               </span>
               <div className="flex-1 h-px bg-yellow-400/60" />
             </div>
@@ -437,7 +450,9 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         <div className="flex items-center gap-2 px-2 py-1">
           <div className="flex-1 h-px bg-yellow-400/60" />
           <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse bg-yellow-400/10 px-2 py-0.5 rounded">
-            ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${(Math.round(cp * nqRatio * 4) / 4).toLocaleString()}` : ''} — below structure
+            {activeSymbol === 'NQ'
+              ? `▶ NQ ${nqRatio ? (Math.round(cp * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'} — below structure`
+              : `▶ QQQ $${cp.toFixed(2)} — below structure`}
           </span>
           <div className="flex-1 h-px bg-yellow-400/60" />
         </div>
@@ -455,14 +470,15 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           <div className="border border-yellow-400/30 rounded-lg px-3 py-2 bg-yellow-400/5 mt-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-yellow-400 font-mono font-bold text-sm">
-                ▶ QQQ ${cp?.toFixed(2) ?? '—'}
-                {nqPrice && <span className="text-yellow-300 ml-2">/ NQ {nqPrice}</span>}
+                {activeSymbol === 'NQ'
+                  ? `▶ NQ ${nqPrice ?? '—'}`
+                  : `▶ QQQ $${cp?.toFixed(2) ?? '—'}`}
               </span>
               {nearest && nearDist !== null && (
                 <span className="text-yellow-300 text-xs font-mono">
-                  {parseFloat(nearDist) >= 0 ? '+' : ''}{nearDist}
-                  {nqRatio ? ` / ${Math.round(Math.abs(parseFloat(nearDist)) * nqRatio * 4) / 4} NQ` : ''}
-                  {' '}from {nearest.id}
+                  {activeSymbol === 'NQ'
+                    ? `${parseFloat(nearDist) >= 0 ? '+' : ''}${nqRatio ? (Math.round(Math.abs(parseFloat(nearDist)) * nqRatio * 4) / 4).toFixed(2) : '—'} NQ from ${nearest.id}`
+                    : `${parseFloat(nearDist) >= 0 ? '+' : ''}${Math.abs(parseFloat(nearDist)).toFixed(2)} from ${nearest.id}`}
                 </span>
               )}
             </div>

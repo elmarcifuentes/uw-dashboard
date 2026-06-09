@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
+const SYMBOLS = [
+  { id: 'NQ',  label: 'NQ',  color: 'text-blue-400' },
+  { id: 'QQQ', label: 'QQQ', color: 'text-white' },
+]
+
 function SessionTypeChip() {
   const etHour = parseInt(new Date().toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/New_York' }))
   const label  = etHour >= 9 && etHour < 16 ? 'LIVE' : etHour >= 4 && etHour < 9 ? 'PRE-MKT' : 'AFTER-HRS'
@@ -17,7 +22,7 @@ function formatPausedTime(isoString) {
   } catch { return '' }
 }
 
-export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive, systemPaused, pausedAt }) {
+export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive, systemPaused, pausedAt, activeSymbol = 'NQ', onSymbolChange }) {
   const [showInfo, setShowInfo] = useState(false)
 
   return (
@@ -60,16 +65,35 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
           )}
         </div>
 
-        {/* Market context — center */}
-        <div className="flex items-center gap-3 text-xs">
+        {/* Symbol selector */}
+        <div className="flex items-center gap-1 bg-gray-800/60 rounded-lg p-0.5 shrink-0">
+          {SYMBOLS.map(s => (
+            <button
+              key={s.id}
+              onClick={() => onSymbolChange?.(s.id)}
+              className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                activeSymbol === s.id
+                  ? `bg-[#111827] ${s.color} shadow-sm`
+                  : 'text-gray-600 hover:text-gray-400'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Live price — changes with symbol */}
+        <div className="flex items-center gap-2 text-xs">
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascadeActive ? 'animate-pulse' : ''}`} />
-          <span className="text-white font-mono font-bold">
-            QQQ ${price?.toFixed(2) ?? '—'}
-          </span>
-          <span className="text-gray-500 hidden sm:inline">/</span>
-          <span className="text-gray-300 font-mono hidden sm:inline">
-            NQ {nqPrice?.toLocaleString() ?? '—'}
-          </span>
+          {activeSymbol === 'NQ' ? (
+            <span className="text-white font-mono font-bold text-sm">
+              NQ {nqPrice != null ? nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+            </span>
+          ) : (
+            <span className="text-white font-mono font-bold text-sm">
+              QQQ ${price?.toFixed(2) ?? '—'}
+            </span>
+          )}
           <span className="text-gray-600 hidden sm:block">
             {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' })}
           </span>

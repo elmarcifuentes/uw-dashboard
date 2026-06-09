@@ -5,7 +5,7 @@ import { stripMarkdown } from '../utils/stripMarkdown'
 const CLS_COLOR  = { sell_resistance: 'text-red-400',   buy_support: 'text-green-400',  no_edge: 'text-gray-400',  continuation: 'text-blue-400'  }
 const CLS_BORDER = { sell_resistance: 'border-red-900',  buy_support: 'border-green-900', no_edge: 'border-gray-800', continuation: 'border-blue-900' }
 
-export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative, dpHistory, variant = 'standard', label, touches }) {
+export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative, dpHistory, variant = 'standard', label, touches, activeSymbol = 'NQ' }) {
   const [expanded, setExpanded] = useState(false)
 
   if (!level) return (
@@ -22,10 +22,10 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
     </div>
   )
 
-  const nq        = nqRatio ? Math.round(level.price * nqRatio) : null
+  const nq        = nqRatio ? Math.round(level.price * nqRatio * 4) / 4 : null
   const dist      = currentPrice != null ? (currentPrice - level.price) : null
   const distStr   = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
-  const distNq    = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio) : null
+  const distNq    = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio * 4) / 4 : null
   const clsCls    = level.classification || 'no_edge'
   const textColor = CLS_COLOR[clsCls]  || CLS_COLOR.no_edge
   const borderCls = CLS_BORDER[clsCls] || CLS_BORDER.no_edge
@@ -34,10 +34,16 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
     <div className={`border rounded-lg p-3 bg-[#111827] ${borderCls}`}>
       <div className="flex items-center justify-between">
         <span className={`text-sm font-bold ${textColor}`}>{level.id}</span>
-        <span className="text-xs font-mono text-white">${level.price?.toFixed(2)}</span>
+        {activeSymbol === 'NQ' ? (
+          <span className="text-xs font-mono text-white">NQ {nq?.toFixed(2) ?? '—'}</span>
+        ) : (
+          <span className="text-xs font-mono text-white">${level.price?.toFixed(2)}</span>
+        )}
       </div>
       <div className="text-xs text-gray-500 mt-0.5">{clsCls.replace('_', ' ').toUpperCase()}</div>
-      {distStr && <div className="text-xs text-gray-600 mt-1">{distStr}{distNq ? ` / ${distNq} NQ` : ''}</div>}
+      {activeSymbol === 'NQ'
+        ? distNq != null && <div className="text-xs text-gray-600 mt-1">{dist >= 0 ? '+' : '-'}{distNq.toFixed(2)} NQ</div>
+        : distStr && <div className="text-xs text-gray-600 mt-1">{distStr}</div>}
     </div>
   )
 
@@ -58,15 +64,21 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
         <div>
           <div className="flex items-baseline gap-2">
             <span className={`text-xl font-bold ${textColor}`}>{level.id}</span>
-            <span className="text-white font-mono font-semibold text-lg">
-              ${level.price?.toFixed(2)}
-            </span>
+            {activeSymbol === 'NQ' ? (
+              <span className="text-white font-mono font-semibold text-lg">
+                NQ {nq?.toFixed(2) ?? '—'}
+              </span>
+            ) : (
+              <span className="text-white font-mono font-semibold text-lg">
+                ${level.price?.toFixed(2)}
+              </span>
+            )}
           </div>
-          {nq && (
-            <div className="text-xs text-gray-500 font-mono mt-0.5">
-              NQ {nq.toLocaleString()}
-            </div>
-          )}
+          <div className="text-xs text-gray-500 font-mono mt-0.5">
+            {activeSymbol === 'NQ'
+              ? `QQQ $${level.price?.toFixed(2)}`
+              : (nq ? `NQ ${nq.toLocaleString()}` : null)}
+          </div>
           <div className={`text-xs font-medium mt-1 ${textColor}`}>
             {level.classification?.replace('_', ' ').toUpperCase()}
             {level.confidence && level.confidence.toLowerCase() !== 'none' && (
@@ -78,14 +90,19 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
         </div>
 
         {/* Distance — right side */}
-        {distStr && (
-          <div className="text-right shrink-0">
-            <div className="text-base font-mono font-bold text-gray-300">{distStr}</div>
-            {distNq && (
-              <div className="text-xs text-gray-600 font-mono">{distNq} NQ</div>
-            )}
-          </div>
-        )}
+        <div className="text-right shrink-0">
+          {activeSymbol === 'NQ' ? (
+            distNq != null && (
+              <div className="text-base font-mono font-bold text-gray-300">
+                {dist >= 0 ? '+' : '-'}{distNq.toFixed(2)} NQ
+              </div>
+            )
+          ) : (
+            distStr && (
+              <div className="text-base font-mono font-bold text-gray-300">{distStr}</div>
+            )
+          )}
+        </div>
       </div>
 
       {/* Divider */}

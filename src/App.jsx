@@ -15,6 +15,7 @@ import RestartBanner from './components/RestartBanner'
 import LevelsTab from './components/LevelsTab'
 import { useServerHealth } from './hooks/useServerHealth'
 import { useSSE } from './hooks/useSSE'
+import { useSymbol } from './hooks/useSymbol'
 import { LayoutProvider } from './context/LayoutContext'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/AuthContext'
@@ -28,13 +29,14 @@ function AppInner() {
   const [showModal, setShowModal] = useState(false)
   const { unlocked } = useAuth()
   const { restarted, hasData, dismiss } = useServerHealth(API_URL)
+  const { activeSymbol, changeSymbol } = useSymbol()
 
   const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt } = useSSE(`${API_URL}/stream`)
 
   const result        = useMemo(() => rescoreData?.result ?? null, [rescoreData])
   const currentPrice  = priceData?.price ?? result?.current_price
   const nqRatio       = result?.nq_ratio ? Number(result.nq_ratio) : null
-  const nqPrice       = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio) : null
+  const nqPrice       = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio * 4) / 4 : null
   const cascadeActive = result?.cascade?.active ?? false
 
   useEffect(() => { localStorage.setItem('uw-active-tab', activeTab) }, [activeTab])
@@ -54,6 +56,8 @@ function AppInner() {
         cascadeActive={cascadeActive}
         systemPaused={systemPaused}
         pausedAt={pausedAt}
+        activeSymbol={activeSymbol}
+        onSymbolChange={changeSymbol}
       />
 
       <TabNav active={activeTab} onChange={setActiveTab} connected={connected} unlocked={unlocked} />
@@ -64,9 +68,9 @@ function AppInner() {
         <RestartBanner restarted={restarted} hasData={hasData} onDismiss={dismiss} />
 
         <div className="mt-4">
-          {activeTab === 'Overview'     && <OverviewTab onNavigate={setActiveTab} />}
-          {activeTab === 'Pre-Session'  && <PreSession assistantRead={assistantRead} />}
-          {activeTab === 'Intraday'     && <Intraday />}
+          {activeTab === 'Overview'     && <OverviewTab onNavigate={setActiveTab} activeSymbol={activeSymbol} />}
+          {activeTab === 'Pre-Session'  && <PreSession assistantRead={assistantRead} activeSymbol={activeSymbol} />}
+          {activeTab === 'Intraday'     && <Intraday activeSymbol={activeSymbol} />}
           {activeTab === 'Post-Session' && <PostSession />}
           {activeTab === 'News'         && <NewsTab />}
           {activeTab === 'Levels'       && <LevelsTab />}

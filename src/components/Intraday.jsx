@@ -18,7 +18,7 @@ import LevelDetailSheet from './intraday/LevelDetailSheet'
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log']
 
-export default function Intraday() {
+export default function Intraday({ activeSymbol = 'NQ' }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
   const {
     rescoreData, priceData, connected,
@@ -81,7 +81,7 @@ export default function Intraday() {
   const lastUpdate = useMemo(() => rescoreData?.timestamp ?? null, [rescoreData])
 
   const currentPrice = priceData?.price ?? result?.current_price
-  const nqPrice      = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio) : null
+  const nqPrice      = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio * 4) / 4 : null
 
   useEffect(() => {
     if (!soundEnabled || !currentPrice || !result?.levels) return
@@ -170,6 +170,7 @@ export default function Intraday() {
         compact={compact}
         onFocus={() => setFocusMode(true)}
         cascadeActive={cascade?.active}
+        activeSymbol={activeSymbol}
       />
 
       {/* Chart stale badge */}
@@ -246,7 +247,7 @@ export default function Intraday() {
           <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
             {subTab === 0 && <>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} />
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} />
             </>}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
             {subTab === 2 && <EtfTideChart history={history} compact={compact} />}

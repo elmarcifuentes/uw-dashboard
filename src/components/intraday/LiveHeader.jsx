@@ -4,6 +4,7 @@ export default function LiveHeader({
   connected, price, nqPrice, velocity,
   sentiment, drawing, drawResult, unlocked,
   onDrawQqq, onDrawBoth, onCompact, compact, onFocus, cascadeActive,
+  activeSymbol = 'NQ',
 }) {
   const [showOverflow, setShowOverflow] = useState(false)
   const abs = velocity != null ? Math.abs(velocity) : 0
@@ -44,14 +45,22 @@ export default function LiveHeader({
 
       {/* Price hero */}
       <div className="flex items-baseline gap-2">
-        <span className="text-xl font-bold text-white font-mono tabular-nums">
-          ${price?.toFixed(2) ?? '—'}
-        </span>
+        {activeSymbol === 'NQ' ? (
+          <span className="text-xl font-bold text-white font-mono tabular-nums">
+            NQ {nqPrice != null ? nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+          </span>
+        ) : (
+          <span className="text-xl font-bold text-white font-mono tabular-nums">
+            ${price?.toFixed(2) ?? '—'}
+          </span>
+        )}
         {velocity != null && (
           <span className={`text-xs font-bold ${arrowColor}`}>{arrow}</span>
         )}
         <span className="text-sm text-gray-500 font-mono hidden sm:inline">
-          / NQ {nqPrice?.toLocaleString() ?? '—'}
+          {activeSymbol === 'NQ'
+            ? `/ QQQ $${price?.toFixed(2) ?? '—'}`
+            : `/ NQ ${nqPrice?.toLocaleString() ?? '—'}`}
         </span>
       </div>
 
