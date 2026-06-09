@@ -1717,6 +1717,235 @@ app.get('/narrative', (req, res) => {
   res.json({ narrative: lastNarrative, timestamp: new Date().toISOString() })
 })
 
+// ─── LABS: Auto Level Detection ─────────────────────────────────────────────
+
+let labsAutoLevels = { qqq: null, nq: null, lastCalculated: null }
+
+async function fetchOHLC(ticker, bars = 250) {
+  const POLYGON_KEY = process.env.POLYGON_API_KEY
+  if (POLYGON_KEY) {
+    const to   = new Date().toISOString().split('T')[0]
+    const from = new Date(Date.now() - bars * 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const url  = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=${bars}&apiKey=${POLYGON_KEY}`
+    const res  = await fetch(url)
+    const data = await res.json()
+    if (data.results?.length > 0) {
+      return {
+        closes: data.results.map(r => r.c),
+        highs:  data.results.map(r => r.h),
+        lows:   data.results.map(r => r.l),
+        source: 'polygon'
+      }
+    }
+  }
+  const yTicker = ticker === '/NQ' ? 'NQ=F' : ticker
+  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${yTicker}?interval=1d&range=14mo`
+  const res  = await fetch(url)
+  const data = await res.json()
+  const result = data.chart.result[0]
+  return {
+    closes: result.indicators.quote[0].close,
+    highs:  result.indicators.quote[0].high,
+    lows:   result.indicators.quote[0].low,
+    source: 'yahoo'
+  }
+}
+
+function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0) {
+  const valid = closes.reduce((acc, c, i) => {
+    if (c && highs[i] && lows[i]) acc.push({ c, h: highs[i], l: lows[i] })
+    return acc
+  }, [])
+  const n = valid.length
+  if (n < length + 1) return null
+
+  let atr = 0
+  for (let i = 1; i <= length; i++) {
+    const tr = Math.max(
+      valid[i].h - valid[i].l,
+      Math.abs(valid[i].h - valid[i-1].c),
+      Math.abs(valid[i].l - valid[i-1].c)
+    )
+    atr += tr
+  }
+  atr = atr / length
+  for (let i = length + 1; i < n; i++) {
+    const tr = Math.max(
+      valid[i].h - valid[i].l,
+      Math.abs(valid[i].h - valid[i-1].c),
+      Math.abs(valid[i].l - valid[i-1].c)
+    )
+    atr = (atr * (length - 1) + tr) / length
+  }
+  atr = atr * mult
+
+  let avg = valid[0].c
+  let holdAtr = 0
+  let prevAvg = avg
+  for (let i = 1; i < n; i++) {
+    const src = valid[i].c
+    prevAvg = avg
+    if (src - avg > atr)      avg = avg + atr
+    else if (avg - src > atr) avg = avg - atr
+    if (avg !== prevAvg) holdAtr = atr / 2
+  }
+  if (holdAtr === 0) return null
+
+  return {
+    R2:      parseFloat((avg + holdAtr * 2).toFixed(2)),
+    R1:      parseFloat((avg + holdAtr).toFixed(2)),
+    MID:     parseFloat(avg.toFixed(2)),
+    S1:      parseFloat((avg - holdAtr).toFixed(2)),
+    S2:      parseFloat((avg - holdAtr * 2).toFixed(2)),
+    atr:     parseFloat(atr.toFixed(4)),
+    holdAtr: parseFloat(holdAtr.toFixed(4)),
+    avgBase: parseFloat(avg.toFixed(2)),
+  }
+}
+
+async function calculateLabsLevels() {
+  console.log('[labs] calculating auto levels...')
+  const now = new Date().toISOString()
+  try {
+    const qqq = await fetchOHLC('QQQ', 250)
+    const qqqLevels = predictiveRanges(qqq.closes, qqq.highs, qqq.lows)
+    if (qqqLevels) {
+      qqqLevels.ticker = 'QQQ'
+      qqqLevels.source = qqq.source
+      console.log(`[labs] QQQ levels: R1=${qqqLevels.R1} MID=${qqqLevels.MID}`)
+    }
+
+    let nqLevels = null
+    try {
+      const nq = await fetchOHLC('/NQ', 250)
+      nqLevels = predictiveRanges(nq.closes, nq.highs, nq.lows)
+      if (nqLevels) {
+        nqLevels.ticker = 'NQ'
+        nqLevels.source = nq.source
+        console.log(`[labs] NQ levels: R1=${nqLevels.R1} MID=${nqLevels.MID}`)
+      }
+    } catch (nqErr) {
+      console.warn('[labs] NQ fetch failed:', nqErr.message)
+    }
+
+    labsAutoLevels = { qqq: qqqLevels, nq: nqLevels, lastCalculated: now }
+    db.prepare(`
+      INSERT INTO settings (key, value, updated_at)
+      VALUES ('labs_auto_levels', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+    `).run(JSON.stringify(labsAutoLevels))
+    console.log('[labs] levels saved')
+  } catch (err) {
+    console.error('[labs] calculation failed:', err.message)
+  }
+}
+
+// Restore from SQLite on startup
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'labs_auto_levels'`).get()
+  if (saved?.value) {
+    labsAutoLevels = JSON.parse(saved.value)
+    console.log('[labs] levels restored from DB')
+  }
+} catch (e) {}
+
+// Calculate fresh on startup (async, non-blocking)
+calculateLabsLevels()
+
+// Schedule daily recalc at 6:30pm ET Mon-Fri via dynamic import
+import('node-cron').then(({ default: cron }) => {
+  cron.schedule('30 18 * * 1-5', () => {
+    console.log('[labs] daily recalc triggered')
+    calculateLabsLevels()
+  }, { timezone: 'America/New_York' })
+  console.log('[labs] daily cron scheduled for 6:30pm ET')
+}).catch(e => {
+  console.log('[labs] node-cron not available:', e.message)
+})
+
+// ─── LABS ENDPOINTS ──────────────────────────────────────────────────────────
+
+app.get('/labs/auto-levels', (req, res) => {
+  res.json({ ...labsAutoLevels, timestamp: new Date().toISOString() })
+})
+
+app.get('/labs/scoring-latest', (req, res) => {
+  res.json({ levels: latest?.levels ?? null, timestamp: new Date().toISOString() })
+})
+
+app.post('/labs/recalculate', async (req, res) => {
+  await calculateLabsLevels()
+  res.json({ success: true, levels: labsAutoLevels })
+})
+
+app.post('/labs/apply-to-main', async (req, res) => {
+  const { source } = req.body
+  const levels = labsAutoLevels[source]
+  if (!levels) return res.status(400).json({ error: `No ${source} levels available` })
+
+  const ratio = latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
+
+  let levelData
+  if (source === 'qqq') {
+    levelData = {
+      r2_qqq: levels.R2,  r2_nq: Math.round(levels.R2  * ratio * 4) / 4,
+      r1_qqq: levels.R1,  r1_nq: Math.round(levels.R1  * ratio * 4) / 4,
+      mid_qqq: levels.MID, mid_nq: Math.round(levels.MID * ratio * 4) / 4,
+      s1_qqq: levels.S1,  s1_nq: Math.round(levels.S1  * ratio * 4) / 4,
+      s2_qqq: levels.S2,  s2_nq: Math.round(levels.S2  * ratio * 4) / 4,
+    }
+  } else {
+    levelData = {
+      r2_nq: levels.R2,   r2_qqq: parseFloat((levels.R2  / ratio).toFixed(2)),
+      r1_nq: levels.R1,   r1_qqq: parseFloat((levels.R1  / ratio).toFixed(2)),
+      mid_nq: levels.MID, mid_qqq: parseFloat((levels.MID / ratio).toFixed(2)),
+      s1_nq: levels.S1,   s1_qqq: parseFloat((levels.S1  / ratio).toFixed(2)),
+      s2_nq: levels.S2,   s2_qqq: parseFloat((levels.S2  / ratio).toFixed(2)),
+    }
+  }
+
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  db.prepare(`
+    INSERT INTO daily_levels (date, r2_nq, r2_qqq, r1_nq, r1_qqq, mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq, nq_ratio, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(date) DO UPDATE SET
+      r2_nq=excluded.r2_nq, r2_qqq=excluded.r2_qqq,
+      r1_nq=excluded.r1_nq, r1_qqq=excluded.r1_qqq,
+      mid_nq=excluded.mid_nq, mid_qqq=excluded.mid_qqq,
+      s1_nq=excluded.s1_nq, s1_qqq=excluded.s1_qqq,
+      s2_nq=excluded.s2_nq, s2_qqq=excluded.s2_qqq,
+      nq_ratio=excluded.nq_ratio, updated_at=datetime('now')
+  `).run(today, levelData.r2_nq, levelData.r2_qqq, levelData.r1_nq, levelData.r1_qqq, levelData.mid_nq, levelData.mid_qqq, levelData.s1_nq, levelData.s1_qqq, levelData.s2_nq, levelData.s2_qqq, ratio)
+
+  console.log(`[labs] levels applied to main: ${source} R1_qqq=${levelData.r1_qqq}`)
+  res.json({ success: true, levelData })
+
+  // Auto-rescore with new levels if scorer available
+  if (runFullScore) {
+    try {
+      const levelsOverride = getLevelsForScoring(db)
+      const result = await runFullScore({ trigger: 'labs_apply', levelsOverride })
+      result._received_at = new Date().toISOString()
+      latest = result
+      history.unshift(result)
+      if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
+      provider.setLevels(result.levels)
+      checkExpansionGex(result)
+      updateDpHistory(result)
+      const sent = computeSentiment(result)
+      result._sentiment = sent
+      sseEmitter.emit('event', {
+        type: 'rescore', result, trigger: 'labs_apply',
+        price: result.current_price, expansionGex: detectExpansionGex(result),
+        dpHistory: { ...dpHistory }, sentiment: sent,
+        timestamp: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('[labs] apply rescore failed:', err.message)
+    }
+  }
+})
+
 app.listen(PORT, () => {
   console.log(`[server] UW Dashboard API listening on port ${PORT}`)
 })

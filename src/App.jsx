@@ -9,6 +9,7 @@ import PostSession from './components/PostSession'
 import NewsTab from './components/NewsTab'
 import ControlsTab from './components/ControlsTab'
 import GuideTab from './components/GuideTab'
+import LabsDashboard from './components/labs/LabsDashboard'
 import LockModal from './components/LockModal'
 import RestartBanner from './components/RestartBanner'
 import LevelsTab from './components/LevelsTab'
@@ -71,6 +72,7 @@ function AppInner() {
           {activeTab === 'Levels'       && <LevelsTab />}
           {activeTab === 'Controls'     && <ControlsTab systemPaused={systemPaused} pausedAt={pausedAt} />}
           {activeTab === 'Guide'        && <GuideTab />}
+          {activeTab === 'Labs'         && <LabsDashboard />}
         </div>
       </main>
 

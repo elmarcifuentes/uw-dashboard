@@ -7,6 +7,7 @@ const TABS = [
   { id: 'Levels',        label: 'Levels',      locked: true },
   { id: 'Controls',      label: 'Controls',    locked: true },
   { id: 'Guide',         label: 'Guide'        },
+  { id: 'Labs',          label: '🧪 Labs',     labs: true },
 ]
 
 export default function TabNav({ active, onChange, connected, unlocked }) {
@@ -19,8 +20,8 @@ export default function TabNav({ active, onChange, connected, unlocked }) {
           className={[
             'px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium transition-colors border-b-2 -mb-px shrink-0 flex items-center gap-1',
             active === tab.id
-              ? 'border-indigo-500 text-white'
-              : 'border-transparent text-gray-400 hover:text-gray-200',
+              ? tab.labs ? 'border-purple-500 text-purple-300' : 'border-indigo-500 text-white'
+              : tab.labs ? 'border-transparent text-purple-600 hover:text-purple-400' : 'border-transparent text-gray-400 hover:text-gray-200',
           ].join(' ')}
         >
           {tab.label}
