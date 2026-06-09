@@ -1740,24 +1740,37 @@ const POLYGON_DAYS_BACK = { '1m': 7, '5m': 60, '15m': 60, '1h': 365, '1d': 730 }
 
 async function fetchOHLC(ticker, bars = 250, interval = '1d') {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
+
+  // Polygon ticker candidates: NQ futures need special format
+  const isNQ = ticker === 'NQ=F' || ticker === '/NQ' || ticker === 'NQ'
+  const polygonCandidates = isNQ ? ['NQ1!', '/NQ'] : [ticker]
+
   if (POLYGON_KEY) {
-    try {
-      const pg      = POLYGON_INTERVAL_MAP[interval] || POLYGON_INTERVAL_MAP['1d']
-      const daysBack = POLYGON_DAYS_BACK[interval] || 730
-      const to      = new Date().toISOString().split('T')[0]
-      const from    = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const url     = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/${pg.multiplier}/${pg.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
-      const res     = await fetch(url)
-      const data    = await res.json()
-      if (data.results?.length >= bars) {
-        const results = data.results.slice(-bars)
-        return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: 'polygon' }
+    const pg       = POLYGON_INTERVAL_MAP[interval] || POLYGON_INTERVAL_MAP['1d']
+    const daysBack = POLYGON_DAYS_BACK[interval] || 730
+    const to       = new Date().toISOString().split('T')[0]
+    const from     = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+    for (const pticker of polygonCandidates) {
+      try {
+        const url  = `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(pticker)}/range/${pg.multiplier}/${pg.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
+        const res  = await fetch(url)
+        const data = await res.json()
+        const count = data.results?.length ?? 0
+        if (count >= bars) {
+          const results = data.results.slice(-bars)
+          console.log(`[labs] ${ticker}: source=polygon (${pticker}) bars=${count}`)
+          return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: `polygon (${pticker})` }
+        }
+        console.warn(`[labs] Polygon ${pticker}: ${count} bars (need ${bars}) — ${data.status || data.error || 'insufficient'}`)
+      } catch (err) {
+        console.warn(`[labs] Polygon ${pticker} failed:`, err.message)
       }
-    } catch (err) {
-      console.warn('[labs] Polygon failed:', err.message, '— falling back to Yahoo')
     }
+    console.warn(`[labs] ${ticker}: all Polygon candidates failed — falling back to Yahoo`)
   }
-  const yTicker  = (ticker === '/NQ' || ticker === 'NQ') ? 'NQ=F' : ticker
+
+  const yTicker  = isNQ ? 'NQ=F' : ticker
   const yConfig  = YAHOO_INTERVAL_MAP[interval] || YAHOO_INTERVAL_MAP['1d']
   const url      = `https://query1.finance.yahoo.com/v8/finance/chart/${yTicker}?interval=${yConfig.interval}&range=${yConfig.range}`
   const res      = await fetch(url)
