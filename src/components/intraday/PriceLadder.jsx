@@ -164,7 +164,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         <div className="flex items-center gap-2 px-2 py-1">
           <div className="flex-1 h-px bg-yellow-400/60" />
           <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse bg-yellow-400/10 px-2 py-0.5 rounded">
-            ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''} — above structure
+            ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${(Math.round(cp * nqRatio * 4) / 4).toLocaleString()}` : ''} — above structure
           </span>
           <div className="flex-1 h-px bg-yellow-400/60" />
         </div>
@@ -175,7 +175,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         const colors     = CLASS_COLORS[level.classification] || CLASS_COLORS.no_edge
         const dist       = cp != null ? (cp - level.price) : null
         const distStr    = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
-        const nqDist     = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio) : null
+        const nqDist     = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio * 4) / 4 : null
         const nqDistStr  = nqDist != null ? `${dist >= 0 ? '+' : '-'}${nqDist}` : null
         const isAbove    = dist != null && dist > 0
         const isFlashing = flashLevel === level.id
@@ -210,7 +210,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                 </span>
                 {result.nq_ratio && (
                   <span className="text-gray-400 font-mono font-medium">
-                    / NQ {Math.round(level.price * result.nq_ratio).toLocaleString()}
+                    / NQ {(Math.round(level.price * result.nq_ratio * 4) / 4).toLocaleString()}
                   </span>
                 )}
               </div>
@@ -423,7 +423,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
             <div className="flex items-center gap-2 px-2 py-0.5">
               <div className="flex-1 h-px bg-yellow-400/60" />
               <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 bg-yellow-400/10 px-2 py-0.5 rounded">
-                ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''}
+                ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${(Math.round(cp * nqRatio * 4) / 4).toLocaleString()}` : ''}
               </span>
               <div className="flex-1 h-px bg-yellow-400/60" />
             </div>
@@ -437,7 +437,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         <div className="flex items-center gap-2 px-2 py-1">
           <div className="flex-1 h-px bg-yellow-400/60" />
           <span className="text-xs text-yellow-400 font-mono font-bold shrink-0 animate-pulse bg-yellow-400/10 px-2 py-0.5 rounded">
-            ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${Math.round(cp * nqRatio).toLocaleString()}` : ''} — below structure
+            ▶ ${cp.toFixed(2)}{nqRatio ? ` / NQ ${(Math.round(cp * nqRatio * 4) / 4).toLocaleString()}` : ''} — below structure
           </span>
           <div className="flex-1 h-px bg-yellow-400/60" />
         </div>
@@ -450,7 +450,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           ? sorted.reduce((a, b) => Math.abs(cp - a.price) < Math.abs(cp - b.price) ? a : b)
           : null
         const nearDist = nearest ? (cp - nearest.price).toFixed(2) : null
-        const nqPrice  = nqRatio ? Math.round(cp * nqRatio).toLocaleString() : null
+        const nqPrice  = nqRatio ? (Math.round(cp * nqRatio * 4) / 4).toLocaleString() : null
         return (
           <div className="border border-yellow-400/30 rounded-lg px-3 py-2 bg-yellow-400/5 mt-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -461,7 +461,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
               {nearest && nearDist !== null && (
                 <span className="text-yellow-300 text-xs font-mono">
                   {parseFloat(nearDist) >= 0 ? '+' : ''}{nearDist}
-                  {nqRatio ? ` / ${Math.round(Math.abs(parseFloat(nearDist)) * nqRatio)} NQ` : ''}
+                  {nqRatio ? ` / ${Math.round(Math.abs(parseFloat(nearDist)) * nqRatio * 4) / 4} NQ` : ''}
                   {' '}from {nearest.id}
                 </span>
               )}

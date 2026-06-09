@@ -5,6 +5,8 @@ import AlertBadge from './AlertBadge'
 const API_URL   = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const LEVEL_IDS = ['R2', 'R1', 'MID', 'S1', 'S2']
 
+const calcNQ = (qqqPrice, ratio, offset = 0) => Math.round(qqqPrice * ratio * 4) / 4 + offset
+
 const LEVEL_COLORS = {
   R2: 'text-red-400', R1: 'text-orange-400', MID: 'text-yellow-400',
   S1: 'text-blue-400', S2: 'text-indigo-400',
@@ -50,7 +52,7 @@ function LevelPreviewTable({ qqq, nq, ratio }) {
           }`}>{id}</span>
           <span className="text-white font-mono">${qqq[id]?.toFixed(2)}</span>
           <span className="text-gray-500 font-mono">
-            NQ {(nq?.[id] || Math.round(qqq[id] * r))?.toLocaleString()}
+            NQ {(nq?.[id] != null ? nq[id] : calcNQ(qqq[id], r)).toFixed(2)}
           </span>
         </div>
       ))}
@@ -209,24 +211,34 @@ export default function LevelsTab() {
     LEVEL_IDS.forEach(id => {
       preview[id] = {
         qqq: previewLevels.qqq[id],
-        nq:  Math.round(previewLevels.qqq[id] * r) + (nqOffsets[id] || 0),
+        nq:  calcNQ(previewLevels.qqq[id], r, nqOffsets[id] || 0),
       }
     })
     setNqPreview(preview)
   }
 
   const handleAutoQqqSave = async () => {
+    if (!nqPreview) return
     setScoring(true)
     try {
-      await fetch(`${API_URL}/levels/nq-offsets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ratio: nqOffsets.ratio ? parseFloat(nqOffsets.ratio) : null,
-          offsets: { R2: nqOffsets.R2 || 0, R1: nqOffsets.R1 || 0, MID: nqOffsets.MID || 0, S1: nqOffsets.S1 || 0, S2: nqOffsets.S2 || 0 },
-        }),
+      const r = parseFloat(nqOffsets.ratio) || ratio || 41.14
+      const body = {
+        r2_qqq:  nqPreview.R2.qqq,  r2_nq:  nqPreview.R2.nq,
+        r1_qqq:  nqPreview.R1.qqq,  r1_nq:  nqPreview.R1.nq,
+        mid_qqq: nqPreview.MID.qqq, mid_nq: nqPreview.MID.nq,
+        s1_qqq:  nqPreview.S1.qqq,  s1_nq:  nqPreview.S1.nq,
+        s2_qqq:  nqPreview.S2.qqq,  s2_nq:  nqPreview.S2.nq,
+        nq_ratio: r,
+      }
+      const res = await fetch(`${API_URL}/levels`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       })
-      await fetch(`${API_URL}/rescore`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setIsToday(true); setSavedDate(data.date); setRatio(data.nq_ratio || r)
+        await fetch(`${API_URL}/rescore`, { method: 'POST' }).catch(() => {})
+      }
     } catch (e) { console.warn('[levels] auto_qqq save failed:', e.message) }
     setTimeout(() => setScoring(false), 3000)
   }
@@ -531,7 +543,7 @@ export default function LevelsTab() {
                         id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
                       }`}>{id}</span>
                       <span className="text-white font-mono">${nqPreview[id]?.qqq?.toFixed(2)}</span>
-                      <span className="text-blue-300 font-mono">NQ {nqPreview[id]?.nq?.toLocaleString()}</span>
+                      <span className="text-blue-300 font-mono">NQ {nqPreview[id]?.nq?.toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

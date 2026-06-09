@@ -1946,6 +1946,8 @@ try {
   }
 } catch (e) {}
 
+const nqRound = v => Math.round(v * 4) / 4
+
 // Apply auto levels to daily_levels + trigger rescore when mode is auto/auto_qqq
 async function applyAutoLevelsIfEnabled() {
   if (systemPaused) return
@@ -1959,19 +1961,19 @@ async function applyAutoLevelsIfEnabled() {
   let levelData
   if (levelSourceMode === 'auto') {
     levelData = {
-      r2_qqq:  qqq.R2,  r2_nq:  nq?.R2  || Math.round(qqq.R2  * ratio),
-      r1_qqq:  qqq.R1,  r1_nq:  nq?.R1  || Math.round(qqq.R1  * ratio),
-      mid_qqq: qqq.MID, mid_nq: nq?.MID || Math.round(qqq.MID * ratio),
-      s1_qqq:  qqq.S1,  s1_nq:  nq?.S1  || Math.round(qqq.S1  * ratio),
-      s2_qqq:  qqq.S2,  s2_nq:  nq?.S2  || Math.round(qqq.S2  * ratio),
+      r2_qqq:  qqq.R2,  r2_nq:  nq?.R2  != null ? nq.R2  : nqRound(qqq.R2  * ratio),
+      r1_qqq:  qqq.R1,  r1_nq:  nq?.R1  != null ? nq.R1  : nqRound(qqq.R1  * ratio),
+      mid_qqq: qqq.MID, mid_nq: nq?.MID != null ? nq.MID : nqRound(qqq.MID * ratio),
+      s1_qqq:  qqq.S1,  s1_nq:  nq?.S1  != null ? nq.S1  : nqRound(qqq.S1  * ratio),
+      s2_qqq:  qqq.S2,  s2_nq:  nq?.S2  != null ? nq.S2  : nqRound(qqq.S2  * ratio),
     }
   } else if (levelSourceMode === 'auto_qqq') {
     levelData = {
-      r2_qqq:  qqq.R2,  r2_nq:  Math.round(qqq.R2  * ratio) + (nqOffsets.R2  || 0),
-      r1_qqq:  qqq.R1,  r1_nq:  Math.round(qqq.R1  * ratio) + (nqOffsets.R1  || 0),
-      mid_qqq: qqq.MID, mid_nq: Math.round(qqq.MID * ratio) + (nqOffsets.MID || 0),
-      s1_qqq:  qqq.S1,  s1_nq:  Math.round(qqq.S1  * ratio) + (nqOffsets.S1  || 0),
-      s2_qqq:  qqq.S2,  s2_nq:  Math.round(qqq.S2  * ratio) + (nqOffsets.S2  || 0),
+      r2_qqq:  qqq.R2,  r2_nq:  nqRound(qqq.R2  * ratio) + (nqOffsets.R2  || 0),
+      r1_qqq:  qqq.R1,  r1_nq:  nqRound(qqq.R1  * ratio) + (nqOffsets.R1  || 0),
+      mid_qqq: qqq.MID, mid_nq: nqRound(qqq.MID * ratio) + (nqOffsets.MID || 0),
+      s1_qqq:  qqq.S1,  s1_nq:  nqRound(qqq.S1  * ratio) + (nqOffsets.S1  || 0),
+      s2_qqq:  qqq.S2,  s2_nq:  nqRound(qqq.S2  * ratio) + (nqOffsets.S2  || 0),
     }
   } else { return }
 

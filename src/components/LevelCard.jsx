@@ -25,10 +25,10 @@ export default function LevelCard({
 }) {
   const [expanded, setExpanded] = useState(false)
 
-  const nq      = nqRatio ? Math.round(level.price * nqRatio) : null
+  const nq      = nqRatio ? Math.round(level.price * nqRatio * 4) / 4 : null
   const dist    = currentPrice != null ? (currentPrice - level.price) : null
   const distStr = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
-  const distNq  = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio) : null
+  const distNq  = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio * 4) / 4 : null
 
   const classColor  = CLASS_COLOR[level.classification]  || 'text-gray-500'
   const borderColor = CLASS_BORDER[level.classification] || 'border-gray-800'
