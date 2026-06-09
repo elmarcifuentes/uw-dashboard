@@ -1753,7 +1753,7 @@ app.get('/narrative', (req, res) => {
 // ─── LABS: Auto Level Detection ─────────────────────────────────────────────
 
 let labsAutoLevels = { qqq: null, nq: null, lastCalculated: null }
-let labsSettings   = { interval: '5m', length: 200, mult: 6.0 }
+let labsSettings   = { interval: '5m', activeInterval: '5m', length: 200, mult: 6.0 }
 
 const YAHOO_INTERVAL_MAP = {
   '1m':  { interval: '1m',  range: '7d'  },
@@ -1923,7 +1923,6 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
     `).run(JSON.stringify(labsAutoLevels))
     console.log('[labs] levels saved')
-    await applyAutoLevelsIfEnabled()
     return labsAutoLevels
   } catch (err) {
     console.error('[labs] calculation failed:', err.message)
@@ -2039,7 +2038,7 @@ async function applyAutoLevelsIfEnabled() {
 }
 
 // Calculate fresh on startup (async, non-blocking)
-calculateLabsLevels(labsSettings.interval)
+calculateLabsLevels(labsSettings.activeInterval).then(() => applyAutoLevelsIfEnabled())
 
 // ─── LABS CRON HELPERS ───────────────────────────────────────────────────────
 
@@ -2062,6 +2061,8 @@ function handleLabsUpdate(result) {
   } else {
     sseEmitter.emit('event', { type: 'labs_levels_update', levels: result, timestamp: new Date().toISOString() })
   }
+  // Cron-driven updates auto-apply to main levels
+  applyAutoLevelsIfEnabled()
 }
 
 function setupLabsCron(cron, interval) {
@@ -2075,17 +2076,17 @@ function setupLabsCron(cron, interval) {
     : '*/15 9-16 * * 1-5'
 
   labsCronTasks.push(cron.schedule(intraSchedule, () => {
-    if (!systemPaused) calculateLabsLevels(labsSettings.interval).then(handleLabsUpdate)
+    if (!systemPaused) calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
   }, { timezone: 'America/New_York' }))
 
   labsCronTasks.push(cron.schedule('35 16 * * 1-5', () => {
     console.log('[labs] end of day recalc')
-    calculateLabsLevels(labsSettings.interval).then(handleLabsUpdate)
+    calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
   }, { timezone: 'America/New_York' }))
 
   labsCronTasks.push(cron.schedule('0 9 * * 1-5', () => {
     console.log('[labs] pre-market recalc')
-    calculateLabsLevels(labsSettings.interval).then(handleLabsUpdate)
+    calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
   }, { timezone: 'America/New_York' }))
 
   console.log(`[labs] crons set: intra=${intraSchedule} + 9:00am + 4:35pm ET`)
@@ -2094,7 +2095,7 @@ function setupLabsCron(cron, interval) {
 // Schedule via dynamic import (ESM-compatible, graceful if node-cron not installed)
 import('node-cron').then(({ default: cron }) => {
   labsCron = cron
-  setupLabsCron(cron, labsSettings.interval)
+  setupLabsCron(cron, labsSettings.activeInterval)
 }).catch(e => {
   console.log('[labs] node-cron not available:', e.message)
 })
@@ -2110,7 +2111,8 @@ app.get('/labs/scoring-latest', (req, res) => {
 })
 
 app.post('/labs/recalculate', async (req, res) => {
-  await calculateLabsLevels(labsSettings.interval)
+  await calculateLabsLevels(labsSettings.activeInterval)
+  await applyAutoLevelsIfEnabled()
   res.json({ success: true, levels: labsAutoLevels })
 })
 
@@ -2120,7 +2122,7 @@ app.post('/labs/settings', async (req, res) => {
   if (interval && !validIntervals.includes(interval))
     return res.status(400).json({ error: 'Invalid interval' })
   const prevInterval = labsSettings.interval
-  if (interval) labsSettings.interval = interval
+  if (interval) labsSettings.interval = interval  // preview only — does NOT affect active cron
   if (length)   labsSettings.length   = parseInt(length)
   if (mult)     labsSettings.mult     = parseFloat(mult)
   db.prepare(`
@@ -2128,12 +2130,25 @@ app.post('/labs/settings', async (req, res) => {
     VALUES ('labs_settings', ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(JSON.stringify(labsSettings))
-  console.log('[labs] settings updated:', labsSettings)
-  if (interval && interval !== prevInterval && labsCron) {
-    setupLabsCron(labsCron, labsSettings.interval)
-  }
-  await calculateLabsLevels(labsSettings.interval)
+  console.log('[labs] settings updated (preview):', labsSettings)
+  await calculateLabsLevels(interval || labsSettings.interval)
+  // No auto-apply here — preview interval change does not push to active levels
   res.json({ success: true, settings: labsSettings, levels: labsAutoLevels })
+})
+
+app.post('/labs/active-interval', async (req, res) => {
+  const { interval } = req.body
+  const valid = ['1m', '5m', '15m', '1h', '1d']
+  if (!valid.includes(interval)) return res.status(400).json({ error: 'Invalid interval' })
+  labsSettings.activeInterval = interval
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('labs_settings', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(JSON.stringify(labsSettings))
+  if (labsCron) setupLabsCron(labsCron, interval)
+  console.log('[labs] active interval set:', interval)
+  res.json({ success: true, activeInterval: interval })
 })
 
 app.post('/labs/apply-to-main', async (req, res) => {

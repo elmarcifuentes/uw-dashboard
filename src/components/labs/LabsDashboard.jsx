@@ -119,9 +119,9 @@ export default function LabsDashboard() {
 
       {/* Controls row: timeframe + source */}
       <div className="flex items-center gap-4 flex-wrap">
-        {/* Timeframe */}
+        {/* Timeframe — preview only, does not affect active levels */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Timeframe</span>
+          <span className="text-xs text-gray-500">Preview Timeframe</span>
           <div className="flex gap-1">
             {INTERVALS.map(tf => (
               <button
@@ -138,6 +138,7 @@ export default function LabsDashboard() {
               </button>
             ))}
           </div>
+          <span className="text-xs text-gray-600">· preview only</span>
         </div>
 
         {/* Divider */}
@@ -200,6 +201,33 @@ export default function LabsDashboard() {
               onApply={() => handleApply(activeSource)}
               applying={applying === activeSource}
             />
+          </div>
+
+          <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-gray-400 font-medium">Push to Active Levels</div>
+                <div className="text-xs text-gray-600 mt-0.5">
+                  Applies current {settings.interval} preview to main scoring + triggers rescore
+                </div>
+              </div>
+              <button
+                onClick={() => handleApply(activeSource)}
+                disabled={applying === activeSource}
+                className={`px-4 py-2 rounded text-xs font-bold transition-colors ${
+                  applying === activeSource
+                    ? 'bg-gray-700 text-gray-500'
+                    : 'bg-indigo-700 hover:bg-indigo-600 text-white'
+                }`}
+              >
+                {applying === activeSource ? '⟳ Applying...' : `↑ Push ${activeSource.toUpperCase()} to Levels`}
+              </button>
+            </div>
+            {settings.interval !== '5m' && (
+              <div className="mt-2 text-xs text-amber-600">
+                ⚠ Active levels use 5m by default. You are previewing {settings.interval} — push only if intentional.
+              </div>
+            )}
           </div>
 
           {scoredLevels?.length > 0 && (
