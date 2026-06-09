@@ -184,6 +184,8 @@ export function useSSE(url) {
         if (data.type === 'levels_updated')   { setPendingLevels(null);        return }
         if (data.type === 'system_paused')    { setSystemPaused(true);  setPausedAt(data.pausedAt || null);  return }
         if (data.type === 'system_resumed')   { setSystemPaused(false); setPausedAt(null);                   return }
+        if (data.type === 'level_source_mode_changed') { console.log('[levels] source mode:', data.mode);          return }
+        if (data.type === 'levels_auto_updated')       { console.log('[levels] auto-updated:', data.mode, data.levelData?.r1_qqq); return }
       }
 
       es.onerror = () => {

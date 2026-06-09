@@ -91,6 +91,26 @@ if (!process.env.NARRATIVE_MODE) {
 }
 console.log('[server] Narrative mode initialized:', narrativeMode, `(${narrativeModeSource})`)
 
+// Level source mode: 'auto' | 'auto_qqq' | 'manual'
+let levelSourceMode = 'auto'
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'level_source_mode'`).get()
+  if (saved?.value) {
+    levelSourceMode = saved.value
+    console.log('[levels] source mode restored:', levelSourceMode)
+  }
+} catch { console.log('[levels] defaulting to auto mode') }
+
+// NQ offset settings for auto_qqq mode
+let nqOffsets = { ratio: null, R2: 0, R1: 0, MID: 0, S1: 0, S2: 0 }
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'nq_offsets'`).get()
+  if (saved?.value) {
+    nqOffsets = JSON.parse(saved.value)
+    console.log('[levels] NQ offsets restored:', nqOffsets)
+  }
+} catch {}
+
 // Restore pause state from SQLite
 {
   try {
@@ -1099,6 +1119,8 @@ app.get('/status', (req, res) => {
     pausedAt: systemPaused
       ? (db.prepare(`SELECT value FROM settings WHERE key = 'paused_at'`).get()?.value || null)
       : null,
+    levelSourceMode,
+    nqOffsets,
   })
 })
 
@@ -1890,6 +1912,7 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
     `).run(JSON.stringify(labsAutoLevels))
     console.log('[labs] levels saved')
+    await applyAutoLevelsIfEnabled()
     return labsAutoLevels
   } catch (err) {
     console.error('[labs] calculation failed:', err.message)
@@ -1912,6 +1935,97 @@ try {
     console.log('[labs] levels restored from DB')
   }
 } catch (e) {}
+
+// Apply auto levels to daily_levels + trigger rescore when mode is auto/auto_qqq
+async function applyAutoLevelsIfEnabled() {
+  if (systemPaused) return
+  if (levelSourceMode === 'manual') return
+  if (!labsAutoLevels?.qqq) return
+
+  const qqq   = labsAutoLevels.qqq
+  const nq    = labsAutoLevels.nq
+  const ratio = nqOffsets.ratio || latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
+
+  let levelData
+  if (levelSourceMode === 'auto') {
+    levelData = {
+      r2_qqq:  qqq.R2,  r2_nq:  nq?.R2  || Math.round(qqq.R2  * ratio),
+      r1_qqq:  qqq.R1,  r1_nq:  nq?.R1  || Math.round(qqq.R1  * ratio),
+      mid_qqq: qqq.MID, mid_nq: nq?.MID || Math.round(qqq.MID * ratio),
+      s1_qqq:  qqq.S1,  s1_nq:  nq?.S1  || Math.round(qqq.S1  * ratio),
+      s2_qqq:  qqq.S2,  s2_nq:  nq?.S2  || Math.round(qqq.S2  * ratio),
+    }
+  } else if (levelSourceMode === 'auto_qqq') {
+    levelData = {
+      r2_qqq:  qqq.R2,  r2_nq:  Math.round(qqq.R2  * ratio) + (nqOffsets.R2  || 0),
+      r1_qqq:  qqq.R1,  r1_nq:  Math.round(qqq.R1  * ratio) + (nqOffsets.R1  || 0),
+      mid_qqq: qqq.MID, mid_nq: Math.round(qqq.MID * ratio) + (nqOffsets.MID || 0),
+      s1_qqq:  qqq.S1,  s1_nq:  Math.round(qqq.S1  * ratio) + (nqOffsets.S1  || 0),
+      s2_qqq:  qqq.S2,  s2_nq:  Math.round(qqq.S2  * ratio) + (nqOffsets.S2  || 0),
+    }
+  } else { return }
+
+  // Skip write + rescore if levels haven't meaningfully changed
+  const today    = getTodayET()
+  const existing = db.prepare(`SELECT r1_qqq FROM daily_levels WHERE date = ?`).get(today)
+  const changed  = !existing || Math.abs((existing.r1_qqq || 0) - levelData.r1_qqq) > 0.10
+  if (!changed) return
+
+  db.prepare(`
+    INSERT INTO daily_levels
+      (date, r2_nq, r2_qqq, r1_nq, r1_qqq, mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq, nq_ratio, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(date) DO UPDATE SET
+      r2_nq=excluded.r2_nq, r2_qqq=excluded.r2_qqq,
+      r1_nq=excluded.r1_nq, r1_qqq=excluded.r1_qqq,
+      mid_nq=excluded.mid_nq, mid_qqq=excluded.mid_qqq,
+      s1_nq=excluded.s1_nq, s1_qqq=excluded.s1_qqq,
+      s2_nq=excluded.s2_nq, s2_qqq=excluded.s2_qqq,
+      nq_ratio=excluded.nq_ratio, updated_at=datetime('now')
+  `).run(today,
+    levelData.r2_nq, levelData.r2_qqq,
+    levelData.r1_nq, levelData.r1_qqq,
+    levelData.mid_nq, levelData.mid_qqq,
+    levelData.s1_nq, levelData.s1_qqq,
+    levelData.s2_nq, levelData.s2_qqq,
+    ratio
+  )
+  console.log(`[levels] auto-applied: mode=${levelSourceMode} R1=${levelData.r1_qqq} MID=${levelData.mid_qqq}`)
+
+  sseEmitter.emit('event', {
+    type: 'levels_auto_updated', mode: levelSourceMode,
+    levelData, timestamp: new Date().toISOString(),
+  })
+
+  // Trigger rescore with the freshly-saved levels
+  if (runFullScore) {
+    setTimeout(async () => {
+      try {
+        const levelsForScoring = getLevelsForScoring(db)
+        if (!levelsForScoring) return
+        const result = await runFullScore({ trigger: 'auto_level_update', levelsOverride: levelsForScoring })
+        result._received_at = new Date().toISOString()
+        const savedRatio = getNqRatioFromDb(db)
+        if (savedRatio) result.nq_ratio = savedRatio
+        latest = result
+        history.unshift(result)
+        if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
+        provider.setLevels(result.levels)
+        checkExpansionGex(result)
+        updateDpHistory(result)
+        const sentiment = computeSentiment(result)
+        result._sentiment = sentiment
+        sseEmitter.emit('event', {
+          type: 'rescore', result, trigger: 'auto_level_update',
+          price: result.current_price, expansionGex: detectExpansionGex(result),
+          dpHistory: { ...dpHistory }, sentiment, timestamp: new Date().toISOString(),
+        })
+      } catch (err) {
+        console.error('[levels] auto rescore failed:', err.message)
+      }
+    }, 1000)
+  }
+}
 
 // Calculate fresh on startup (async, non-blocking)
 calculateLabsLevels(labsSettings.interval)
@@ -2077,6 +2191,43 @@ app.post('/labs/apply-to-main', async (req, res) => {
       console.error('[labs] apply rescore failed:', err.message)
     }
   }
+})
+
+app.post('/levels/source-mode', async (req, res) => {
+  const { mode } = req.body
+  const valid = ['auto', 'auto_qqq', 'manual']
+  if (!valid.includes(mode)) return res.status(400).json({ error: 'Invalid mode' })
+
+  levelSourceMode = mode
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('level_source_mode', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(mode)
+  console.log('[levels] source mode set:', mode)
+
+  if (mode !== 'manual') await applyAutoLevelsIfEnabled()
+
+  sseEmitter.emit('event', { type: 'level_source_mode_changed', mode, timestamp: new Date().toISOString() })
+  res.json({ success: true, mode })
+})
+
+app.post('/levels/nq-offsets', async (req, res) => {
+  const { ratio, offsets } = req.body
+  if (ratio !== undefined) nqOffsets.ratio = ratio ? parseFloat(ratio) : null
+  if (offsets) {
+    ;['R2', 'R1', 'MID', 'S1', 'S2'].forEach(id => {
+      if (offsets[id] !== undefined) nqOffsets[id] = parseInt(offsets[id]) || 0
+    })
+  }
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('nq_offsets', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(JSON.stringify(nqOffsets))
+  console.log('[levels] NQ offsets updated:', nqOffsets)
+  if (levelSourceMode === 'auto_qqq') await applyAutoLevelsIfEnabled()
+  res.json({ success: true, offsets: nqOffsets })
 })
 
 app.listen(PORT, () => {

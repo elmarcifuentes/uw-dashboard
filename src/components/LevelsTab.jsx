@@ -35,40 +35,14 @@ export default function LevelsTab() {
   const pendingPollRef              = useRef(null)
 
   const [autoLevels, setAutoLevels]           = useState(null)
-  const [autoLoaded, setAutoLoaded]           = useState(false)
-  const [sourceMode, setSourceMode]           = useState('auto')
-  const [nqRatioOverride, setNqRatioOverride] = useState('')
-  const [ratioLocked, setRatioLocked]         = useState(true)
-
-  function applyAutoToForm(qqq, nq) {
-    setLevels({
-      R2:  { qqq: qqq.R2,  nq: nq?.R2  ?? '' },
-      R1:  { qqq: qqq.R1,  nq: nq?.R1  ?? '' },
-      MID: { qqq: qqq.MID, nq: nq?.MID ?? '' },
-      S1:  { qqq: qqq.S1,  nq: nq?.S1  ?? '' },
-      S2:  { qqq: qqq.S2,  nq: nq?.S2  ?? '' },
-    })
-  }
-
-  function recalcNqFromRatio(r) {
-    setLevels(prev => {
-      const updated = {}
-      Object.keys(prev).forEach(id => {
-        const qqq = parseFloat(prev[id].qqq)
-        updated[id] = {
-          ...prev[id],
-          nq: qqq && r ? Math.round(qqq * r * 4) / 4 : prev[id].nq,
-        }
-      })
-      return updated
-    })
-  }
+  const [levelSourceMode, setLevelSourceMode] = useState('auto')
+  const [nqOffsets, setNqOffsets]             = useState({ ratio: null, R2: 0, R1: 0, MID: 0, S1: 0, S2: 0 })
+  const [showOffsets, setShowOffsets]         = useState(false)
 
   useEffect(() => {
     fetch(`${API_URL}/levels`)
       .then(r => r.json())
       .then(data => {
-        const todayLoaded = data.is_today
         if (data.levels) {
           const l = data.levels
           setLevels({
@@ -80,24 +54,22 @@ export default function LevelsTab() {
           })
           setRatio(l.nq_ratio)
           setSavedDate(l.date)
-          setIsToday(todayLoaded)
-          if (l.source) setSourceMode(l.source)
+          setIsToday(data.is_today)
         }
-        // Chain auto-levels after knowing todayLoaded
-        return fetch(`${API_URL}/labs/auto-levels`)
-          .then(r => r.json())
-          .then(autoData => {
-            if (autoData?.qqq) {
-              setAutoLevels(autoData)
-              if (!todayLoaded) {
-                applyAutoToForm(autoData.qqq, autoData.nq)
-                setSourceMode('auto')
-                setAutoLoaded(true)
-              }
-            }
-          })
-          .catch(() => {})
       })
+      .catch(() => {})
+
+    fetch(`${API_URL}/status`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.levelSourceMode) setLevelSourceMode(data.levelSourceMode)
+        if (data.nqOffsets)       setNqOffsets(data.nqOffsets)
+      })
+      .catch(() => {})
+
+    fetch(`${API_URL}/labs/auto-levels`)
+      .then(r => r.json())
+      .then(data => { if (data?.qqq) setAutoLevels(data) })
       .catch(() => {})
 
     fetch(`${API_URL}/levels/history`)
@@ -127,9 +99,48 @@ export default function LevelsTab() {
     }
   }, [levels])
 
-  const updateLevel = (id, field, value) => {
-    setSourceMode('manual')
+  const updateLevel = (id, field, value) =>
     setLevels(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
+
+  const handleModeChange = async (mode) => {
+    setLevelSourceMode(mode)
+    try {
+      await fetch(`${API_URL}/levels/source-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      })
+      // Reload levels from DB after server applies auto levels
+      if (mode !== 'manual') {
+        const data = await fetch(`${API_URL}/levels`).then(r => r.json())
+        if (data.levels) {
+          const l = data.levels
+          setLevels({
+            R2:  { nq: l.r2_nq  ?? '', qqq: l.r2_qqq  ?? '' },
+            R1:  { nq: l.r1_nq  ?? '', qqq: l.r1_qqq  ?? '' },
+            MID: { nq: l.mid_nq ?? '', qqq: l.mid_qqq ?? '' },
+            S1:  { nq: l.s1_nq  ?? '', qqq: l.s1_qqq  ?? '' },
+            S2:  { nq: l.s2_nq  ?? '', qqq: l.s2_qqq  ?? '' },
+          })
+          if (l.nq_ratio) setRatio(l.nq_ratio)
+          setIsToday(data.is_today)
+        }
+      }
+    } catch (e) { console.warn('[levels] mode change failed:', e.message) }
+  }
+
+  const handleOffsetSave = async () => {
+    try {
+      await fetch(`${API_URL}/levels/nq-offsets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ratio: nqOffsets.ratio,
+          offsets: { R2: nqOffsets.R2, R1: nqOffsets.R1, MID: nqOffsets.MID, S1: nqOffsets.S1, S2: nqOffsets.S2 },
+        }),
+      })
+      setShowOffsets(false)
+    } catch (e) { console.warn('[levels] offset save failed:', e.message) }
   }
 
   const handleSubmit = async () => {
@@ -141,8 +152,6 @@ export default function LevelsTab() {
         mid_nq: parseFloat(levels.MID.nq) || null, mid_qqq: parseFloat(levels.MID.qqq) || null,
         s1_nq:  parseFloat(levels.S1.nq)  || null, s1_qqq:  parseFloat(levels.S1.qqq)  || null,
         s2_nq:  parseFloat(levels.S2.nq)  || null, s2_qqq:  parseFloat(levels.S2.qqq)  || null,
-        source: sourceMode,
-        ratio:  parseFloat(nqRatioOverride) || ratio,
       }
       const res  = await fetch(`${API_URL}/levels`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -212,7 +221,11 @@ export default function LevelsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold text-white uppercase tracking-wide">Daily Levels</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Enter NQ and QQQ prices for today's session</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {levelSourceMode === 'manual'
+              ? 'Manual entry — levels only change when you save'
+              : 'Auto-detecting from Predictive Ranges'}
+          </p>
         </div>
         {savedDate && (
           <div className={`text-xs px-2 py-1 rounded ${isToday ? 'bg-green-900 text-green-400' : 'bg-amber-900 text-amber-400'}`}>
@@ -229,7 +242,6 @@ export default function LevelsTab() {
             label="📡 New levels from TradingView"
             detail={`Received ${new Date(pending.received_at + 'Z').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })} ET — review and accept to update scoring`}
           />
-
           <div className="mb-3 text-xs space-y-0.5">
             <div className="grid grid-cols-5 gap-1 mb-1">
               <div className="text-gray-500">Level</div>
@@ -250,12 +262,8 @@ export default function LevelsTab() {
               return (
                 <div key={id} className={`grid grid-cols-5 gap-1 py-0.5 ${anyChanged ? 'bg-amber-950 rounded px-1' : ''}`}>
                   <div className="font-bold text-gray-300">{id}</div>
-                  <div className="text-center font-mono text-gray-500">
-                    {!isNaN(currentNq)  ? currentNq.toFixed(2)        : '—'}
-                  </div>
-                  <div className="text-center font-mono text-gray-400">
-                    {!isNaN(currentQqq) ? `$${currentQqq.toFixed(2)}` : '—'}
-                  </div>
+                  <div className="text-center font-mono text-gray-500">{!isNaN(currentNq)  ? currentNq.toFixed(2)        : '—'}</div>
+                  <div className="text-center font-mono text-gray-400">{!isNaN(currentQqq) ? `$${currentQqq.toFixed(2)}` : '—'}</div>
                   <div className={`text-center font-mono ${nqChanged  ? 'text-amber-300 font-bold' : 'text-gray-400'}`}>
                     {!isNaN(incomingNq)  ? incomingNq.toFixed(2)        : '—'}{nqChanged  ? ' ←' : ''}
                   </div>
@@ -266,13 +274,9 @@ export default function LevelsTab() {
               )
             })}
           </div>
-
           {pending.nq_ratio && (
-            <div className="text-xs text-gray-500 mb-3">
-              Ratio: {parseFloat(pending.nq_ratio).toFixed(3)}
-            </div>
+            <div className="text-xs text-gray-500 mb-3">Ratio: {parseFloat(pending.nq_ratio).toFixed(3)}</div>
           )}
-
           <div className="flex gap-2">
             <button
               disabled={accepting}
@@ -296,7 +300,6 @@ export default function LevelsTab() {
                       setRatio(l.nq_ratio)
                       setSavedDate(data.date)
                       setIsToday(true)
-                      setSourceMode('manual')
                     }
                   }
                 } catch { /* ignore */ }
@@ -321,181 +324,259 @@ export default function LevelsTab() {
         </div>
       )}
 
-      {/* Source mode banner */}
-      <div className="bg-[#111827] border border-gray-800 rounded-lg p-3">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setSourceMode('auto')
-                if (autoLevels?.qqq) applyAutoToForm(autoLevels.qqq, autoLevels.nq)
-              }}
-              className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
-                sourceMode === 'auto'
-                  ? 'bg-indigo-700 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              🤖 Auto (Predictive Ranges)
-            </button>
-            <button
-              onClick={() => setSourceMode('manual')}
-              className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
-                sourceMode === 'manual'
-                  ? 'bg-gray-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              ✏️ Manual
-            </button>
-          </div>
+      {/* Level Source Mode selector */}
+      <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
+        <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Level Source Mode</div>
 
-          {autoLevels?.lastCalculated && (
-            <span className="text-xs text-gray-600">
-              Auto calculated{' '}
-              {new Date(autoLevels.lastCalculated).toLocaleTimeString('en-US', {
-                timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit'
-              })} ET
-            </span>
-          )}
-        </div>
+        <div className="space-y-2">
 
-        {/* NQ Ratio row */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-gray-500 shrink-0">NQ/QQQ Ratio</span>
+          {/* Mode 1 — Full Auto */}
+          <button
+            onClick={() => handleModeChange('auto')}
+            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+              levelSourceMode === 'auto'
+                ? 'border-indigo-600 bg-indigo-950/30'
+                : 'border-gray-700 bg-gray-800/30 hover:border-gray-600'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className={`text-xs font-bold ${levelSourceMode === 'auto' ? 'text-indigo-400' : 'text-gray-400'}`}>
+                  🤖 Auto — QQQ + NQ
+                </div>
+                <div className="text-xs text-gray-600 mt-0.5">
+                  Both auto-calculated · updates automatically on bar close
+                </div>
+              </div>
+              {levelSourceMode === 'auto' && <span className="text-indigo-500 text-xs">● active</span>}
+            </div>
+          </button>
 
-          {ratioLocked ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white font-mono">
-                {nqRatioOverride || ratio?.toFixed(3) || '—'}
-              </span>
+          {/* Mode 2 — Auto QQQ + derived NQ */}
+          <button
+            onClick={() => handleModeChange('auto_qqq')}
+            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+              levelSourceMode === 'auto_qqq'
+                ? 'border-blue-600 bg-blue-950/20'
+                : 'border-gray-700 bg-gray-800/30 hover:border-gray-600'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className={`text-xs font-bold ${levelSourceMode === 'auto_qqq' ? 'text-blue-400' : 'text-gray-400'}`}>
+                  🤖 Auto QQQ · Manual NQ
+                </div>
+                <div className="text-xs text-gray-600 mt-0.5">
+                  QQQ auto-updates · NQ = QQQ × ratio with optional offset per level
+                </div>
+              </div>
+              {levelSourceMode === 'auto_qqq' && <span className="text-blue-500 text-xs">● active</span>}
+            </div>
+          </button>
+
+          {/* Mode 2 expanded controls */}
+          {levelSourceMode === 'auto_qqq' && (
+            <div className="border border-blue-900/40 bg-blue-950/10 rounded-lg p-3 ml-2 space-y-2">
+
+              {/* Ratio */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-gray-500 w-20 shrink-0">NQ Ratio</span>
+                <input
+                  type="number"
+                  value={nqOffsets.ratio || ''}
+                  onChange={e => setNqOffsets(prev => ({ ...prev, ratio: e.target.value || null }))}
+                  placeholder={`${ratio?.toFixed(3) || '41.142'} (live)`}
+                  step="0.001"
+                  className="bg-gray-700 text-white font-mono text-xs rounded px-2 py-1 border border-gray-600 focus:border-blue-500 focus:outline-none w-28"
+                />
+                <span className="text-xs text-gray-600">leave blank = use live ratio</span>
+              </div>
+
+              {/* Per-level offsets toggle */}
               <button
-                onClick={() => {
-                  setNqRatioOverride(ratio?.toFixed(3) || '')
-                  setRatioLocked(false)
-                }}
+                onClick={() => setShowOffsets(v => !v)}
                 className="text-xs text-gray-600 hover:text-gray-400"
               >
-                ✏️ edit
+                {showOffsets ? '▲ hide offsets' : '▼ per-level NQ offsets'}
               </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 flex-wrap">
-              <input
-                type="number"
-                value={nqRatioOverride}
-                onChange={e => setNqRatioOverride(e.target.value)}
-                step="0.001"
-                className="bg-gray-700 text-white font-mono text-xs rounded px-2 py-1 border border-gray-600 focus:border-indigo-500 focus:outline-none w-24"
-                placeholder="41.142"
-              />
+
+              {showOffsets && (
+                <div className="space-y-1.5">
+                  <div className="text-xs text-gray-600 mb-1">Add NQ points to each level (+ or − to fine-tune)</div>
+                  {LEVEL_IDS.map(id => (
+                    <div key={id} className="flex items-center gap-2">
+                      <span className={`text-xs font-bold w-8 shrink-0 ${
+                        id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
+                      }`}>{id}</span>
+                      <input
+                        type="number"
+                        value={nqOffsets[id] || 0}
+                        onChange={e => setNqOffsets(prev => ({ ...prev, [id]: parseInt(e.target.value) || 0 }))}
+                        step="1"
+                        className="bg-gray-700 text-white font-mono text-xs rounded px-2 py-1 border border-gray-600 w-20 text-center focus:outline-none"
+                      />
+                      <span className="text-xs text-gray-700">NQ pts</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <button
-                onClick={() => {
-                  const r = parseFloat(nqRatioOverride)
-                  if (r > 0) recalcNqFromRatio(r)
-                  setRatioLocked(true)
-                }}
-                className="text-xs bg-indigo-700 hover:bg-indigo-600 text-white px-2 py-1 rounded"
+                onClick={handleOffsetSave}
+                className="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-xs rounded font-medium mt-1"
               >
-                Apply
+                Apply Changes
               </button>
-              <button
-                onClick={() => setRatioLocked(true)}
-                className="text-xs text-gray-600 hover:text-gray-400"
-              >
-                cancel
-              </button>
-              <span className="text-xs text-gray-600">Applies ratio to all QQQ prices → NQ</span>
             </div>
           )}
+
+          {/* Mode 3 — Full Manual */}
+          <button
+            onClick={() => handleModeChange('manual')}
+            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+              levelSourceMode === 'manual'
+                ? 'border-gray-500 bg-gray-800/50'
+                : 'border-gray-700 bg-gray-800/30 hover:border-gray-600'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className={`text-xs font-bold ${levelSourceMode === 'manual' ? 'text-gray-300' : 'text-gray-500'}`}>
+                  ✏️ Manual — QQQ + NQ
+                </div>
+                <div className="text-xs text-gray-600 mt-0.5">
+                  Levels only change when you save manually or accept webhook
+                </div>
+              </div>
+              {levelSourceMode === 'manual' && <span className="text-gray-400 text-xs">● active</span>}
+            </div>
+          </button>
         </div>
 
-        {sourceMode === 'auto' && autoLoaded && (
-          <div className="mt-2 text-xs text-indigo-400">
-            ✓ Levels auto-detected from QQQ 5m Predictive Ranges — you can still edit any value below
-          </div>
-        )}
-        {sourceMode === 'auto' && !autoLevels && (
-          <div className="mt-2 text-xs text-gray-600 animate-pulse">Loading auto levels…</div>
-        )}
-      </div>
-
-      {/* Entry grid */}
-      <div className="bg-gray-800 rounded overflow-hidden border border-gray-700">
-        <div className="grid grid-cols-3 gap-2 px-3 py-2 border-b border-gray-700 bg-gray-800/80">
-          <span className="text-xs text-gray-500">Level</span>
-          <span className="text-xs text-gray-500 text-center">NQ Price</span>
-          <span className="text-xs text-gray-500 text-center">QQQ Price</span>
-        </div>
-        {LEVEL_IDS.map((id, i) => (
-          <div key={id} className={`grid grid-cols-3 gap-2 px-3 py-2 ${i < LEVEL_IDS.length - 1 ? 'border-b border-gray-700' : ''}`}>
-            <div className="self-center flex items-center gap-1">
-              <span className={`text-sm font-bold ${LEVEL_COLORS[id]}`}>{id}</span>
-              {sourceMode === 'auto' && (
-                <span className="text-indigo-600 text-xs">auto</span>
+        {/* Auto levels preview */}
+        {levelSourceMode !== 'manual' && autoLevels?.qqq && (
+          <div className="mt-3 pt-3 border-t border-gray-800">
+            <div className="text-xs text-gray-600 mb-2">
+              Current auto levels ({autoLevels.interval || '5m'})
+              {autoLevels.lastCalculated && (
+                <span className="ml-2">
+                  · {new Date(autoLevels.lastCalculated).toLocaleTimeString('en-US', {
+                    timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit'
+                  })} ET
+                </span>
               )}
             </div>
-            <input
-              type="number" step="0.25" placeholder="e.g. 29995"
-              value={levels[id].nq}
-              onChange={e => updateLevel(id, 'nq', e.target.value)}
-              className={`bg-gray-700 text-white text-xs font-mono rounded px-2 py-1.5 text-center focus:outline-none w-full border ${
-                sourceMode === 'auto'
-                  ? 'border-indigo-800 focus:border-indigo-500'
-                  : 'border-gray-600 focus:border-blue-500'
-              }`}
-            />
-            <input
-              type="number" step="0.01" placeholder="e.g. 728.79"
-              value={levels[id].qqq}
-              onChange={e => updateLevel(id, 'qqq', e.target.value)}
-              className={`bg-gray-700 text-white text-xs font-mono rounded px-2 py-1.5 text-center focus:outline-none w-full border ${
-                sourceMode === 'auto'
-                  ? 'border-indigo-800 focus:border-indigo-500'
-                  : 'border-gray-600 focus:border-blue-500'
-              }`}
-            />
+            <div className="grid grid-cols-5 gap-1">
+              {LEVEL_IDS.map(id => (
+                <div key={id} className="text-center">
+                  <div className={`text-xs font-bold ${
+                    id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
+                  }`}>{id}</div>
+                  <div className="text-xs text-white font-mono">${autoLevels.qqq[id]?.toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-2">
-        <button
-          onClick={handleSubmit}
-          disabled={!allValid || saving}
-          className={`flex-1 py-2 rounded text-sm font-medium transition-colors ${
-            allValid && !saving
-              ? saveResult === 'success' ? 'bg-green-700 text-white'
-              : saveResult === 'error'   ? 'bg-red-700 text-white'
-              : 'bg-blue-600 hover:bg-blue-500 text-white'
-              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {saving ? '⟳ Saving…' : saveResult === 'success' ? '✓ Levels Saved' : saveResult === 'error' ? '✗ Error' : 'Save Levels'}
-        </button>
-        <button
-          onClick={copyForTradingView}
-          disabled={!isToday}
-          className={`px-4 py-2 rounded text-sm font-medium transition-colors ${isToday ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}`}
-        >
-          {copied ? '✓ Copied!' : '📋 Copy JSON'}
-        </button>
-      </div>
-
-      {!allValid && <p className="text-xs text-gray-500 text-center">Enter all 5 NQ and QQQ prices to save</p>}
-
-      {saveResult === 'success' && ratio && (
-        <div className="bg-green-950 border border-green-700 rounded p-2 text-xs space-y-0.5">
-          <div className="text-green-400">✓ Levels saved — ratio {ratio.toFixed(4)} cached — scoring will use these levels</div>
-          <div className="text-gray-500">
-            Source: {sourceMode}
-            {sourceMode === 'auto' && <span className="text-indigo-400 ml-1">🤖 Predictive Ranges</span>}
-          </div>
+      {/* Ratio display */}
+      {ratio && (
+        <div className="bg-gray-800 rounded px-3 py-2 flex items-center justify-between">
+          <span className="text-xs text-gray-400">NQ/QQQ Ratio</span>
+          <span className="text-xs font-mono text-white font-bold">{ratio.toFixed(4)}</span>
         </div>
       )}
 
-      {/* Force Rescore — only shown after levels saved for today */}
+      {/* Entry grid — shown in manual mode or for review in auto modes */}
+      <div>
+        {levelSourceMode !== 'manual' && (
+          <div className="text-xs text-gray-600 mb-2">
+            ↓ Current levels in DB
+            {levelSourceMode === 'auto' ? ' (auto-updated)' : ' (QQQ auto · NQ derived)'}
+          </div>
+        )}
+        <div className="bg-gray-800 rounded overflow-hidden border border-gray-700">
+          <div className="grid grid-cols-3 gap-2 px-3 py-2 border-b border-gray-700 bg-gray-800/80">
+            <span className="text-xs text-gray-500">Level</span>
+            <span className="text-xs text-gray-500 text-center">NQ Price</span>
+            <span className="text-xs text-gray-500 text-center">QQQ Price</span>
+          </div>
+          {LEVEL_IDS.map((id, i) => (
+            <div key={id} className={`grid grid-cols-3 gap-2 px-3 py-2 ${i < LEVEL_IDS.length - 1 ? 'border-b border-gray-700' : ''}`}>
+              <span className={`text-sm font-bold self-center ${LEVEL_COLORS[id]}`}>{id}</span>
+              <input
+                type="number" step="0.25" placeholder="e.g. 29995"
+                value={levels[id].nq}
+                onChange={e => updateLevel(id, 'nq', e.target.value)}
+                readOnly={levelSourceMode !== 'manual'}
+                className={`bg-gray-700 text-white text-xs font-mono rounded px-2 py-1.5 text-center border focus:outline-none w-full ${
+                  levelSourceMode !== 'manual'
+                    ? 'border-gray-700 text-gray-500 cursor-default'
+                    : 'border-gray-600 focus:border-blue-500'
+                }`}
+              />
+              <input
+                type="number" step="0.01" placeholder="e.g. 728.79"
+                value={levels[id].qqq}
+                onChange={e => updateLevel(id, 'qqq', e.target.value)}
+                readOnly={levelSourceMode !== 'manual'}
+                className={`bg-gray-700 text-white text-xs font-mono rounded px-2 py-1.5 text-center border focus:outline-none w-full ${
+                  levelSourceMode !== 'manual'
+                    ? 'border-gray-700 text-gray-500 cursor-default'
+                    : 'border-gray-600 focus:border-blue-500'
+                }`}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions — only show save/copy in manual mode */}
+      {levelSourceMode === 'manual' && (
+        <>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSubmit}
+              disabled={!allValid || saving}
+              className={`flex-1 py-2 rounded text-sm font-medium transition-colors ${
+                allValid && !saving
+                  ? saveResult === 'success' ? 'bg-green-700 text-white'
+                  : saveResult === 'error'   ? 'bg-red-700 text-white'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white'
+                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {saving ? '⟳ Saving…' : saveResult === 'success' ? '✓ Levels Saved' : saveResult === 'error' ? '✗ Error' : 'Save Levels'}
+            </button>
+            <button
+              onClick={copyForTradingView}
+              disabled={!isToday}
+              className={`px-4 py-2 rounded text-sm font-medium transition-colors ${isToday ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}`}
+            >
+              {copied ? '✓ Copied!' : '📋 Copy JSON'}
+            </button>
+          </div>
+          {!allValid && <p className="text-xs text-gray-500 text-center">Enter all 5 NQ and QQQ prices to save</p>}
+          {saveResult === 'success' && ratio && (
+            <div className="bg-green-950 border border-green-700 rounded p-2 text-xs text-green-400">
+              ✓ Levels saved — ratio {ratio.toFixed(4)} cached — scoring will use these levels
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Copy JSON always available when today's levels exist */}
+      {levelSourceMode !== 'manual' && isToday && (
+        <button
+          onClick={copyForTradingView}
+          className="w-full py-2 rounded text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+        >
+          {copied ? '✓ Copied!' : '📋 Copy JSON for TradingView'}
+        </button>
+      )}
+
+      {/* Force Rescore */}
       {isToday && (
         <button
           onClick={async () => {
