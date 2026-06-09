@@ -1,5 +1,5 @@
 export default function LevelComparison({
-  autoLevels, currentLevels, activeSource, lastCalculated, onApply, applying
+  autoLevels, currentLevels, activeSource, lastCalculated, interval, onApply, applying
 }) {
   const isNQ     = activeSource === 'nq'
   const levelIds = ['R2', 'R1', 'MID', 'S1', 'S2']
@@ -67,8 +67,8 @@ export default function LevelComparison({
 
       <div className="mt-3 pt-3 border-t border-gray-800">
         <div className="text-xs text-gray-600">
-          Predictive Ranges params: length=200 factor=6.0 · {isNQ ? 'NQ' : 'QQQ'} daily
-          · ATR {isNQ ? autoLevels.atr?.toFixed(0) : `$${autoLevels.atr?.toFixed(2)}`}
+          Predictive Ranges · {interval || autoLevels.interval || '1d'} bars · length=200 factor=6.0
+          · {isNQ ? 'NQ' : 'QQQ'} · ATR {isNQ ? autoLevels.atr?.toFixed(0) : `$${autoLevels.atr?.toFixed(2)}`}
         </div>
       </div>
     </div>

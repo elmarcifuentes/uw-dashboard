@@ -1720,35 +1720,57 @@ app.get('/narrative', (req, res) => {
 // ─── LABS: Auto Level Detection ─────────────────────────────────────────────
 
 let labsAutoLevels = { qqq: null, nq: null, lastCalculated: null }
+let labsSettings   = { interval: '5m', length: 200, mult: 6.0 }
 
-async function fetchOHLC(ticker, bars = 250) {
+const YAHOO_INTERVAL_MAP = {
+  '1m':  { interval: '1m',  range: '7d'  },
+  '5m':  { interval: '5m',  range: '60d' },
+  '15m': { interval: '15m', range: '60d' },
+  '1h':  { interval: '60m', range: '730d' },
+  '1d':  { interval: '1d',  range: '2y'  },
+}
+const POLYGON_INTERVAL_MAP = {
+  '1m':  { multiplier: 1,  timespan: 'minute' },
+  '5m':  { multiplier: 5,  timespan: 'minute' },
+  '15m': { multiplier: 15, timespan: 'minute' },
+  '1h':  { multiplier: 1,  timespan: 'hour'   },
+  '1d':  { multiplier: 1,  timespan: 'day'    },
+}
+const POLYGON_DAYS_BACK = { '1m': 7, '5m': 60, '15m': 60, '1h': 365, '1d': 730 }
+
+async function fetchOHLC(ticker, bars = 250, interval = '1d') {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (POLYGON_KEY) {
-    const to   = new Date().toISOString().split('T')[0]
-    const from = new Date(Date.now() - bars * 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    const url  = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=${bars}&apiKey=${POLYGON_KEY}`
-    const res  = await fetch(url)
-    const data = await res.json()
-    if (data.results?.length > 0) {
-      return {
-        closes: data.results.map(r => r.c),
-        highs:  data.results.map(r => r.h),
-        lows:   data.results.map(r => r.l),
-        source: 'polygon'
+    try {
+      const pg      = POLYGON_INTERVAL_MAP[interval] || POLYGON_INTERVAL_MAP['1d']
+      const daysBack = POLYGON_DAYS_BACK[interval] || 730
+      const to      = new Date().toISOString().split('T')[0]
+      const from    = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const url     = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/${pg.multiplier}/${pg.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
+      const res     = await fetch(url)
+      const data    = await res.json()
+      if (data.results?.length >= bars) {
+        const results = data.results.slice(-bars)
+        return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: 'polygon' }
       }
+    } catch (err) {
+      console.warn('[labs] Polygon failed:', err.message, '— falling back to Yahoo')
     }
   }
-  const yTicker = ticker === '/NQ' ? 'NQ=F' : ticker
-  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${yTicker}?interval=1d&range=14mo`
-  const res  = await fetch(url)
-  const data = await res.json()
-  const result = data.chart.result[0]
-  return {
-    closes: result.indicators.quote[0].close,
-    highs:  result.indicators.quote[0].high,
-    lows:   result.indicators.quote[0].low,
-    source: 'yahoo'
+  const yTicker  = (ticker === '/NQ' || ticker === 'NQ') ? 'NQ=F' : ticker
+  const yConfig  = YAHOO_INTERVAL_MAP[interval] || YAHOO_INTERVAL_MAP['1d']
+  const url      = `https://query1.finance.yahoo.com/v8/finance/chart/${yTicker}?interval=${yConfig.interval}&range=${yConfig.range}`
+  const res      = await fetch(url)
+  const data     = await res.json()
+  const result   = data.chart.result[0]
+  const quotes   = result.indicators.quote[0]
+  const valid    = []
+  for (let i = 0; i < quotes.close.length; i++) {
+    if (quotes.close[i] && quotes.high[i] && quotes.low[i])
+      valid.push({ c: quotes.close[i], h: quotes.high[i], l: quotes.low[i] })
   }
+  const last = valid.slice(-bars)
+  return { closes: last.map(v => v.c), highs: last.map(v => v.h), lows: last.map(v => v.l), source: 'yahoo' }
 }
 
 function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0) {
@@ -1803,44 +1825,55 @@ function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0) {
   }
 }
 
-async function calculateLabsLevels() {
-  console.log('[labs] calculating auto levels...')
-  const now = new Date().toISOString()
+async function calculateLabsLevels(interval = labsSettings.interval) {
+  console.log(`[labs] calculating levels (${interval})...`)
+  const { length, mult } = labsSettings
   try {
-    const qqq = await fetchOHLC('QQQ', 250)
-    const qqqLevels = predictiveRanges(qqq.closes, qqq.highs, qqq.lows)
+    const qqq       = await fetchOHLC('QQQ', 250, interval)
+    const qqqLevels = predictiveRanges(qqq.closes, qqq.highs, qqq.lows, length, mult)
     if (qqqLevels) {
-      qqqLevels.ticker = 'QQQ'
-      qqqLevels.source = qqq.source
-      console.log(`[labs] QQQ levels: R1=${qqqLevels.R1} MID=${qqqLevels.MID}`)
+      qqqLevels.ticker   = 'QQQ'
+      qqqLevels.source   = qqq.source
+      qqqLevels.interval = interval
+      console.log(`[labs] QQQ: R1=${qqqLevels.R1} MID=${qqqLevels.MID} S1=${qqqLevels.S1}`)
     }
 
     let nqLevels = null
     try {
-      const nq = await fetchOHLC('/NQ', 250)
-      nqLevels = predictiveRanges(nq.closes, nq.highs, nq.lows)
+      const nq   = await fetchOHLC('NQ=F', 250, interval)
+      nqLevels   = predictiveRanges(nq.closes, nq.highs, nq.lows, length, mult)
       if (nqLevels) {
-        nqLevels.ticker = 'NQ'
-        nqLevels.source = nq.source
-        console.log(`[labs] NQ levels: R1=${nqLevels.R1} MID=${nqLevels.MID}`)
+        nqLevels.ticker   = 'NQ'
+        nqLevels.source   = nq.source
+        nqLevels.interval = interval
+        console.log(`[labs] NQ: R1=${nqLevels.R1} MID=${nqLevels.MID} S1=${nqLevels.S1}`)
       }
     } catch (nqErr) {
       console.warn('[labs] NQ fetch failed:', nqErr.message)
     }
 
-    labsAutoLevels = { qqq: qqqLevels, nq: nqLevels, lastCalculated: now }
+    labsAutoLevels = { qqq: qqqLevels, nq: nqLevels, lastCalculated: new Date().toISOString(), interval, settings: labsSettings }
     db.prepare(`
       INSERT INTO settings (key, value, updated_at)
       VALUES ('labs_auto_levels', ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
     `).run(JSON.stringify(labsAutoLevels))
     console.log('[labs] levels saved')
+    return labsAutoLevels
   } catch (err) {
     console.error('[labs] calculation failed:', err.message)
+    return null
   }
 }
 
-// Restore from SQLite on startup
+// Restore settings + levels from SQLite on startup
+try {
+  const savedSettings = db.prepare(`SELECT value FROM settings WHERE key = 'labs_settings'`).get()
+  if (savedSettings?.value) {
+    labsSettings = { ...labsSettings, ...JSON.parse(savedSettings.value) }
+    console.log('[labs] settings restored:', labsSettings.interval)
+  }
+} catch (e) {}
 try {
   const saved = db.prepare(`SELECT value FROM settings WHERE key = 'labs_auto_levels'`).get()
   if (saved?.value) {
@@ -1850,13 +1883,13 @@ try {
 } catch (e) {}
 
 // Calculate fresh on startup (async, non-blocking)
-calculateLabsLevels()
+calculateLabsLevels(labsSettings.interval)
 
 // Schedule daily recalc at 6:30pm ET Mon-Fri via dynamic import
 import('node-cron').then(({ default: cron }) => {
   cron.schedule('30 18 * * 1-5', () => {
     console.log('[labs] daily recalc triggered')
-    calculateLabsLevels()
+    calculateLabsLevels(labsSettings.interval)
   }, { timezone: 'America/New_York' })
   console.log('[labs] daily cron scheduled for 6:30pm ET')
 }).catch(e => {
@@ -1874,8 +1907,26 @@ app.get('/labs/scoring-latest', (req, res) => {
 })
 
 app.post('/labs/recalculate', async (req, res) => {
-  await calculateLabsLevels()
+  await calculateLabsLevels(labsSettings.interval)
   res.json({ success: true, levels: labsAutoLevels })
+})
+
+app.post('/labs/settings', async (req, res) => {
+  const { interval, length, mult } = req.body
+  const validIntervals = ['1m', '5m', '15m', '1h', '1d']
+  if (interval && !validIntervals.includes(interval))
+    return res.status(400).json({ error: 'Invalid interval' })
+  if (interval) labsSettings.interval = interval
+  if (length)   labsSettings.length   = parseInt(length)
+  if (mult)     labsSettings.mult     = parseFloat(mult)
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('labs_settings', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(JSON.stringify(labsSettings))
+  console.log('[labs] settings updated:', labsSettings)
+  await calculateLabsLevels(labsSettings.interval)
+  res.json({ success: true, settings: labsSettings, levels: labsAutoLevels })
 })
 
 app.post('/labs/apply-to-main', async (req, res) => {
