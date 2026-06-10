@@ -182,7 +182,7 @@ export default function FocusMode({
 
       {/* Row 4 — Price between levels */}
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-        <div className="max-w-2xl mx-auto w-full flex flex-col gap-2 justify-center min-h-full">
+        <div className="max-w-2xl mx-auto w-full flex flex-col gap-3">
 
           {resistance ? (
             <div className="border border-red-900/50 bg-red-950/10 rounded-lg px-4 py-3">

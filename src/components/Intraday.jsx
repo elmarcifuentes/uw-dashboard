@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSSE } from '../hooks/useSSE'
 import { evaluateHoldExit } from '../utils/holdExit'
 import { calcPnL } from '../utils/pnl'
+import { formatNarrative } from '../utils/formatNarrative'
 import { useLayout } from '../context/LayoutContext'
 import { useAuth } from '../context/AuthContext'
 import PriceLadder from './intraday/PriceLadder'
@@ -308,7 +309,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
           {activeTrade && !expandNarrative ? (
             <div className="border border-gray-800 bg-[#111827] rounded-lg px-3 py-2 flex items-center gap-2">
               <span className="text-xs text-gray-500 truncate flex-1">
-                {(narrativeMode === 'claude' && tacticalBrief) ? tacticalBrief : narrative?.[0] || 'Narrative paused — trade active'}
+                {formatNarrative((narrativeMode === 'claude' && tacticalBrief) ? tacticalBrief : narrative?.[0] || 'Narrative paused — trade active', activeSymbol)}
               </span>
               <button
                 onClick={() => setExpandNarrative(true)}
