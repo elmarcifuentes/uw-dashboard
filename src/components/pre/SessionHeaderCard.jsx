@@ -7,7 +7,7 @@ function msToLabel(ms) {
 export default function SessionHeaderCard({
   date, sessionType, price, nqPrice, nqRatio,
   lastFetch, budget, mode, onToggleMode, onRefresh,
-  providerStatus, lastPolled,
+  providerStatus, lastPolled, activeSymbol = 'NQ',
 }) {
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 space-y-3">
@@ -44,10 +44,9 @@ export default function SessionHeaderCard({
 
       <div>
         <div className="text-2xl font-bold text-white font-mono tabular-nums">
-          ${price?.toFixed(2) ?? '—'}
-        </div>
-        <div className="text-sm text-gray-500 font-mono">
-          NQ {nqPrice ?? '—'}
+          {activeSymbol === 'NQ' && nqRatio && price != null
+            ? '$' + (Math.round(price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : (price != null ? '$' + price.toFixed(2) : '—')}
         </div>
       </div>
 

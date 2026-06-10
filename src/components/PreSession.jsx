@@ -348,6 +348,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
           onRefresh={fetchLatest}
           providerStatus={providerStatus}
           lastPolled={lastPolled}
+          activeSymbol={activeSymbol}
         />
         <AlertsCard
           cascade={cascade}
