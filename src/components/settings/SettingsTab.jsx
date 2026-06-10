@@ -19,7 +19,7 @@ export default function SettingsTab({ systemPaused, pausedAt, activeSymbol }) {
   if (!unlocked) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <div className="text-gray-400 text-sm uppercase tracking-wide">🔒 Settings — PIN Required</div>
+        <div className="text-text-secondary text-sm uppercase tracking-wide">🔒 Settings — PIN Required</div>
         <div className="flex gap-2">
           <input
             type="password"
@@ -27,26 +27,26 @@ export default function SettingsTab({ systemPaused, pausedAt, activeSymbol }) {
             value={pinInput}
             onChange={e => { setPinInput(e.target.value); setPinError(null) }}
             onKeyDown={e => e.key === 'Enter' && handleUnlock()}
-            className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none w-32 text-center tracking-widest"
+            className="bg-bg-elevated border border-border-strong rounded px-3 py-2 text-text-primary text-sm focus:border-blue-500 focus:outline-none w-32 text-center tracking-widest"
             autoFocus
           />
-          <button onClick={handleUnlock} className="bg-blue-600 hover:bg-blue-500 text-white rounded px-4 py-2 text-sm">
+          <button onClick={handleUnlock} className="bg-blue-600 hover:bg-blue-500 text-text-primary rounded px-4 py-2 text-sm">
             Unlock
           </button>
         </div>
         {pinError && <div className="text-red-400 text-xs">{pinError}</div>}
-        <div className="text-gray-600 text-xs mt-2">Same PIN as before</div>
+        <div className="text-text-muted text-xs mt-2">Same PIN as before</div>
       </div>
     )
   }
 
   return (
     <div className="py-3">
-      <div className="flex gap-1 bg-gray-800/50 rounded-lg p-0.5 mb-4 max-w-xs">
+      <div className="flex gap-1 bg-bg-elevated/50 rounded-lg p-0.5 mb-4 max-w-xs">
         <button
           onClick={() => setActivePanel('system')}
           className={`flex-1 py-2 rounded text-xs font-bold transition-colors ${
-            activePanel === 'system' ? 'bg-[#111827] text-white' : 'text-gray-500 hover:text-gray-300'
+            activePanel === 'system' ? 'bg-bg-card text-text-primary' : 'text-text-tertiary hover:text-text-secondary'
           }`}
         >
           ⚙ System
@@ -54,7 +54,7 @@ export default function SettingsTab({ systemPaused, pausedAt, activeSymbol }) {
         <button
           onClick={() => setActivePanel('labs')}
           className={`flex-1 py-2 rounded text-xs font-bold transition-colors ${
-            activePanel === 'labs' ? 'bg-[#111827] text-white' : 'text-gray-500 hover:text-gray-300'
+            activePanel === 'labs' ? 'bg-bg-card text-text-primary' : 'text-text-tertiary hover:text-text-secondary'
           }`}
         >
           🧪 Labs

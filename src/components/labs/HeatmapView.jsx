@@ -31,8 +31,8 @@ export default function HeatmapView({ levels, currentPrice, nqRatio, activeSourc
   }
 
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">
+    <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
+      <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">
         Level Heatmap — {showNQ ? 'NQ' : 'QQQ'}
       </div>
 
@@ -53,25 +53,25 @@ export default function HeatmapView({ levels, currentPrice, nqRatio, activeSourc
             ? levelInfo.color === 'red'   ? 'bg-red-500'
             : levelInfo.color === 'green' ? 'bg-green-500'
             : 'bg-blue-500'
-            : 'bg-gray-700'
+            : 'bg-bg-elevated'
 
           const textColor = levelInfo?.color === 'red'   ? 'text-red-400'
             : levelInfo?.color === 'green' ? 'text-green-400'
             : levelInfo?.color === 'blue'  ? 'text-blue-400'
             : nearCurrent                  ? 'text-yellow-400'
-            : 'text-gray-600'
+            : 'text-text-muted'
 
           return (
             <div
               key={i}
               className={`flex items-center gap-2 py-0.5 rounded px-1 ${
-                nearCurrent ? 'bg-yellow-400/10' : levelInfo ? 'bg-gray-800/50' : ''
+                nearCurrent ? 'bg-yellow-400/10' : levelInfo ? 'bg-bg-elevated/50' : ''
               }`}
             >
               <span className={`w-16 text-right shrink-0 ${textColor}`}>
                 {p(rowPrice)}
               </span>
-              <div className="flex-1 h-3 bg-gray-900 rounded overflow-hidden relative">
+              <div className="flex-1 h-3 bg-bg-card2 rounded overflow-hidden relative">
                 <div
                   className={`h-full rounded transition-all ${barColor} ${levelInfo ? 'opacity-80' : 'opacity-30'}`}
                   style={{ width: `${barWidth}%` }}
@@ -88,24 +88,24 @@ export default function HeatmapView({ levels, currentPrice, nqRatio, activeSourc
         })}
       </div>
 
-      <div className="flex gap-4 mt-3 text-xs text-gray-600">
+      <div className="flex gap-4 mt-3 text-xs text-text-muted">
         <span><span className="text-red-500">■</span> Resistance band</span>
         <span><span className="text-green-500">■</span> Support band</span>
         <span><span className="text-yellow-400">▶</span> Current price</span>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-gray-800 space-y-1">
+      <div className="mt-3 pt-3 border-t border-border-subtle space-y-1">
         <div className="flex justify-between text-xs">
-          <span className="text-gray-600">ATR band</span>
-          <span className="text-gray-400 font-mono">{p(levels.holdAtr)} per side</span>
+          <span className="text-text-muted">ATR band</span>
+          <span className="text-text-secondary font-mono">{p(levels.holdAtr)} per side</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-gray-600">Full range</span>
-          <span className="text-gray-400 font-mono">{p(levels.S2)} — {p(levels.R2)}</span>
+          <span className="text-text-muted">Full range</span>
+          <span className="text-text-secondary font-mono">{p(levels.S2)} — {p(levels.R2)}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-gray-600">Source</span>
-          <span className="text-gray-500">{levels.source}</span>
+          <span className="text-text-muted">Source</span>
+          <span className="text-text-tertiary">{levels.source}</span>
         </div>
       </div>
     </div>

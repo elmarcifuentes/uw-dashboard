@@ -87,17 +87,17 @@ export default function Guide() {
 
       {/* Section 1 — How to Read */}
       <div>
-        <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-3">
+        <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-3">
           How to Read This Dashboard
         </h2>
         <div className="space-y-3">
           {GUIDE_SECTIONS.map((s, i) => (
-            <div key={i} className="bg-gray-800/60 rounded border border-gray-700 p-4">
+            <div key={i} className="bg-bg-elevated/60 rounded border border-border-default p-4">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-2xl">{s.icon}</span>
-                <h3 className="text-white font-bold text-sm">{s.title}</h3>
+                <h3 className="text-text-primary font-bold text-sm">{s.title}</h3>
               </div>
-              <p className="text-gray-300 text-sm leading-relaxed">{s.content}</p>
+              <p className="text-text-secondary text-sm leading-relaxed">{s.content}</p>
             </div>
           ))}
         </div>
@@ -105,19 +105,19 @@ export default function Guide() {
 
       {/* Section 2 — Signal Reference */}
       <div>
-        <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-3">
+        <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-3">
           Signal Reference
         </h2>
 
         {/* Color reference */}
-        <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Level Colors</h3>
+        <h3 className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Level Colors</h3>
         <div className="space-y-2 mb-6">
           {COLOR_REFERENCE.map((item, i) => (
-            <div key={i} className="flex gap-3 p-3 bg-gray-800/60 rounded border border-gray-700">
+            <div key={i} className="flex gap-3 p-3 bg-bg-elevated/60 rounded border border-border-default">
               <div className="w-1 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
               <div>
                 <div className="font-bold text-sm mb-1" style={{ color: item.color }}>{item.label}</div>
-                <p className="text-gray-300 text-xs mb-1">{item.meaning}</p>
+                <p className="text-text-secondary text-xs mb-1">{item.meaning}</p>
                 <p className="text-teal-400 text-xs">→ {item.action}</p>
               </div>
             </div>
@@ -125,36 +125,36 @@ export default function Guide() {
         </div>
 
         {/* Flag reference */}
-        <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Flags</h3>
+        <h3 className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Flags</h3>
         <div className="space-y-2 mb-6">
           {FLAG_REFERENCE.map((item, i) => (
-            <div key={i} className="flex gap-3 p-3 bg-gray-800/60 rounded border border-gray-700">
+            <div key={i} className="flex gap-3 p-3 bg-bg-elevated/60 rounded border border-border-default">
               <span className={`text-lg w-6 shrink-0 text-center ${item.color}`}>{item.flag}</span>
               <div>
                 <div className={`font-bold text-sm mb-1 ${item.color}`}>{item.label}</div>
-                <p className="text-gray-300 text-xs">{item.meaning}</p>
+                <p className="text-text-secondary text-xs">{item.meaning}</p>
               </div>
             </div>
           ))}
         </div>
 
         {/* Arrow reference */}
-        <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Arrows</h3>
-        <div className="bg-gray-800/60 rounded border border-gray-700 divide-y divide-gray-700 mb-6">
+        <h3 className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Arrows</h3>
+        <div className="bg-bg-elevated/60 rounded border border-border-default divide-y divide-gray-700 mb-6">
           {ARROW_REFERENCE.map((item, i) => (
             <div key={i} className="flex items-center gap-4 px-3 py-2">
-              <span className="font-mono text-sm text-white w-12 shrink-0">{item.arrow}</span>
-              <span className="text-gray-300 text-xs">{item.meaning}</span>
+              <span className="font-mono text-sm text-text-primary w-12 shrink-0">{item.arrow}</span>
+              <span className="text-text-secondary text-xs">{item.meaning}</span>
             </div>
           ))}
         </div>
 
         {/* Validated rules */}
-        <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">Validated Rules</h3>
-        <div className="bg-gray-800/60 rounded border border-gray-700 overflow-hidden">
+        <h3 className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Validated Rules</h3>
+        <div className="bg-bg-elevated/60 rounded border border-border-default overflow-hidden">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-700">
+              <tr className="text-text-tertiary border-b border-border-default">
                 <th className="text-left px-3 py-2">Rule</th>
                 <th className="text-left px-3 py-2 w-20">Accuracy</th>
                 <th className="text-left px-3 py-2">Description</th>
@@ -162,10 +162,10 @@ export default function Guide() {
             </thead>
             <tbody>
               {VALIDATED_RULES.map((rule, i) => (
-                <tr key={i} className="border-b border-gray-800 last:border-0">
+                <tr key={i} className="border-b border-border-subtle last:border-0">
                   <td className="px-3 py-2 text-green-400 font-bold whitespace-nowrap">{rule.rule}</td>
                   <td className="px-3 py-2 text-yellow-400 font-mono">{rule.sessions}</td>
-                  <td className="px-3 py-2 text-gray-300">{rule.description}</td>
+                  <td className="px-3 py-2 text-text-secondary">{rule.description}</td>
                 </tr>
               ))}
             </tbody>

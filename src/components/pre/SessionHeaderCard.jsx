@@ -10,14 +10,14 @@ export default function SessionHeaderCard({
   providerStatus, lastPolled, activeSymbol = 'NQ',
 }) {
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 space-y-3">
+    <div className="bg-bg-card border border-border-subtle rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-xs text-gray-500 uppercase tracking-wider">Session</div>
+        <div className="text-xs text-text-tertiary uppercase tracking-wider">Session</div>
         <div className="flex items-center gap-2">
           <span className={`text-xs px-2 py-0.5 rounded font-medium ${
             sessionType === 'LIVE' ? 'bg-green-950 text-green-400'
               : sessionType === 'PRE-MARKET' ? 'bg-blue-950 text-blue-400'
-              : 'bg-gray-800 text-gray-500'
+              : 'bg-bg-elevated text-text-tertiary'
           }`}>
             {sessionType}
           </span>
@@ -33,17 +33,17 @@ export default function SessionHeaderCard({
           </button>
           <button
             onClick={onRefresh}
-            className="px-2 py-0.5 text-xs bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-gray-400 transition-colors"
+            className="px-2 py-0.5 text-xs bg-bg-elevated hover:bg-bg-elevated rounded border border-border-default text-text-secondary transition-colors"
           >
             ↺
           </button>
         </div>
       </div>
 
-      <div className="text-xs text-gray-500 font-mono">{date}</div>
+      <div className="text-xs text-text-tertiary font-mono">{date}</div>
 
       <div>
-        <div className="text-2xl font-bold text-white font-mono tabular-nums">
+        <div className="text-2xl font-bold text-text-primary font-mono tabular-nums">
           {activeSymbol === 'NQ' && nqRatio && price != null
             ? '$' + (Math.round(price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : (price != null ? '$' + price.toFixed(2) : '—')}

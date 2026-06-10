@@ -25,8 +25,8 @@ export default function EvidenceMeter({ levels, etfDirection }) {
   ]
 
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Signal Evidence</div>
+    <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
+      <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Signal Evidence</div>
       <div className="space-y-2">
         {meters.map(m => {
           const isBull = m.pct > 55, isBear = m.pct < 45
@@ -34,19 +34,19 @@ export default function EvidenceMeter({ levels, etfDirection }) {
           return (
             <div key={m.label} className="flex items-center gap-3">
               <span style={{ minWidth: '80px', flexShrink: 0 }}
-                    className="text-xs text-gray-500 whitespace-nowrap">
+                    className="text-xs text-text-tertiary whitespace-nowrap">
                 {m.label}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}
-                   className="relative h-1.5 bg-gray-800 rounded overflow-hidden">
-                <div className="absolute inset-y-0 left-1/2 w-px bg-gray-600 z-10" />
+                   className="relative h-1.5 bg-bg-elevated rounded overflow-hidden">
+                <div className="absolute inset-y-0 left-1/2 w-px bg-bg-card2 z-10" />
                 {m.pct >= 50
                   ? <div className={`absolute inset-y-0 left-1/2 rounded-r ${barColor}`} style={{ width: `${(m.pct - 50) * 2}%` }} />
                   : <div className={`absolute inset-y-0 right-1/2 rounded-l ${barColor}`} style={{ width: `${(50 - m.pct) * 2}%` }} />
                 }
               </div>
               <span style={{ minWidth: '64px', flexShrink: 0, textAlign: 'right' }}
-                    className="text-xs font-mono text-gray-500 whitespace-nowrap">
+                    className="text-xs font-mono text-text-tertiary whitespace-nowrap">
                 {m.value}
               </span>
             </div>

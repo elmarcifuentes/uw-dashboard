@@ -8,10 +8,10 @@ export default function CascadeBanner({ cascade, midPrice, nqRatio }) {
 
   if (!active) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded bg-green-900/40 border border-green-700">
-        <span className="w-2 h-2 rounded-full bg-green-500 shrink-0 inline-block" />
-        <span className="text-green-400 text-sm font-medium">✓ CASCADE INACTIVE</span>
-        <span className="text-gray-400 text-xs">
+      <div className="flex items-center gap-2 px-3 py-2 rounded bg-state-holdSoft border border-state-hold/40">
+        <span className="w-2 h-2 rounded-full bg-state-hold shrink-0 inline-block" />
+        <span className="text-state-hold text-sm font-medium">✓ CASCADE INACTIVE</span>
+        <span className="text-text-secondary text-xs">
           Institutional support present at key levels — structure intact
         </span>
       </div>
@@ -19,14 +19,14 @@ export default function CascadeBanner({ cascade, midPrice, nqRatio }) {
   }
 
   return (
-    <div className="rounded bg-red-900/60 border border-red-500 p-3 animate-pulse">
+    <div className="rounded bg-state-stopSoft border border-state-stop p-3 animate-pulse">
       <div className="flex items-center gap-2 mb-2">
-        <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 inline-block" />
-        <span className="text-red-200 font-bold text-sm">⚠ CASCADE ACTIVE</span>
+        <span className="w-2 h-2 rounded-full bg-state-stop shrink-0 inline-block" />
+        <span className="text-state-stop/90 font-bold text-sm">⚠ CASCADE ACTIVE</span>
       </div>
-      <p className="text-red-300 text-xs mb-3 leading-relaxed">
+      <p className="text-state-stop/70 text-xs mb-3 leading-relaxed">
         If price breaks below MID
-        {midPrice && <> <span className="text-white">${midPrice.toFixed(2)}</span>{midNq && <span className="text-gray-400"> / NQ {midNq}</span>}</>}
+        {midPrice && <> <span className="text-text-primary">${midPrice.toFixed(2)}</span>{midNq && <span className="text-text-secondary"> / NQ {midNq}</span>}</>}
         {' '}there is no institutional support at S1 or S2.
         GEX provides mechanical friction only.
         Do not hold longs through a MID break in this configuration.
@@ -38,10 +38,10 @@ export default function CascadeBanner({ cascade, midPrice, nqRatio }) {
           'S2 is a structural void',
         ].map((label, i) => (
           <div key={i} className="flex items-center gap-2 text-xs">
-            <span className={conditions[i] ? 'text-red-400' : 'text-gray-600'}>
+            <span className={conditions[i] ? 'text-state-stop' : 'text-text-muted'}>
               {conditions[i] ? '●' : '○'}
             </span>
-            <span className={conditions[i] ? 'text-red-300' : 'text-gray-600'}>
+            <span className={conditions[i] ? 'text-state-stop/80' : 'text-text-muted'}>
               {label}
             </span>
           </div>

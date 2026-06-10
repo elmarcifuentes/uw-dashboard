@@ -1,8 +1,8 @@
 const BADGE_STYLES = {
-  full_stack: 'bg-yellow-500 text-black',
-  conflict:   'bg-amber-500 text-black',
-  boundary:   'bg-orange-500 text-black',
-  lower_high: 'bg-purple-600 text-white',
+  full_stack: 'bg-accent-price text-bg-base',
+  conflict:   'bg-state-cascadeWatch text-bg-base',
+  boundary:   'bg-accent-price/80 text-bg-base',
+  lower_high: 'bg-accent-aiSoft text-accent-ai',
 }
 
 const BADGE_LABELS = {

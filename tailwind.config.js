@@ -2,8 +2,79 @@
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        bg: {
+          base:     '#08111f',
+          subtle:   '#0d1728',
+          card:     '#101b2f',
+          card2:    '#132038',
+          elevated: '#17253f',
+        },
+        text: {
+          primary:   '#e8eefc',
+          secondary: '#aab7d6',
+          tertiary:  '#73819f',
+          muted:     '#55627c',
+          disabled:  '#3c465a',
+        },
+        border: {
+          subtle:  'rgba(154, 173, 206, 0.10)',
+          default: 'rgba(154, 173, 206, 0.18)',
+          strong:  'rgba(154, 173, 206, 0.28)',
+        },
+        signal: {
+          support:          '#2fd47a',
+          supportSoft:      'rgba(47, 212, 122, 0.14)',
+          resistance:       '#ff6b6b',
+          resistanceSoft:   'rgba(255, 107, 107, 0.14)',
+          neutral:          '#7b8ba8',
+          neutralSoft:      'rgba(123, 139, 168, 0.12)',
+          continuation:     '#5ba7ff',
+          continuationSoft: 'rgba(91, 167, 255, 0.14)',
+        },
+        state: {
+          hold:              '#20c997',
+          holdSoft:          'rgba(32, 201, 151, 0.16)',
+          exit:              '#ffb84d',
+          exitSoft:          'rgba(255, 184, 77, 0.16)',
+          stop:              '#ff4d5e',
+          stopSoft:          'rgba(255, 77, 94, 0.16)',
+          cascadeWatch:      '#ffb020',
+          cascadeWatchSoft:  'rgba(255, 176, 32, 0.16)',
+          cascadeActive:     '#ff8a00',
+          cascadeActiveSoft: 'rgba(255, 138, 0, 0.18)',
+          info:              '#66d9ff',
+          infoSoft:          'rgba(102, 217, 255, 0.14)',
+          paused:            '#8b94ad',
+        },
+        accent: {
+          price:     '#f5c84c',
+          priceSoft: 'rgba(245, 200, 76, 0.16)',
+          ai:        '#9b7dff',
+          aiSoft:    'rgba(155, 125, 255, 0.16)',
+          gamma:     '#53c7ff',
+          gammaSoft: 'rgba(83, 199, 255, 0.14)',
+        },
+      },
+      fontFamily: {
+        ui:    ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        price: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+      },
+      fontSize: {
+        hero:  ['32px', { lineHeight: '36px', fontWeight: '700' }],
+        xl2:   ['24px', { lineHeight: '28px', fontWeight: '600' }],
+        lg2:   ['18px', { lineHeight: '24px', fontWeight: '600' }],
+        md2:   ['14px', { lineHeight: '20px', fontWeight: '500' }],
+        sm2:   ['12px', { lineHeight: '16px', fontWeight: '500' }],
+        micro: ['11px', { lineHeight: '14px', fontWeight: '600' }],
+      },
+      boxShadow: {
+        card:     '0 1px 3px rgba(0,0,0,0.3)',
+        elevated: '0 4px 12px rgba(0,0,0,0.4)',
+        focus:    '0 0 0 1px rgba(154,173,206,0.18)',
+      },
+    },
   },
   plugins: [],
 }
-

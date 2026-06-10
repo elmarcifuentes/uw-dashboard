@@ -9,12 +9,12 @@ import SectorETF from './SectorETF'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
-function StatCard({ label, value, sub, color = 'text-white' }) {
+function StatCard({ label, value, sub, color = 'text-text-primary' }) {
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg px-4 py-3">
-      <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">{label}</div>
+    <div className="bg-bg-card border border-border-subtle rounded-lg px-4 py-3">
+      <div className="text-xs text-text-muted uppercase tracking-wider mb-1">{label}</div>
       <div className={`text-xl font-bold ${color}`}>{value ?? '—'}</div>
-      {sub && <div className="text-xs text-gray-600 mt-0.5">{sub}</div>}
+      {sub && <div className="text-xs text-text-muted mt-0.5">{sub}</div>}
     </div>
   )
 }
@@ -73,8 +73,8 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
         {/* Market state */}
-        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 flex flex-col gap-3">
-          <div className="text-xs text-gray-500 uppercase tracking-wider">Market State</div>
+        <div className="bg-bg-card border border-border-subtle rounded-lg p-4 flex flex-col gap-3">
+          <div className="text-xs text-text-tertiary uppercase tracking-wider">Market State</div>
 
           {/* Sentiment badge — most prominent */}
           {effectiveSentiment?.state && (
@@ -96,14 +96,14 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
 
           {/* NOW text */}
           {assistantRead?.now && (
-            <p className="text-xs text-gray-400 leading-relaxed">
+            <p className="text-xs text-text-secondary leading-relaxed">
               {formatNarrative(assistantRead.now, activeSymbol)}
             </p>
           )}
 
           {/* Session brief expander */}
           {sessionBrief && (
-            <div className="border-t border-gray-800 pt-2">
+            <div className="border-t border-border-subtle pt-2">
               <button
                 onClick={() => setShowBrief(!showBrief)}
                 className="text-xs text-purple-700 hover:text-purple-500 transition-colors"
@@ -111,7 +111,7 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
                 {showBrief ? '▲ hide' : '▼ session brief'}
               </button>
               {showBrief && (
-                <p className="text-xs text-gray-400 mt-2 leading-relaxed border-l-2 border-purple-900 pl-2">
+                <p className="text-xs text-text-secondary mt-2 leading-relaxed border-l-2 border-purple-900 pl-2">
                   {formatNarrative(sessionBrief, activeSymbol)}
                 </p>
               )}
@@ -120,25 +120,25 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
         </div>
 
         {/* Price hero */}
-        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 flex flex-col items-center justify-center">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Live Price</div>
-          <div className="text-4xl font-bold text-white font-mono tabular-nums">
+        <div className="bg-bg-card border border-border-subtle rounded-lg p-4 flex flex-col items-center justify-center">
+          <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Live Price</div>
+          <div className="text-4xl font-bold text-text-primary font-mono tabular-nums">
             {activeSymbol === 'NQ'
               ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
               : (currentPrice != null ? '$' + currentPrice.toFixed(2) : '—')}
           </div>
           <div className="flex items-center gap-2 mt-3">
             <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascade?.active ? 'animate-pulse' : ''}`} />
-            <span className="text-xs text-gray-500">{connected ? 'LIVE' : 'DISCONNECTED'}</span>
+            <span className="text-xs text-text-tertiary">{connected ? 'LIVE' : 'DISCONNECTED'}</span>
             {priceVelocity != null && (() => {
               const abs = Math.abs(priceVelocity), up = priceVelocity > 0
               const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : '→'
-              const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : 'text-gray-600'
+              const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : 'text-text-muted'
               return <span className={`text-xs font-bold ${color}`}>{arrow}</span>
             })()}
           </div>
           {focusLevel && currentPrice != null && (
-            <div className="text-xs text-gray-500 mt-2">
+            <div className="text-xs text-text-tertiary mt-2">
               {(() => {
                 const d = Math.abs(currentPrice - focusLevel.price)
                 const val = activeSymbol === 'NQ' && nqRatio ? Math.round(d * nqRatio * 4) / 4 : d
@@ -146,11 +146,11 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
               })()}
             </div>
           )}
-          <div className="text-xs text-gray-600 mt-1">
+          <div className="text-xs text-text-muted mt-1">
             {sessionType === 'LIVE' ? '● Market open' : sessionType === 'PRE-MARKET' ? '◑ Pre-market' : '○ After hours'}
           </div>
           {lastRescoreTime && (
-            <div className="text-xs text-gray-700 mt-0.5">updated {lastRescoreTime}</div>
+            <div className="text-xs text-text-disabled mt-0.5">updated {lastRescoreTime}</div>
           )}
         </div>
 
@@ -170,9 +170,9 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Streak"     value={streak}          sub="consecutive sessions" color="text-white" />
-        <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} color={etfDir === 'bullish' ? 'text-green-400' : etfDir === 'bearish' ? 'text-red-400' : 'text-gray-400'} />
-        <StatCard label="API Budget" value={apiCalls}        sub={`/ 14,000 (${typeof apiCalls === 'number' ? ((apiCalls / 14000) * 100).toFixed(1) : '—'}%)`} color="text-white" />
+        <StatCard label="Streak"     value={streak}          sub="consecutive sessions" color="text-text-primary" />
+        <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} color={etfDir === 'bullish' ? 'text-green-400' : etfDir === 'bearish' ? 'text-red-400' : 'text-text-secondary'} />
+        <StatCard label="API Budget" value={apiCalls}        sub={`/ 14,000 (${typeof apiCalls === 'number' ? ((apiCalls / 14000) * 100).toFixed(1) : '—'}%)`} color="text-text-primary" />
         <StatCard label="GEX Regime" value={status?.expansionGexActive ? 'EXPANSION' : 'PINNING'} sub={`${status?.allPinningSessions ?? '—'} sessions`} color={status?.expansionGexActive ? 'text-red-400' : 'text-green-400'} />
       </div>
 

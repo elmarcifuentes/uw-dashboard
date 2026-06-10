@@ -35,7 +35,7 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
 
   const borderClass = isClaudeMode
     ? 'border border-purple-900/50 bg-purple-950/20'
-    : 'border border-gray-700 bg-gray-900/80'
+    : 'border border-border-default bg-bg-card2/80'
 
   return (
     <div className={`rounded-lg ${borderClass}`}>
@@ -46,19 +46,19 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
         onClick={() => setExpanded(v => !v)}
       >
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 uppercase tracking-wider">Session Read</span>
+          <span className="text-xs text-text-tertiary uppercase tracking-wider">Session Read</span>
           {isClaudeMode && (
             <span className="text-xs bg-purple-900/50 text-purple-400 px-1.5 py-0.5 rounded">
               🤖 Claude
             </span>
           )}
           {!isClaudeMode && narrativeMode === 'template' && (
-            <span className="text-xs text-gray-600">📋 template</span>
+            <span className="text-xs text-text-muted">📋 template</span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {time && <span className="text-xs text-gray-600 font-mono">{time}</span>}
-          <span className="text-gray-500 text-sm font-bold leading-none">{expanded ? '▲' : '▼'}</span>
+          {time && <span className="text-xs text-text-muted font-mono">{time}</span>}
+          <span className="text-text-tertiary text-sm font-bold leading-none">{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
 
@@ -77,7 +77,7 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
                   isCascade   ? 'text-red-300'    :
                   isWarning   ? 'text-amber-300'  :
                   isFullStack ? 'text-yellow-300' :
-                  (i === 0 ? 'text-gray-200' : 'text-gray-300')
+                  (i === 0 ? 'text-gray-200' : 'text-text-secondary')
                 return (
                   <p key={i} className={`text-xs leading-relaxed ${i > 0 ? 'mt-1' : ''} ${textColor}`}>
                     {formatNarrative(line, activeSymbol)}

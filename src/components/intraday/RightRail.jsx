@@ -29,7 +29,6 @@ export default function RightRail({
   const [contracts, setContracts]               = useState(1)
   const [scoring, setScoring]                   = useState(false)
 
-  // External level selection from PriceLadder
   useEffect(() => {
     if (selectedLevel) {
       setActiveLevel(selectedLevel)
@@ -52,12 +51,10 @@ export default function RightRail({
     }
   }, [nearestLevelId, userSelected])
 
-  // Auto-switch to trade mode when active trade appears
   useEffect(() => {
     if (activeTrade) setRailMode('trade')
   }, [activeTrade?.id])
 
-  // Open entry form when pendingTrade arrives from Scout
   useEffect(() => {
     if (pendingTrade) {
       setShowEntryForm(true)
@@ -69,7 +66,7 @@ export default function RightRail({
   const tradeCurrentPrice = (() => {
     if (tradeUnit === 'NQ' || tradeUnit === 'MNQ') return nqPrice
     if (tradeUnit === 'QQQ') return currentPrice
-    if (tradeUnit === 'ES'  || tradeUnit === 'MES') return nqPrice // replace with ES price when available
+    if (tradeUnit === 'ES'  || tradeUnit === 'MES') return nqPrice
     return currentPrice
   })()
 
@@ -128,12 +125,11 @@ export default function RightRail({
   return (
     <div className="space-y-3">
 
-      {/* Mode switcher */}
-      <div className="flex gap-1 bg-gray-800/50 rounded-lg p-0.5">
+      <div className="flex gap-1 bg-bg-elevated/50 rounded-lg p-0.5">
         <button
           onClick={() => setRailMode('evidence')}
           className={`flex-1 py-1.5 rounded text-xs font-medium transition-colors ${
-            railMode === 'evidence' ? 'bg-[#111827] text-white' : 'text-gray-500 hover:text-gray-300'
+            railMode === 'evidence' ? 'bg-bg-card text-text-primary' : 'text-text-tertiary hover:text-text-secondary'
           }`}
         >
           Evidence
@@ -141,12 +137,12 @@ export default function RightRail({
         <button
           onClick={() => setRailMode('trade')}
           className={`flex-1 py-1.5 rounded text-xs font-medium transition-colors relative ${
-            railMode === 'trade' ? 'bg-[#111827] text-white' : 'text-gray-500 hover:text-gray-300'
+            railMode === 'trade' ? 'bg-bg-card text-text-primary' : 'text-text-tertiary hover:text-text-secondary'
           }`}
         >
           Trade
           {activeTrade && (
-            <span className="absolute top-0.5 right-1.5 w-1.5 h-1.5 rounded-full bg-green-400" />
+            <span className="absolute top-0.5 right-1.5 w-1.5 h-1.5 rounded-full bg-state-hold" />
           )}
         </button>
       </div>
@@ -154,41 +150,39 @@ export default function RightRail({
       {/* EVIDENCE MODE */}
       {railMode === 'evidence' && (
         <>
-          {/* Cascade summary */}
           <div className={`border rounded-lg p-3 ${
             cascade?.active
-              ? 'border-red-800 bg-red-950/20'
+              ? 'border-state-stop bg-state-stopSoft'
               : midDp <= -0.500
-              ? 'border-amber-800/50 bg-amber-950/10'
-              : 'border-gray-800 bg-[#111827]'
+              ? 'border-state-cascadeWatch/50 bg-state-cascadeWatchSoft'
+              : 'border-border-subtle bg-bg-card'
           }`}>
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Cascade Monitor</div>
+            <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">Cascade Monitor</div>
             <div className={`text-sm font-bold mb-1 ${
-              cascade?.active ? 'text-red-400'
-                : midDp <= -0.500 ? 'text-amber-400'
-                : 'text-green-400'
+              cascade?.active ? 'text-state-stop'
+                : midDp <= -0.500 ? 'text-state-cascadeWatch'
+                : 'text-state-hold'
             }`}>
               {cascade?.active ? '⚠ ACTIVE' : midDp <= -0.500 ? '⚡ APPROACHING' : '✓ SAFE'}
             </div>
-            <div className="text-xs text-gray-400 font-mono">MID dp {midDp.toFixed(3)}</div>
+            <div className="text-xs text-text-secondary font-price">MID dp {midDp.toFixed(3)}</div>
             {!cascade?.active && (
-              <div className={`text-xs font-mono mt-0.5 ${midDp <= -0.500 ? 'text-amber-400' : 'text-gray-600'}`}>
+              <div className={`text-xs font-price mt-0.5 ${midDp <= -0.500 ? 'text-state-cascadeWatch' : 'text-text-muted'}`}>
                 {gap.toFixed(3)} from trigger
               </div>
             )}
           </div>
 
-          {/* Level selector + evidence detail */}
-          <div className="border border-gray-800 bg-[#111827] rounded-lg p-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Level Evidence</div>
+          <div className="border border-border-subtle bg-bg-card rounded-lg p-3">
+            <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">Level Evidence</div>
 
             {userSelected && activeLevel && (
               <div className="flex items-center gap-1.5 mb-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                <span className="text-xs text-indigo-400">Showing {activeLevel} evidence</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-signal-continuation" />
+                <span className="text-xs text-signal-continuation">Showing {activeLevel} evidence</span>
                 <button
                   onClick={() => { setUserSelected(false); setActiveLevel(nearestLevelId) }}
-                  className="text-xs text-gray-600 hover:text-gray-400 ml-auto"
+                  className="text-xs text-text-muted hover:text-text-secondary ml-auto"
                 >
                   reset
                 </button>
@@ -206,11 +200,11 @@ export default function RightRail({
                   className={`flex-1 py-1 rounded text-xs font-bold transition-all duration-200 ${
                     activeLevel === level.id
                       ? level.classification === 'sell_resistance'
-                        ? 'bg-red-800 text-white ring-1 ring-red-500'
+                        ? 'bg-signal-resistanceSoft text-signal-resistance ring-1 ring-signal-resistance/50'
                         : level.classification === 'buy_support'
-                        ? 'bg-green-800 text-white ring-1 ring-green-500'
-                        : 'bg-gray-600 text-white ring-1 ring-gray-400'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                        ? 'bg-signal-supportSoft text-signal-support ring-1 ring-signal-support/50'
+                        : 'bg-bg-card2 text-text-secondary ring-1 ring-border-default'
+                      : 'bg-bg-elevated text-text-secondary hover:bg-bg-card2'
                   }`}
                 >
                   {level.id}
@@ -221,13 +215,13 @@ export default function RightRail({
             {activeLevelData ? (
               <div className="space-y-2">
                 <div className="flex justify-between items-baseline">
-                  <span className="text-sm font-bold text-white font-mono">
+                  <span className="text-sm font-bold text-text-primary font-price">
                     {activeSymbol === 'NQ' && nqRatio
                       ? '$' + (Math.round(activeLevelData.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       : '$' + (activeLevelData.price?.toFixed(2) ?? '—')}
                   </span>
                   {currentPrice != null && (
-                    <span className="text-xs font-mono text-gray-400">
+                    <span className="text-xs font-price text-text-secondary">
                       {(() => {
                         const rawDist = currentPrice - activeLevelData.price
                         const sign = rawDist >= 0 ? '+' : '-'
@@ -242,26 +236,26 @@ export default function RightRail({
 
                 <div className="flex items-center gap-2">
                   <span style={{ minWidth: '64px', flexShrink: 0 }}
-                        className="text-xs text-gray-600 whitespace-nowrap">
+                        className="text-xs text-text-muted whitespace-nowrap">
                     Dark Pool
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}
-                       className="h-1.5 bg-gray-800 rounded relative overflow-hidden">
-                    <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700 z-10" />
+                       className="h-1.5 bg-bg-elevated rounded relative overflow-hidden">
+                    <div className="absolute inset-y-0 left-1/2 w-px bg-text-disabled z-10" />
                     {(() => {
                       const dp  = activeLevelData.dark_pool || 0
                       const pct = ((dp + 1) / 2) * 100
                       return pct >= 50 ? (
-                        <div className="absolute inset-y-0 left-1/2 bg-green-500"
+                        <div className="absolute inset-y-0 left-1/2 bg-signal-support"
                              style={{ width: `${(pct - 50) * 2}%` }} />
                       ) : (
-                        <div className="absolute inset-y-0 right-1/2 bg-red-500"
+                        <div className="absolute inset-y-0 right-1/2 bg-signal-resistance"
                              style={{ width: `${(50 - pct) * 2}%` }} />
                       )
                     })()}
                   </div>
                   <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
-                        className="text-xs font-mono text-gray-400">
+                        className="text-xs font-price text-text-secondary">
                     {activeLevelData.dark_pool?.toFixed(3)}
                   </span>
                 </div>
@@ -274,50 +268,50 @@ export default function RightRail({
 
                 <div className="flex items-center gap-2">
                   <span style={{ minWidth: '64px', flexShrink: 0 }}
-                        className="text-xs text-gray-600 whitespace-nowrap">
+                        className="text-xs text-text-muted whitespace-nowrap">
                     Score
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}
-                       className="h-1.5 bg-gray-800 rounded overflow-hidden">
+                       className="h-1.5 bg-bg-elevated rounded overflow-hidden">
                     <div className={`h-full ${
-                      activeLevelData.classification === 'sell_resistance' ? 'bg-red-500'
-                        : activeLevelData.classification === 'buy_support' ? 'bg-green-500'
-                        : 'bg-gray-600'
+                      activeLevelData.classification === 'sell_resistance' ? 'bg-signal-resistance'
+                        : activeLevelData.classification === 'buy_support' ? 'bg-signal-support'
+                        : 'bg-signal-neutral'
                     }`}
                          style={{ width: `${Math.min(activeLevelData.score || 0, 100)}%` }} />
                   </div>
                   <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
-                        className="text-xs font-mono text-gray-400">
+                        className="text-xs font-price text-text-secondary">
                     {activeLevelData.score || 0}/100
                   </span>
                 </div>
 
                 <div className={`text-xs font-medium ${
-                  activeLevelData.classification === 'sell_resistance' ? 'text-red-400'
-                    : activeLevelData.classification === 'buy_support' ? 'text-green-400'
-                    : 'text-gray-500'
+                  activeLevelData.classification === 'sell_resistance' ? 'text-signal-resistance'
+                    : activeLevelData.classification === 'buy_support' ? 'text-signal-support'
+                    : 'text-text-tertiary'
                 }`}>
                   {activeLevelData.classification?.replace('_', ' ').toUpperCase()}
                   {activeLevelData.confidence && activeLevelData.confidence.toLowerCase() !== 'none' && (
-                    <span className="text-gray-600 font-normal ml-1">
+                    <span className="text-text-muted font-normal ml-1">
                       · {activeLevelData.confidence.toLowerCase()}
                     </span>
                   )}
                 </div>
 
                 {activeLevelData.full_stack && (
-                  <div className="text-xs text-yellow-400 font-bold">★ FULL STACK</div>
+                  <div className="text-xs text-accent-price font-bold">★ FULL STACK</div>
                 )}
 
                 {levelNarratives?.[activeLevelData.id] && (
-                  <div className="border-t border-gray-800 pt-2 mt-1">
-                    <p className={`text-xs text-gray-300 leading-relaxed italic border-l-2 border-purple-900 pl-2 ${narrativeExpanded ? '' : 'line-clamp-4'}`}>
+                  <div className="border-t border-border-subtle pt-2 mt-1">
+                    <p className={`text-xs text-text-secondary leading-relaxed italic border-l-2 border-accent-ai/50 pl-2 ${narrativeExpanded ? '' : 'line-clamp-4'}`}>
                       {formatNarrative(stripMarkdown(levelNarratives[activeLevelData.id]), activeSymbol)}
                     </p>
                     {levelNarratives[activeLevelData.id].length > 300 && (
                       <button
                         onClick={() => setNarrativeExpanded(!narrativeExpanded)}
-                        className="text-xs text-purple-700 hover:text-purple-500 mt-1"
+                        className="text-xs text-accent-ai/60 hover:text-accent-ai mt-1"
                       >
                         {narrativeExpanded ? '▲ less' : '▼ more'}
                       </button>
@@ -326,39 +320,37 @@ export default function RightRail({
                 )}
               </div>
             ) : (
-              <p className="text-xs text-gray-700 text-center py-2">Select a level to see evidence</p>
+              <p className="text-xs text-text-disabled text-center py-2">Select a level to see evidence</p>
             )}
           </div>
 
-          {/* Active signals summary */}
-          <div className="border border-gray-800 bg-[#111827] rounded-lg p-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Active Signals</div>
+          <div className="border border-border-subtle bg-bg-card rounded-lg p-3">
+            <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">Active Signals</div>
             <div className="space-y-1">
               {levels?.filter(l => l.classification !== 'no_edge').map(l => (
                 <div key={l.id} className="flex items-center justify-between gap-2">
                   <span className={`text-xs font-bold shrink-0 ${
-                    l.classification === 'sell_resistance' ? 'text-red-400' : 'text-green-400'
+                    l.classification === 'sell_resistance' ? 'text-signal-resistance' : 'text-signal-support'
                   }`}>
                     {l.id}
                   </span>
-                  <span className="text-xs text-gray-500 truncate">
+                  <span className="text-xs text-text-tertiary truncate">
                     {l.classification?.replace('_', ' ')}
                   </span>
-                  <span className="text-xs font-mono text-gray-600 shrink-0">
+                  <span className="text-xs font-price text-text-muted shrink-0">
                     DP {l.dark_pool?.toFixed(3)}
                   </span>
                 </div>
               ))}
               {!levels?.some(l => l.classification !== 'no_edge') && (
-                <p className="text-xs text-gray-700">No classified levels</p>
+                <p className="text-xs text-text-disabled">No classified levels</p>
               )}
             </div>
           </div>
 
-          {/* Enter trade button */}
           <button
             onClick={() => { setShowEntryForm(true); setRailMode('trade') }}
-            className="w-full py-2 rounded text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors border border-gray-700"
+            className="w-full py-2 rounded text-xs font-medium bg-bg-elevated hover:bg-bg-card2 text-text-secondary hover:text-text-primary transition-colors border border-border-default"
           >
             + Enter Trade
           </button>
@@ -369,7 +361,7 @@ export default function RightRail({
       {railMode === 'trade' && (
         <>
           {!activeTrade && (
-            <div className="bg-[#111827] border border-gray-800 rounded-lg p-3">
+            <div className="bg-bg-card border border-border-subtle rounded-lg p-3">
               <InstrumentSelector
                 instrument={instrument}
                 contracts={contracts}
@@ -398,19 +390,19 @@ export default function RightRail({
             <>
               {evaluation && (
                 <div className={`border rounded-lg px-3 py-2 flex items-center gap-2 ${
-                  evaluation.verdictColor === 'red'   ? 'bg-red-950/40 border-red-800'
-                  : evaluation.verdictColor === 'amber' ? 'bg-amber-950/40 border-amber-800'
-                  : 'bg-green-950/40 border-green-800'
+                  evaluation.verdictColor === 'red'   ? 'bg-state-stopSoft border-state-stop'
+                  : evaluation.verdictColor === 'amber' ? 'bg-state-cascadeWatchSoft border-state-cascadeWatch'
+                  : 'bg-state-holdSoft border-state-hold'
                 }`}>
                   <span className={`text-sm font-bold ${
-                    evaluation.verdictColor === 'red'   ? 'text-red-400'
-                    : evaluation.verdictColor === 'amber' ? 'text-amber-400'
-                    : 'text-green-400'
+                    evaluation.verdictColor === 'red'   ? 'text-state-stop'
+                    : evaluation.verdictColor === 'amber' ? 'text-state-cascadeWatch'
+                    : 'text-state-hold'
                   }`}>
                     {evaluation.verdictLabel}
                   </span>
                   {pnl && (
-                    <span className={`text-xs font-mono ml-auto ${pnl.isProfit ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`text-xs font-price ml-auto ${pnl.isProfit ? 'text-state-hold' : 'text-state-stop'}`}>
                       {pnl.dollarsStr}
                     </span>
                   )}
@@ -428,20 +420,20 @@ export default function RightRail({
               <div className="flex gap-2">
                 <button
                   onClick={() => handleExitTrade('manual')}
-                  className="flex-1 py-2 rounded text-xs font-bold bg-gray-700 hover:bg-gray-600 text-white"
+                  className="flex-1 py-2 rounded text-xs font-bold bg-bg-elevated hover:bg-bg-card2 text-text-primary border border-border-default"
                 >
                   ✓ Close
                 </button>
                 <button
                   onClick={() => handleExitTrade('stop')}
-                  className="flex-1 py-2 rounded text-xs font-bold bg-red-800 hover:bg-red-700 text-white"
+                  className="flex-1 py-2 rounded text-xs font-bold bg-state-stopSoft hover:bg-state-stop/30 text-state-stop border border-state-stop/60"
                 >
                   ✗ Stop Out
                 </button>
               </div>
               <button
                 onClick={() => setRailMode('evidence')}
-                className="w-full py-1.5 rounded text-xs text-gray-600 hover:text-gray-400 border border-gray-800"
+                className="w-full py-1.5 rounded text-xs text-text-muted hover:text-text-secondary border border-border-subtle"
               >
                 View Level Evidence
               </button>
@@ -450,10 +442,10 @@ export default function RightRail({
 
           {!activeTrade && !showEntryForm && (
             <div className="text-center py-6">
-              <div className="text-gray-700 mb-2">No active trade</div>
+              <div className="text-text-disabled mb-2">No active trade</div>
               <button
                 onClick={() => setShowEntryForm(true)}
-                className="text-xs text-indigo-500 hover:text-indigo-400"
+                className="text-xs text-signal-continuation hover:text-signal-continuation/80"
               >
                 + Manual entry
               </button>

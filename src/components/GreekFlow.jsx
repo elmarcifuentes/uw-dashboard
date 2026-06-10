@@ -4,7 +4,7 @@ const fmtM = n => (n >= 0 ? '+' : '') + (n / 1e6).toFixed(1) + 'M'
 const signColor = n => n > 0 ? 'text-green-400' : 'text-red-400'
 const barColor  = n => n > 0 ? 'bg-green-500'   : 'bg-red-500'
 
-const BIAS_COLORS = { bullish: 'text-green-400', bearish: 'text-red-400', mixed: 'text-gray-400' }
+const BIAS_COLORS = { bullish: 'text-green-400', bearish: 'text-red-400', mixed: 'text-text-secondary' }
 
 export default function GreekFlow({ apiUrl }) {
   const [data, setData]     = useState(null)
@@ -41,10 +41,10 @@ export default function GreekFlow({ apiUrl }) {
   }, [apiUrl])
 
   const skeleton = (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
-      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
-      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
-      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3 animate-pulse">
+      <div className="h-2.5 bg-bg-elevated rounded w-24 mb-2" />
+      <div className="h-2 bg-bg-elevated rounded w-full mb-1.5" />
+      <div className="h-2 bg-bg-elevated rounded w-3/4" />
     </div>
   )
 
@@ -62,9 +62,9 @@ export default function GreekFlow({ apiUrl }) {
   ]
 
   return (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-500 uppercase tracking-wider">Greek Flow — Intraday</span>
+        <span className="text-xs text-text-tertiary uppercase tracking-wider">Greek Flow — Intraday</span>
         <span className={`text-xs font-bold ${BIAS_COLORS[data.bias]}`}>{data.bias.toUpperCase()}</span>
       </div>
 
@@ -72,11 +72,11 @@ export default function GreekFlow({ apiUrl }) {
         {rows.map((row, i) => (
           <div key={i} className="flex items-center gap-2">
             <span style={{ minWidth: '80px', flexShrink: 0 }}
-                  className="text-xs text-gray-500 whitespace-nowrap">
+                  className="text-xs text-text-tertiary whitespace-nowrap">
               {row.label}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}
-                 className="bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                 className="bg-bg-elevated rounded-full h-1.5 overflow-hidden">
               <div className={`h-full rounded-full ${barColor(row.value)}`} style={{ width: `${pct(row.value)}%` }} />
             </div>
             <span style={{ minWidth: '64px', flexShrink: 0, textAlign: 'right' }}
@@ -88,7 +88,7 @@ export default function GreekFlow({ apiUrl }) {
       </div>
 
       <p className={`text-xs ${BIAS_COLORS[data.bias]}`}>{data.context}</p>
-      <p className="text-xs text-gray-600 mt-0.5">{data.bullishSignals}/3 bullish signals · {data.barCount} bars</p>
+      <p className="text-xs text-text-muted mt-0.5">{data.bullishSignals}/3 bullish signals · {data.barCount} bars</p>
     </div>
   )
 }

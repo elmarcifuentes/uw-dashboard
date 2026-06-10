@@ -20,8 +20,8 @@ export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, 
     sell_resistance: 'bg-red-500',
     buy_support:     'bg-green-500',
     continuation:    'bg-blue-500',
-    no_edge:         'bg-gray-700',
-  }[level.classification] || 'bg-gray-700')
+    no_edge:         'bg-bg-elevated',
+  }[level.classification] || 'bg-bg-elevated')
 
   const barWidth = (level) =>
     level.classification === 'no_edge' ? 15 : Math.max(20, Math.min(100, level.score || 0))
@@ -29,8 +29,8 @@ export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, 
   const idColor = (level) => ({
     sell_resistance: 'text-red-400',
     buy_support:     'text-green-400',
-    no_edge:         'text-gray-500',
-  }[level.classification] || (level.id === 'MID' ? 'text-blue-400' : 'text-gray-500'))
+    no_edge:         'text-text-tertiary',
+  }[level.classification] || (level.id === 'MID' ? 'text-blue-400' : 'text-text-tertiary'))
 
   return (
     <div className="space-y-1 font-mono text-xs">
@@ -49,19 +49,19 @@ export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, 
               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all text-left ${
                 isSelected
                   ? 'bg-indigo-900/40 border border-indigo-700'
-                  : 'hover:bg-gray-800/50'
+                  : 'hover:bg-bg-elevated/50'
               }`}
             >
               <span className={`w-8 shrink-0 font-bold ${idColor(level)}`}>{level.id}</span>
-              <span className="w-24 shrink-0 text-white">{fmt(level.price)}</span>
-              <div className="flex-1 h-3 bg-gray-900 rounded overflow-hidden">
+              <span className="w-24 shrink-0 text-text-primary">{fmt(level.price)}</span>
+              <div className="flex-1 h-3 bg-bg-card2 rounded overflow-hidden">
                 <div
                   className={`h-full rounded transition-all ${barColor(level)}`}
                   style={{ width: `${barWidth(level)}%`, opacity: isNear ? 1 : 0.6 }}
                 />
               </div>
               <span className={`w-12 text-right shrink-0 ${
-                level.classification === 'no_edge' ? 'text-gray-700' : 'text-gray-400'
+                level.classification === 'no_edge' ? 'text-text-disabled' : 'text-text-secondary'
               }`}>
                 {level.classification === 'no_edge' ? '—' : level.score}
               </span>

@@ -26,7 +26,7 @@ export default memo(function DarkPoolChart({ history, compact }) {
 
   if (chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
+      <div className="flex items-center justify-center h-64 text-text-tertiary text-sm">
         Waiting for rescore data…
       </div>
     )
@@ -34,7 +34,7 @@ export default memo(function DarkPoolChart({ history, compact }) {
 
   return (
     <div>
-      <div className="text-xs text-gray-500 mb-2">
+      <div className="text-xs text-text-tertiary mb-2">
         Dark pool strength per level — red dashed = cascade threshold (−0.700)
       </div>
       <div style={{ height: compact ? 256 : 384 }}>

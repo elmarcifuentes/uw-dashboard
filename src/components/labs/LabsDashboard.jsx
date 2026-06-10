@@ -98,8 +98,8 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-sm font-bold text-white uppercase tracking-wide">TradesAlgo Labs</h1>
-          <p className="text-xs text-gray-600 mt-0.5">
+          <h1 className="text-sm font-bold text-text-primary uppercase tracking-wide">TradesAlgo Labs</h1>
+          <p className="text-xs text-text-muted mt-0.5">
             Predictive Ranges · length={settings.length} · factor={settings.mult} · source: Yahoo Finance
           </p>
         </div>
@@ -110,7 +110,7 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
           <button
             onClick={handleRecalculate}
             disabled={loading}
-            className="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50"
+            className="text-xs px-3 py-1.5 bg-bg-elevated hover:bg-bg-card2 text-text-primary rounded transition-colors disabled:opacity-50"
           >
             {loading ? '⟳ Calculating...' : '⟳ Recalculate'}
           </button>
@@ -121,7 +121,7 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
       <div className="flex items-center gap-4 flex-wrap">
         {/* Timeframe — preview only, does not affect active levels */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Preview Timeframe</span>
+          <span className="text-xs text-text-tertiary">Preview Timeframe</span>
           <div className="flex gap-1">
             {INTERVALS.map(tf => (
               <button
@@ -130,19 +130,19 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
                 disabled={loading}
                 className={`px-3 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-40 ${
                   settings.interval === tf.value
-                    ? 'bg-indigo-700 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                    ? 'bg-indigo-700 text-text-primary'
+                    : 'bg-bg-elevated text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
                 }`}
               >
                 {tf.label}
               </button>
             ))}
           </div>
-          <span className="text-xs text-gray-600">· preview only</span>
+          <span className="text-xs text-text-muted">· preview only</span>
         </div>
 
         {/* Divider */}
-        <div className="w-px h-4 bg-gray-700" />
+        <div className="w-px h-4 bg-bg-elevated" />
 
         {/* QQQ / NQ toggle */}
         <div className="flex gap-1">
@@ -151,12 +151,12 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
               key={src}
               onClick={() => setActiveSource(src)}
               className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${
-                activeSource === src ? 'bg-indigo-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                activeSource === src ? 'bg-indigo-700 text-text-primary' : 'bg-bg-elevated text-text-secondary hover:text-gray-200'
               }`}
             >
               {src}
               {src === 'nq' && !autoLevels?.nq && (
-                <span className="ml-1 text-gray-600 font-normal normal-case">(needs Polygon)</span>
+                <span className="ml-1 text-text-muted font-normal normal-case">(needs Polygon)</span>
               )}
             </button>
           ))}
@@ -164,7 +164,7 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
 
         {/* Status badge */}
         {autoLevels?.lastCalculated && !loading && (
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-text-muted">
             {settings.interval} bars ·{' '}
             {new Date(autoLevels.lastCalculated).toLocaleTimeString('en-US', {
               hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York'
@@ -174,11 +174,11 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-600 text-sm animate-pulse">
+        <div className="text-center py-12 text-text-muted text-sm animate-pulse">
           Calculating Predictive Ranges ({settings.interval})...
         </div>
       ) : !levels ? (
-        <div className="text-center py-12 text-gray-600 text-sm">
+        <div className="text-center py-12 text-text-muted text-sm">
           {activeSource === 'nq'
             ? 'NQ data requires Polygon.io futures subscription. Add POLYGON_API_KEY to Railway.'
             : 'Level calculation failed. Check Railway logs.'}
@@ -206,11 +206,11 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
             />
           </div>
 
-          <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
+          <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs text-gray-400 font-medium">Push to Active Levels</div>
-                <div className="text-xs text-gray-600 mt-0.5">
+                <div className="text-xs text-text-secondary font-medium">Push to Active Levels</div>
+                <div className="text-xs text-text-muted mt-0.5">
                   Applies current {settings.interval} preview to main scoring + triggers rescore
                 </div>
               </div>
@@ -219,8 +219,8 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
                 disabled={applying === activeSource}
                 className={`px-4 py-2 rounded text-xs font-bold transition-colors ${
                   applying === activeSource
-                    ? 'bg-gray-700 text-gray-500'
-                    : 'bg-indigo-700 hover:bg-indigo-600 text-white'
+                    ? 'bg-bg-elevated text-text-tertiary'
+                    : 'bg-indigo-700 hover:bg-indigo-600 text-text-primary'
                 }`}
               >
                 {applying === activeSource ? '⟳ Applying...' : `↑ Push ${activeSource.toUpperCase()} to Levels`}
@@ -235,7 +235,7 @@ export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
 
           {scoredLevels?.length > 0 && (
             <div className="space-y-3">
-              <div className="text-xs text-gray-500 uppercase tracking-wider">
+              <div className="text-xs text-text-tertiary uppercase tracking-wider">
                 Trade Setups — Classified Levels
               </div>
               {scoredLevels

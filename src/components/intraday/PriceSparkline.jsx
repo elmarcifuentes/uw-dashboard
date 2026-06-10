@@ -1,7 +1,7 @@
 export default function PriceSparkline({ history, levels }) {
   if (!history || history.length < 2) return (
-    <div className="h-8 bg-gray-900 rounded mb-2 flex items-center justify-center">
-      <span className="text-xs text-gray-700">Price history building…</span>
+    <div className="h-8 bg-bg-card2 rounded mb-2 flex items-center justify-center">
+      <span className="text-xs text-text-disabled">Price history building…</span>
     </div>
   )
 
@@ -24,7 +24,7 @@ export default function PriceSparkline({ history, levels }) {
   }
 
   return (
-    <div className="bg-gray-900 rounded overflow-hidden mb-2 px-1">
+    <div className="bg-bg-card2 rounded overflow-hidden mb-2 px-1">
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
         {levels?.map(level => {
           const y     = toY(level.price)

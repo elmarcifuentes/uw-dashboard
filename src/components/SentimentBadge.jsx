@@ -28,7 +28,7 @@ export default function SentimentBadge({ sentiment, compact = false }) {
           <span className={`w-3 h-3 rounded-full shrink-0 ${c.dot} ${isPulsing ? 'animate-pulse' : ''}`} />
           <span className={`text-sm font-bold ${c.text}`}>{sentiment.label}</span>
         </div>
-        <span className="text-xs text-gray-500">{sentiment.bullCount}/{sentiment.total} bullish</span>
+        <span className="text-xs text-text-tertiary">{sentiment.bullCount}/{sentiment.total} bullish</span>
       </div>
 
       <p className={`text-xs mb-2 ${c.text}`}>{sentiment.description}</p>

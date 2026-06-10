@@ -6,17 +6,17 @@ import { calculateTradeSetup } from '../utils/tradeSetup'
 import { formatNarrative } from '../utils/formatNarrative'
 
 const CLASS_COLOR = {
-  sell_resistance: 'text-red-400',
-  buy_support:     'text-green-400',
-  no_edge:         'text-gray-500',
-  continuation:    'text-blue-400',
+  sell_resistance: 'text-signal-resistance',
+  buy_support:     'text-signal-support',
+  no_edge:         'text-text-tertiary',
+  continuation:    'text-signal-continuation',
 }
 
 const CLASS_BORDER = {
-  sell_resistance: 'border-red-900/40',
-  buy_support:     'border-green-900/40',
-  no_edge:         'border-gray-800',
-  continuation:    'border-blue-900/40',
+  sell_resistance: 'border-signal-resistance/30',
+  buy_support:     'border-signal-support/30',
+  no_edge:         'border-border-subtle',
+  continuation:    'border-signal-continuation/30',
 }
 
 export default function LevelCard({
@@ -28,11 +28,10 @@ export default function LevelCard({
 
   const nq      = nqRatio ? Math.round(level.price * nqRatio * 4) / 4 : null
   const dist    = currentPrice != null ? (currentPrice - level.price) : null
-  const distStr = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
   const distNq  = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio * 4) / 4 : null
 
-  const classColor  = CLASS_COLOR[level.classification]  || 'text-gray-500'
-  const borderColor = CLASS_BORDER[level.classification] || 'border-gray-800'
+  const classColor  = CLASS_COLOR[level.classification]  || 'text-text-tertiary'
+  const borderColor = CLASS_BORDER[level.classification] || 'border-border-subtle'
 
   const proximity = getLevelProximity(currentPrice, level.price)
   const styles    = getProximityStyles(proximity, level.classification, level)
@@ -40,7 +39,7 @@ export default function LevelCard({
   return (
     <div
       onClick={() => onSelect?.(level.id)}
-      className={`border rounded-lg overflow-hidden bg-[#111827] transition-all duration-300 ${
+      className={`border rounded-lg overflow-hidden bg-bg-card transition-all duration-300 ${
         onSelect ? 'cursor-pointer' : ''
       } ${styles.border || borderColor} ${styles.glow || ''} ${styles.pulse ? 'animate-pulse' : ''}`}
     >
@@ -48,7 +47,7 @@ export default function LevelCard({
       <div className="px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className={`text-base font-bold shrink-0 ${classColor}`}>{level.id}</span>
-          <span className="text-white font-mono font-semibold text-sm tabular-nums">
+          <span className="text-text-primary font-price font-semibold text-sm tabular-nums">
             {activeSymbol === 'NQ'
               ? (nq != null ? '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
               : (level.price != null ? '$' + level.price.toFixed(2) : '—')}
@@ -60,7 +59,7 @@ export default function LevelCard({
             {level.classification?.replace('_', ' ').toUpperCase()}
           </span>
           {level.confidence && level.confidence.toLowerCase() !== 'none' && (
-            <span className="text-xs text-gray-600">· {level.confidence.toLowerCase()}</span>
+            <span className="text-xs text-text-muted">· {level.confidence.toLowerCase()}</span>
           )}
         </div>
 
@@ -69,11 +68,11 @@ export default function LevelCard({
             if (activeSymbol === 'NQ') {
               if (distNq == null) return null
               const sign = dist >= 0 ? '+' : '-'
-              return <div className="text-sm font-mono font-bold text-gray-300">{sign}${distNq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              return <div className="text-sm font-price font-bold text-text-secondary">{sign}${distNq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             } else {
               if (dist == null) return null
               const sign = dist >= 0 ? '+' : '-'
-              return <div className="text-sm font-mono font-bold text-gray-300">{sign}${Math.abs(dist).toFixed(2)}</div>
+              return <div className="text-sm font-price font-bold text-text-secondary">{sign}${Math.abs(dist).toFixed(2)}</div>
             }
           })()}
         </div>
@@ -86,21 +85,21 @@ export default function LevelCard({
         )}
 
         <div className="flex items-center gap-2">
-          <span style={{ minWidth: '20px', flexShrink: 0 }} className="text-xs text-gray-600">DP</span>
-          <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-gray-800 rounded relative overflow-hidden">
-            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700 z-10" />
+          <span style={{ minWidth: '20px', flexShrink: 0 }} className="text-xs text-text-muted">DP</span>
+          <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-bg-elevated rounded relative overflow-hidden">
+            <div className="absolute inset-y-0 left-1/2 w-px bg-text-disabled z-10" />
             {(() => {
               const dp  = level.dark_pool || 0
               const pct = ((dp + 1) / 2) * 100
               return pct >= 50 ? (
-                <div className="absolute inset-y-0 left-1/2 bg-green-500" style={{ width: `${(pct - 50) * 2}%` }} />
+                <div className="absolute inset-y-0 left-1/2 bg-signal-support" style={{ width: `${(pct - 50) * 2}%` }} />
               ) : (
-                <div className="absolute inset-y-0 right-1/2 bg-red-500" style={{ width: `${(50 - pct) * 2}%` }} />
+                <div className="absolute inset-y-0 right-1/2 bg-signal-resistance" style={{ width: `${(50 - pct) * 2}%` }} />
               )
             })()}
           </div>
           <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
-                className="text-xs font-mono text-gray-400">
+                className="text-xs font-price text-text-secondary">
             {level.dark_pool?.toFixed(3)}
           </span>
         </div>
@@ -108,10 +107,10 @@ export default function LevelCard({
         {(level.full_stack || (level.net_gex || 0) < 0) && (
           <div className="flex gap-1.5 mt-1.5">
             {level.full_stack && (
-              <span className="text-xs text-yellow-400 font-bold">★ FULL STACK</span>
+              <span className="text-xs text-accent-price font-bold">★ FULL STACK</span>
             )}
             {(level.net_gex || 0) < 0 && (
-              <span className="text-xs text-red-400">⚡ EXP</span>
+              <span className="text-xs text-signal-resistance">⚡ EXP</span>
             )}
           </div>
         )}
@@ -119,41 +118,41 @@ export default function LevelCard({
 
       {/* Expand toggle */}
       <div
-        className="border-t border-gray-800/50 px-4 py-1.5 flex items-center justify-between"
+        className="border-t border-border-subtle/50 px-4 py-1.5 flex items-center justify-between"
         onClick={e => { e.stopPropagation(); setExpanded(!expanded) }}
       >
-        <span className="text-xs text-gray-700 hover:text-gray-500 cursor-pointer">
+        <span className="text-xs text-text-disabled hover:text-text-tertiary cursor-pointer">
           {expanded ? '▲ less' : '▼ more'}
         </span>
         <div className="flex items-center gap-2">
           {levelTouches?.total_touches > 0 && (
-            <span className="text-xs text-gray-700">{levelTouches.total_touches}× today</span>
+            <span className="text-xs text-text-disabled">{levelTouches.total_touches}× today</span>
           )}
-          {levelNarrative && <span className="text-xs text-purple-700">🤖</span>}
+          {levelNarrative && <span className="text-xs text-accent-ai/60">🤖</span>}
         </div>
       </div>
 
       {/* LAYER 3 — EVIDENCE */}
       {expanded && (
-        <div className="border-t border-gray-800/50 px-4 py-3 space-y-2 bg-[#0d1424]/50">
+        <div className="border-t border-border-subtle/50 px-4 py-3 space-y-2 bg-bg-subtle/50">
 
           {level.dp_condition && (
             <p className={`text-xs font-medium mb-2 ${classColor}`}>{level.dp_condition}</p>
           )}
 
           <div className="flex items-center gap-2">
-            <span style={{ minWidth: '44px', flexShrink: 0 }} className="text-xs text-gray-600 whitespace-nowrap">
+            <span style={{ minWidth: '44px', flexShrink: 0 }} className="text-xs text-text-muted whitespace-nowrap">
               Score
             </span>
-            <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-gray-800 rounded overflow-hidden">
+            <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-bg-elevated rounded overflow-hidden">
               <div className={`h-full rounded ${
-                level.classification === 'sell_resistance' ? 'bg-red-500'
-                  : level.classification === 'buy_support' ? 'bg-green-500'
-                  : 'bg-gray-600'
+                level.classification === 'sell_resistance' ? 'bg-signal-resistance'
+                  : level.classification === 'buy_support' ? 'bg-signal-support'
+                  : 'bg-signal-neutral'
               }`} style={{ width: `${Math.min(level.score || 0, 100)}%` }} />
             </div>
             <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
-                  className="text-xs font-mono text-gray-400">
+                  className="text-xs font-price text-text-secondary">
               {level.score || 0}/100
             </span>
           </div>
@@ -166,36 +165,36 @@ export default function LevelCard({
 
           <div className="flex flex-wrap gap-1.5">
             {level.etf_direction === 'bullish' && (
-              <span className="text-xs bg-green-950 text-green-400 px-1.5 py-0.5 rounded">↑ ETF</span>
+              <span className="text-xs bg-signal-supportSoft text-signal-support px-1.5 py-0.5 rounded">↑ ETF</span>
             )}
             {level.etf_direction === 'bearish' && (
-              <span className="text-xs bg-red-950 text-red-400 px-1.5 py-0.5 rounded">↓ ETF</span>
+              <span className="text-xs bg-signal-resistanceSoft text-signal-resistance px-1.5 py-0.5 rounded">↓ ETF</span>
             )}
             {level.lower_high && (
-              <span className="text-xs bg-orange-950 text-orange-400 px-1.5 py-0.5 rounded">↘ LH</span>
+              <span className="text-xs bg-accent-priceSoft text-accent-price px-1.5 py-0.5 rounded">↘ LH</span>
             )}
           </div>
 
           {levelTouches?.total_touches > 0 && (
-            <div className="flex gap-3 text-xs text-gray-600">
+            <div className="flex gap-3 text-xs text-text-muted">
               <span>touched {levelTouches.total_touches}×</span>
               {levelTouches.crosses > 0 && (
-                <span className="text-amber-700">crossed {levelTouches.crosses}×</span>
+                <span className="text-state-cascadeWatch/60">crossed {levelTouches.crosses}×</span>
               )}
             </div>
           )}
 
           {level.net_gex != null && (
-            <div className="text-xs text-gray-600">
+            <div className="text-xs text-text-muted">
               GEX {level.net_gex?.toLocaleString()}
               {(level.net_gex || 0) < 0 ? ' — expansion' : ' — pinning'}
             </div>
           )}
 
           {levelNarrative && (
-            <div className="border-t border-gray-800 pt-2">
-              <div className="text-xs text-purple-600 mb-1">🤖 Claude Analysis</div>
-              <p className="text-xs text-gray-300 leading-relaxed italic border-l-2 border-purple-900 pl-2">
+            <div className="border-t border-border-subtle pt-2">
+              <div className="text-xs text-accent-ai mb-1">🤖 Claude Analysis</div>
+              <p className="text-xs text-text-secondary leading-relaxed italic border-l-2 border-accent-ai/50 pl-2">
                 {formatNarrative(stripMarkdown(levelNarrative), activeSymbol)}
               </p>
             </div>
@@ -204,52 +203,52 @@ export default function LevelCard({
           {(() => {
             const setup = calculateTradeSetup(level, allLevels, currentPrice, nqRatio)
             if (!setup) return null
-            const rrColor = setup.quality === 'excellent' ? 'text-green-400'
-              : setup.quality === 'good' ? 'text-green-500'
-              : setup.quality === 'acceptable' ? 'text-amber-400'
-              : 'text-red-400'
-            const dirColor = setup.direction === 'short' ? 'text-red-400' : 'text-green-400'
+            const rrColor = setup.quality === 'excellent' || setup.quality === 'good'
+              ? 'text-signal-support'
+              : setup.quality === 'acceptable' ? 'text-state-exit'
+              : 'text-signal-resistance'
+            const dirColor = setup.direction === 'short' ? 'text-signal-resistance' : 'text-signal-support'
             return (
-              <div className="border-t border-gray-800 pt-2 mt-1">
-                <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">📍 Trade Setup</div>
+              <div className="border-t border-border-subtle pt-2 mt-1">
+                <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">📍 Trade Setup</div>
                 <div className={`text-xs font-bold mb-2 ${dirColor}`}>
                   {setup.direction.toUpperCase()} from {setup.entry.level}
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 w-12">Entry</span>
-                    <span className="text-white font-mono">
+                    <span className="text-text-muted w-12">Entry</span>
+                    <span className="text-text-primary font-price">
                       {activeSymbol === 'NQ'
                         ? (setup.entry.nq ? `NQ ${setup.entry.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
                         : `$${setup.entry.qqq?.toFixed(2)}`}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 w-12">Target</span>
-                    <span className={`font-mono ${activeSymbol === 'NQ' ? 'text-green-600' : 'text-green-400'}`}>
+                    <span className="text-text-muted w-12">Target</span>
+                    <span className={`font-price text-signal-support`}>
                       {activeSymbol === 'NQ'
                         ? (setup.target.nq ? `NQ ${setup.target.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
                         : `$${setup.target.qqq?.toFixed(2)}`}
                     </span>
-                    <span className="text-gray-600">← {setup.target.level}</span>
+                    <span className="text-text-muted">← {setup.target.level}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 w-12">Stop</span>
-                    <span className={`font-mono ${activeSymbol === 'NQ' ? 'text-red-600' : 'text-red-400'}`}>
+                    <span className="text-text-muted w-12">Stop</span>
+                    <span className={`font-price text-signal-resistance`}>
                       {activeSymbol === 'NQ'
                         ? (setup.stop.nq ? `NQ ${setup.stop.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
                         : `$${setup.stop.qqq?.toFixed(2)}`}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800 text-xs">
-                  <div className="text-gray-600">Move <span className="text-gray-400 font-mono">
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-subtle text-xs">
+                  <div className="text-text-muted">Move <span className="text-text-secondary font-price">
                     {activeSymbol === 'NQ' ? (setup.move.nq ? `${setup.move.nq} NQ` : '—') : `$${setup.move.qqq}`}
                   </span></div>
-                  <div className="text-gray-600">Risk <span className="text-gray-400 font-mono">
+                  <div className="text-text-muted">Risk <span className="text-text-secondary font-price">
                     {activeSymbol === 'NQ' ? (setup.risk.nq ? `${setup.risk.nq} NQ` : '—') : `$${setup.risk.qqq}`}
                   </span></div>
-                  <div className={`font-mono font-bold ${rrColor}`}>{setup.rr}:1</div>
+                  <div className={`font-price font-bold ${rrColor}`}>{setup.rr}:1</div>
                 </div>
                 <div className={`text-xs mt-1 ${rrColor}`}>
                   {setup.quality === 'excellent' && '✅ Excellent R/R'}
@@ -260,7 +259,7 @@ export default function LevelCard({
                 {setup.flags.length > 0 && (
                   <div className="mt-1.5 space-y-0.5">
                     {setup.flags.map((f, i) => (
-                      <div key={i} className="text-xs text-gray-600">{f}</div>
+                      <div key={i} className="text-xs text-text-muted">{f}</div>
                     ))}
                   </div>
                 )}
@@ -269,7 +268,7 @@ export default function LevelCard({
           })()}
 
           {level.timestamp && (
-            <div className="text-xs text-gray-700 text-right">{level.timestamp}</div>
+            <div className="text-xs text-text-disabled text-right">{level.timestamp}</div>
           )}
         </div>
       )}

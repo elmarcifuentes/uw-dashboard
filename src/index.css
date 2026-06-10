@@ -4,8 +4,11 @@
 
 body {
   margin: 0;
-  background: #0D1B2A;
-  color: #e5e7eb;
+  background-color: #08111f;
+  color: #e8eefc;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {

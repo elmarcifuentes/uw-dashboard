@@ -1,4 +1,5 @@
 import AlertBadge from './AlertBadge'
+import { TriangleAlert } from 'lucide-react'
 
 export default function ImmediateRiskCard({ cascade, levels, structureBreak }) {
   const mid    = levels?.find(l => l.id === 'MID')
@@ -7,12 +8,12 @@ export default function ImmediateRiskCard({ cascade, levels, structureBreak }) {
   const isHigh = cascade?.active || structureBreak?.active
   const isMed  = !isHigh && midDp <= -0.500
 
-  const border = isHigh ? 'border-red-600' : isMed ? 'border-amber-600' : 'border-gray-800'
-  const bg     = isHigh ? 'bg-red-950/30'  : isMed ? 'bg-amber-950/20'  : 'bg-[#111827]'
+  const border = isHigh ? 'border-state-stop' : isMed ? 'border-state-cascadeWatch' : 'border-border-subtle'
+  const bg     = isHigh ? 'bg-state-stopSoft'  : isMed ? 'bg-state-cascadeWatchSoft'  : 'bg-bg-card'
 
   return (
     <div className={`border rounded-lg p-4 ${border} ${bg}`}>
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Immediate Risk</div>
+      <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">Immediate Risk</div>
 
       <div className="mb-3">
         {cascade?.active ? (
@@ -33,24 +34,27 @@ export default function ImmediateRiskCard({ cascade, levels, structureBreak }) {
           { label: 'S2 structural void', met: cascade?.conditions?.[2] },
         ].map((c, i) => (
           <div key={i} className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 ${
-            c.met ? 'bg-red-950/60 border border-red-800/60' : 'bg-gray-900/40 border border-gray-800/40'
+            c.met ? 'bg-state-stopSoft border border-state-stop/40' : 'bg-bg-card2/40 border border-border-subtle/40'
           }`}>
-            <span className={`text-sm font-bold leading-none ${c.met ? 'text-red-400' : 'text-gray-700'}`}>
+            <span className={`text-sm font-bold leading-none ${c.met ? 'text-state-stop' : 'text-text-disabled'}`}>
               {c.met ? '✓' : '○'}
             </span>
-            <span className={`text-xs ${c.met ? 'text-red-300 font-medium' : 'text-gray-600'}`}>
+            <span className={`text-xs ${c.met ? 'text-state-stop/80 font-medium' : 'text-text-muted'}`}>
               {c.label}
             </span>
-            {c.met && <span className="ml-auto text-xs text-red-500 font-bold">MET</span>}
+            {c.met && <span className="ml-auto text-xs text-state-stop font-bold">MET</span>}
           </div>
         ))}
       </div>
 
       {structureBreak?.active && (
-        <div className="mt-2 text-xs text-amber-400">⚠ Structure break {structureBreak.direction}</div>
+        <div className="mt-2 text-xs text-state-cascadeWatch flex items-center gap-1">
+          <TriangleAlert className="w-3 h-3 shrink-0" />
+          Structure break {structureBreak.direction}
+        </div>
       )}
       {levels?.length > 0 && levels.every(l => l.classification === 'no_edge') && !cascade?.active && (
-        <div className="text-xs text-gray-600 mt-2 border-t border-gray-800 pt-2">
+        <div className="text-xs text-text-muted mt-2 border-t border-border-subtle pt-2">
           ○ All levels no_edge — no institutional edge today
         </div>
       )}

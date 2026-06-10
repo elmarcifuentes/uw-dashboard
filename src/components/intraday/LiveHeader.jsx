@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { RefreshCw, Minimize2, Maximize2, Target } from 'lucide-react'
 
 export default function LiveHeader({
   connected, price, nqPrice, velocity,
@@ -11,18 +12,18 @@ export default function LiveHeader({
   const up  = velocity > 0
   const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : abs > 0.005 ? (up ? '↑' : '↓') : '→'
   const arrowColor = abs > 0.05
-    ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse')
-    : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500')
-    : abs > 0.005 ? (up ? 'text-green-700' : 'text-red-700')
-    : 'text-gray-600'
+    ? (up ? 'text-signal-support animate-pulse' : 'text-signal-resistance animate-pulse')
+    : abs > 0.02 ? (up ? 'text-signal-support' : 'text-signal-resistance')
+    : abs > 0.005 ? (up ? 'text-signal-support/60' : 'text-signal-resistance/60')
+    : 'text-text-muted'
 
   const btnBase = 'px-2 py-1 rounded text-xs font-medium transition-colors'
   const drawBtnClass = (type) => {
-    if (!unlocked)                return `${btnBase} bg-gray-800 text-gray-600 cursor-not-allowed`
-    if (drawing === type)         return `${btnBase} bg-gray-700 text-gray-400 cursor-wait`
-    if (drawResult === 'success') return `${btnBase} bg-green-800 text-green-300`
-    if (drawResult === 'error')   return `${btnBase} bg-red-800 text-red-300`
-    return `${btnBase} bg-gray-700 text-gray-300 hover:bg-gray-600`
+    if (!unlocked)                return `${btnBase} bg-bg-elevated text-text-muted cursor-not-allowed`
+    if (drawing === type)         return `${btnBase} bg-bg-elevated text-text-secondary cursor-wait`
+    if (drawResult === 'success') return `${btnBase} bg-state-holdSoft text-state-hold`
+    if (drawResult === 'error')   return `${btnBase} bg-state-stopSoft text-state-stop`
+    return `${btnBase} bg-bg-elevated text-text-secondary hover:bg-bg-card2`
   }
   const drawLabel = (type) => {
     if (!unlocked)                return type === 'qqq' ? '🔒 Draw QQQ' : '🔒 Draw Both'
@@ -33,19 +34,17 @@ export default function LiveHeader({
   }
 
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg px-4 py-2.5 flex items-center gap-4 flex-wrap relative">
+    <div className="bg-bg-card border border-border-subtle rounded-lg px-4 py-2.5 flex items-center gap-4 flex-wrap relative">
 
-      {/* Live indicator */}
       <div className="flex items-center gap-1.5 shrink-0">
-        <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascadeActive ? 'animate-pulse' : ''}`} />
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">
+        <span className={`w-2 h-2 rounded-full ${connected ? 'bg-state-hold' : 'bg-state-stop'} ${connected && !cascadeActive ? 'animate-pulse' : ''}`} />
+        <span className="text-micro font-bold text-text-secondary uppercase tracking-wider hidden sm:inline">
           {connected ? 'Live' : 'Off'}
         </span>
       </div>
 
-      {/* Price hero */}
       <div className="flex items-baseline gap-2">
-        <span className="text-xl font-bold text-white font-mono tabular-nums">
+        <span className="text-xl2 font-bold text-text-primary font-price tabular-nums">
           {activeSymbol === 'NQ'
             ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
             : (price != null ? '$' + price.toFixed(2) : '—')}
@@ -55,17 +54,16 @@ export default function LiveHeader({
         )}
       </div>
 
-      {/* Sentiment compact pill */}
       {sentiment?.state && (
         <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold shrink-0 ${
-          sentiment.color === 'green' ? 'bg-green-950 text-green-400'
-            : sentiment.color === 'red' ? 'bg-red-950 text-red-400'
-            : 'bg-amber-950 text-amber-400'
+          sentiment.color === 'green' ? 'bg-state-holdSoft text-state-hold'
+            : sentiment.color === 'red' ? 'bg-state-stopSoft text-state-stop'
+            : 'bg-state-cascadeWatchSoft text-state-cascadeWatch'
         }`}>
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-            sentiment.color === 'green' ? 'bg-green-500'
-              : sentiment.color === 'red' ? 'bg-red-500'
-              : 'bg-amber-500'
+            sentiment.color === 'green' ? 'bg-state-hold'
+              : sentiment.color === 'red' ? 'bg-state-stop'
+              : 'bg-state-cascadeWatch'
           } ${sentiment.state === 'HIGH_RISK' && !cascadeActive ? 'animate-pulse' : ''}`} />
           {sentiment.state}
         </div>
@@ -73,7 +71,6 @@ export default function LiveHeader({
 
       <div className="flex-1" />
 
-      {/* Draw buttons — desktop only */}
       <div className="hidden lg:flex items-center gap-2 shrink-0">
         <button onClick={onDrawQqq} disabled={!unlocked || !!drawing} className={drawBtnClass('qqq')}>
           {drawLabel('qqq')}
@@ -82,36 +79,36 @@ export default function LiveHeader({
           {drawLabel('both')}
         </button>
         {onFocus && (
-          <button onClick={onFocus} className="text-xs text-gray-500 hover:text-white px-2 py-1 border border-gray-700 rounded transition-colors">
-            ⊡ Focus
+          <button onClick={onFocus} className="text-xs text-text-tertiary hover:text-text-primary px-2 py-1 border border-border-default rounded transition-colors flex items-center gap-1">
+            <Target className="w-3 h-3" /> Focus
           </button>
         )}
-        <button onClick={onCompact} className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 border border-gray-700 rounded transition-colors">
-          {compact ? '⊞ Full' : '⊡ Compact'}
+        <button onClick={onCompact} className="text-xs text-text-tertiary hover:text-text-secondary px-2 py-1 border border-border-default rounded transition-colors">
+          {compact ? <Maximize2 className="w-3 h-3 inline" /> : <Minimize2 className="w-3 h-3 inline" />}
+          <span className="ml-1">{compact ? 'Full' : 'Compact'}</span>
         </button>
       </div>
 
-      {/* Tablet overflow menu */}
       <div className="flex lg:hidden items-center gap-2 shrink-0">
-        <button onClick={onCompact} className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 border border-gray-700 rounded transition-colors">
+        <button onClick={onCompact} className="text-xs text-text-tertiary hover:text-text-secondary px-2 py-1 border border-border-default rounded transition-colors">
           {compact ? '⊞ Full' : '⊡ Compact'}
         </button>
         <button
           onClick={() => setShowOverflow(!showOverflow)}
-          className="text-gray-500 hover:text-gray-300 px-2 py-1 border border-gray-700 rounded text-xs transition-colors"
+          className="text-text-tertiary hover:text-text-secondary px-2 py-1 border border-border-default rounded text-xs transition-colors"
         >
           ⋯
         </button>
         {showOverflow && (
-          <div className="absolute top-full mt-1 right-0 z-50 bg-[#111827] border border-gray-800 rounded-lg p-2 space-y-1 shadow-xl">
-            <button onClick={() => { onDrawQqq(); setShowOverflow(false) }} disabled={!unlocked || !!drawing} className="block w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded disabled:opacity-50">
+          <div className="absolute top-full mt-1 right-0 z-50 bg-bg-card border border-border-subtle rounded-lg p-2 space-y-1 shadow-elevated">
+            <button onClick={() => { onDrawQqq(); setShowOverflow(false) }} disabled={!unlocked || !!drawing} className="block w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-elevated rounded disabled:opacity-50">
               {drawLabel('qqq')}
             </button>
-            <button onClick={() => { onDrawBoth(); setShowOverflow(false) }} disabled={!unlocked || !!drawing} className="block w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded disabled:opacity-50">
+            <button onClick={() => { onDrawBoth(); setShowOverflow(false) }} disabled={!unlocked || !!drawing} className="block w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-elevated rounded disabled:opacity-50">
               {drawLabel('both')}
             </button>
             {onFocus && (
-              <button onClick={() => { onFocus(); setShowOverflow(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded">
+              <button onClick={() => { onFocus(); setShowOverflow(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-elevated rounded">
                 ⊡ Focus Mode
               </button>
             )}

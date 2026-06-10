@@ -13,11 +13,11 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
 
   const classColor = level.classification === 'sell_resistance' ? 'text-red-400'
     : level.classification === 'buy_support' ? 'text-green-400'
-    : 'text-gray-400'
+    : 'text-text-secondary'
 
   const barColor = level.classification === 'sell_resistance' ? 'bg-red-500'
     : level.classification === 'buy_support' ? 'bg-green-500'
-    : 'bg-gray-600'
+    : 'bg-bg-card2'
 
   return (
     <div className="space-y-4">
@@ -27,11 +27,11 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
         <div>
           <div className="flex items-baseline gap-2">
             <span className={`text-2xl font-bold ${classColor}`}>{level.id}</span>
-            <span className="text-white font-mono text-xl">${level.price?.toFixed(2)}</span>
+            <span className="text-text-primary font-mono text-xl">${level.price?.toFixed(2)}</span>
           </div>
-          {nq && <div className="text-xs text-gray-500 font-mono mt-0.5">NQ {nq}</div>}
+          {nq && <div className="text-xs text-text-tertiary font-mono mt-0.5">NQ {nq}</div>}
         </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-white text-lg px-2 py-0.5 -mr-1">✕</button>
+        <button onClick={onClose} className="text-text-tertiary hover:text-text-primary text-lg px-2 py-0.5 -mr-1">✕</button>
       </div>
 
       {/* Classification + Distance */}
@@ -39,11 +39,11 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
         <span className={`text-sm font-bold ${classColor}`}>
           {level.classification?.replace('_', ' ').toUpperCase() || 'NO EDGE'}
           {level.confidence && level.confidence !== 'NONE' && (
-            <span className="text-gray-600 font-normal text-xs ml-2">{level.confidence}</span>
+            <span className="text-text-muted font-normal text-xs ml-2">{level.confidence}</span>
           )}
         </span>
         {dist != null && (
-          <span className="text-sm font-mono text-gray-300">
+          <span className="text-sm font-mono text-text-secondary">
             {parseFloat(dist) > 0 ? '+' : ''}{dist} from price
           </span>
         )}
@@ -51,12 +51,12 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
 
       {/* Dark Pool bar */}
       <div className="space-y-1">
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex justify-between text-xs text-text-tertiary">
           <span>Dark Pool</span>
-          <span className="font-mono text-gray-400">{dp.toFixed(3)}</span>
+          <span className="font-mono text-text-secondary">{dp.toFixed(3)}</span>
         </div>
-        <div className="h-2 bg-gray-800 rounded relative overflow-hidden">
-          <div className="absolute inset-y-0 left-1/2 w-px bg-gray-600" />
+        <div className="h-2 bg-bg-elevated rounded relative overflow-hidden">
+          <div className="absolute inset-y-0 left-1/2 w-px bg-bg-card2" />
           {dpPct >= 50 ? (
             <div className="absolute inset-y-0 left-1/2 bg-green-500 opacity-80"
                  style={{ width: `${(dpPct - 50) * 2}%` }} />
@@ -69,11 +69,11 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
 
       {/* Score bar */}
       <div className="space-y-1">
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex justify-between text-xs text-text-tertiary">
           <span>Score</span>
-          <span className="font-mono text-gray-400">{level.score || 0}/100</span>
+          <span className="font-mono text-text-secondary">{level.score || 0}/100</span>
         </div>
-        <div className="h-2 bg-gray-800 rounded overflow-hidden">
+        <div className="h-2 bg-bg-elevated rounded overflow-hidden">
           <div className={`h-full ${barColor} opacity-80`}
                style={{ width: `${Math.min(level.score || 0, 100)}%` }} />
         </div>
@@ -82,7 +82,7 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
       {/* DP Sparkline */}
       {dpHistory?.[level.id]?.length > 1 && (
         <div>
-          <div className="text-xs text-gray-600 mb-1">DP trend</div>
+          <div className="text-xs text-text-muted mb-1">DP trend</div>
           <DpSparkline history={dpHistory[level.id]} />
         </div>
       )}
@@ -98,9 +98,9 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
 
       {/* Claude narrative */}
       {levelNarrative && (
-        <div className="border-t border-gray-800 pt-3">
+        <div className="border-t border-border-subtle pt-3">
           <div className="text-xs text-purple-500 mb-2">🤖 Claude Analysis</div>
-          <p className="text-xs text-gray-300 leading-relaxed border-l-2 border-purple-900 pl-2">
+          <p className="text-xs text-text-secondary leading-relaxed border-l-2 border-purple-900 pl-2">
             {formatNarrative(stripMarkdown(levelNarrative), activeSymbol)}
           </p>
         </div>

@@ -22,11 +22,11 @@ export default function ScoutTab({ activeSymbol, onEnterTrade }) {
     <div className="py-3">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-sm font-bold text-white uppercase tracking-wide">Scout</h2>
-          <p className="text-xs text-gray-600 mt-0.5">Click a level to plan your trade</p>
+          <h2 className="text-sm font-bold text-text-primary uppercase tracking-wide">Scout</h2>
+          <p className="text-xs text-text-muted mt-0.5">Click a level to plan your trade</p>
         </div>
         {assistantRead?.now && (
-          <div className="text-xs text-gray-400 max-w-xs text-right hidden sm:block">
+          <div className="text-xs text-text-secondary max-w-xs text-right hidden sm:block">
             {formatNarrative(assistantRead.now, activeSymbol)}
           </div>
         )}
@@ -34,8 +34,8 @@ export default function ScoutTab({ activeSymbol, onEnterTrade }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Left — Level Map */}
-        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Level Map</div>
+        <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
+          <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Level Map</div>
           <LevelMap
             levels={levels}
             currentPrice={currentPrice}
@@ -44,16 +44,16 @@ export default function ScoutTab({ activeSymbol, onEnterTrade }) {
             selectedLevel={selectedLevel}
             onLevelSelect={setSelectedLevel}
           />
-          <div className="flex gap-4 mt-4 pt-3 border-t border-gray-800 text-xs text-gray-600">
+          <div className="flex gap-4 mt-4 pt-3 border-t border-border-subtle text-xs text-text-muted">
             <span><span className="text-red-500">█</span> Resistance</span>
             <span><span className="text-green-500">█</span> Support</span>
-            <span><span className="text-gray-700">█</span> No edge</span>
+            <span><span className="text-text-disabled">█</span> No edge</span>
             <span><span className="text-yellow-400">▶</span> Price</span>
           </div>
         </div>
 
         {/* Right — Level Plan */}
-        <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
+        <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
           {selectedLevelData ? (
             <LevelPlanCard
               level={selectedLevelData}
@@ -68,8 +68,8 @@ export default function ScoutTab({ activeSymbol, onEnterTrade }) {
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-48 gap-2">
-              <span className="text-gray-700 text-2xl">←</span>
-              <span className="text-xs text-gray-600">Select a level to plan</span>
+              <span className="text-text-disabled text-2xl">←</span>
+              <span className="text-xs text-text-muted">Select a level to plan</span>
             </div>
           )}
         </div>

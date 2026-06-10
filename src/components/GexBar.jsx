@@ -6,7 +6,7 @@ export default function GexBar({ value, sessionMax }) {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="relative h-[8px] w-24 bg-gray-800 rounded overflow-hidden">
+      <div className="relative h-[8px] w-24 bg-bg-elevated rounded overflow-hidden">
         <div
           className={`absolute left-0 top-0 h-full rounded ${pinning ? 'bg-blue-400' : 'bg-orange-400'}`}
           style={{ width: `${pct}%` }}

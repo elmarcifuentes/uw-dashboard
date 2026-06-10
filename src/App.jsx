@@ -45,7 +45,7 @@ function AppInner() {
   const showStrip = STRIP_TABS.has(activeTab)
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-gray-100 font-mono">
+    <div className="min-h-screen bg-bg-base text-gray-100 font-mono">
 
       <AppBar
         connected={connected}

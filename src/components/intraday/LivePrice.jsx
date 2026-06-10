@@ -10,11 +10,11 @@ const LivePrice = memo(function LivePrice({ priceData, nqRatio }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-white font-mono font-bold">
+      <span className="text-text-primary font-mono font-bold">
         QQQ ${Number(price)?.toFixed(2) ?? '—'}
       </span>
       {nqPrice && (
-        <span className="text-gray-400 font-mono font-bold">
+        <span className="text-text-secondary font-mono font-bold">
           / NQ {nqPrice}
         </span>
       )}

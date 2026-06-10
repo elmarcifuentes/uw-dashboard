@@ -32,9 +32,9 @@ export default function ScenarioCards({
   const scenarios = [
     {
       label: 'BULLISH PATH',
-      border: 'border-green-900/50',
-      bg: 'bg-green-950/10',
-      labelColor: 'text-green-400',
+      border: 'border-border-subtle',
+      bg:     'bg-bg-card',
+      labelColor: 'text-signal-support',
       icon: '↑',
       content: bullishTarget,
       sub: buyLevels?.length > 0
@@ -43,9 +43,9 @@ export default function ScenarioCards({
     },
     {
       label: 'BEARISH PATH',
-      border: 'border-red-900/50',
-      bg: 'bg-red-950/10',
-      labelColor: 'text-red-400',
+      border: 'border-border-subtle',
+      bg:     'bg-bg-card',
+      labelColor: 'text-signal-resistance',
       icon: '↓',
       content: bearishTrigger,
       sub: sellLevels?.length > 0
@@ -54,9 +54,9 @@ export default function ScenarioCards({
     },
     {
       label: 'INVALIDATION',
-      border: 'border-gray-700',
-      bg: 'bg-gray-900/30',
-      labelColor: 'text-gray-400',
+      border: 'border-border-default',
+      bg:     'bg-bg-card',
+      labelColor: 'text-text-secondary',
       icon: '✕',
       content: noTrade,
       sub: 'Condition that changes the entire read',
@@ -73,10 +73,10 @@ export default function ScenarioCards({
               {s.label}
             </span>
           </div>
-          <p className="text-xs text-gray-300 leading-relaxed mb-2">
+          <p className="text-xs text-text-secondary leading-relaxed mb-2">
             {s.content || '—'}
           </p>
-          <p className="text-xs text-gray-600 border-t border-gray-800 pt-2">
+          <p className="text-xs text-text-muted border-t border-border-subtle pt-2">
             {s.sub}
           </p>
         </div>

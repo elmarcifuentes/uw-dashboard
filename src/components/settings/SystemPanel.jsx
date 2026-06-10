@@ -20,9 +20,9 @@ const emptyLevels = () => ({
 
 function Section({ title, children }) {
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-gray-800 bg-gray-900/30">
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{title}</span>
+    <div className="bg-bg-card border border-border-subtle rounded-lg overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-border-subtle bg-bg-card2/30">
+        <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">{title}</span>
       </div>
       <div className="p-4">{children}</div>
     </div>
@@ -80,28 +80,28 @@ function SystemStatus({ systemPaused, pausedAt }) {
       <div className="space-y-1.5">
         {services.map(svc => (
           <div key={svc.label} className="flex items-center gap-2.5 text-xs">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${svc.ok ? 'bg-green-500' : 'bg-gray-600'}`} />
-            <span className={svc.ok ? 'text-gray-300' : 'text-gray-600'}>{svc.label}</span>
-            <span className={`ml-auto text-xs ${svc.ok ? 'text-green-500' : 'text-gray-600'}`}>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${svc.ok ? 'bg-green-500' : 'bg-bg-card2'}`} />
+            <span className={svc.ok ? 'text-text-secondary' : 'text-text-muted'}>{svc.label}</span>
+            <span className={`ml-auto text-xs ${svc.ok ? 'text-green-500' : 'text-text-muted'}`}>
               {svc.ok ? 'active' : 'paused'}
             </span>
           </div>
         ))}
       </div>
-      <div className="border-t border-gray-800 pt-3">
+      <div className="border-t border-border-subtle pt-3">
         {error && <div className="text-xs text-red-400 mb-2">{error}</div>}
         <button
           onClick={handleToggle}
           disabled={loading}
           className={`w-full py-2 rounded text-sm font-medium transition-colors ${
             systemPaused
-              ? 'bg-green-700 hover:bg-green-600 text-white disabled:opacity-50'
-              : 'bg-amber-800 hover:bg-amber-700 text-white disabled:opacity-50'
+              ? 'bg-green-700 hover:bg-green-600 text-text-primary disabled:opacity-50'
+              : 'bg-amber-800 hover:bg-amber-700 text-text-primary disabled:opacity-50'
           }`}
         >
           {loading ? '...' : systemPaused ? '▶ Resume System' : '⏸ Pause System'}
         </button>
-        <div className="text-xs text-gray-600 text-center mt-1.5">
+        <div className="text-xs text-text-muted text-center mt-1.5">
           {systemPaused
             ? 'Restarts UW polling and auto-rescore'
             : 'Stops all UW + Claude API calls — dashboard stays live'}
@@ -113,17 +113,17 @@ function SystemStatus({ systemPaused, pausedAt }) {
 
 function AutoScoreToggle({ enabled, onToggle }) {
   return (
-    <div className="flex items-center justify-between pt-3 border-t border-gray-800">
+    <div className="flex items-center justify-between pt-3 border-t border-border-subtle">
       <div>
-        <div className="text-xs text-gray-400 font-medium">Auto-Score</div>
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-text-secondary font-medium">Auto-Score</div>
+        <div className="text-xs text-text-muted">
           {enabled ? 'Rescores automatically on level change' : 'Manual score only'}
         </div>
       </div>
       <button
         onClick={onToggle}
         className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
-          enabled ? 'bg-green-800 text-green-300' : 'bg-gray-700 text-gray-500'
+          enabled ? 'bg-green-800 text-green-300' : 'bg-bg-elevated text-text-tertiary'
         }`}
       >
         {enabled ? '● Auto-Score ON' : '○ Auto-Score OFF'}
@@ -137,14 +137,14 @@ function LevelPreviewTable({ qqq, nq, ratio }) {
   const r = ratio || 41.14
   return (
     <div className="space-y-1">
-      <div className="text-xs text-gray-600 mb-2">Current levels</div>
+      <div className="text-xs text-text-muted mb-2">Current levels</div>
       {LEVEL_IDS.map(id => (
         <div key={id} className="flex items-center justify-between text-xs">
           <span className={`font-bold w-8 ${
             id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
           }`}>{id}</span>
-          <span className="text-white font-mono">${qqq[id]?.toFixed(2)}</span>
-          <span className="text-gray-500 font-mono">
+          <span className="text-text-primary font-mono">${qqq[id]?.toFixed(2)}</span>
+          <span className="text-text-tertiary font-mono">
             NQ {(nq?.[id] != null ? nq[id] : calcNQ(qqq[id], r)).toFixed(2)}
           </span>
         </div>
@@ -388,9 +388,9 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
           />
           <div className="mb-3 text-xs space-y-0.5">
             <div className="grid grid-cols-5 gap-1 mb-1">
-              <div className="text-gray-500">Level</div>
-              <div className="text-gray-500 text-center">Cur NQ</div>
-              <div className="text-gray-500 text-center">Cur QQQ</div>
+              <div className="text-text-tertiary">Level</div>
+              <div className="text-text-tertiary text-center">Cur NQ</div>
+              <div className="text-text-tertiary text-center">Cur QQQ</div>
               <div className="text-amber-400 text-center">New NQ</div>
               <div className="text-amber-400 text-center">New QQQ</div>
             </div>
@@ -405,13 +405,13 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
               const anyChanged = nqChanged || qqqChanged
               return (
                 <div key={id} className={`grid grid-cols-5 gap-1 py-0.5 ${anyChanged ? 'bg-amber-950 rounded px-1' : ''}`}>
-                  <div className="font-bold text-gray-300">{id}</div>
-                  <div className="text-center font-mono text-gray-500">{!isNaN(currentNq)  ? currentNq.toFixed(2)        : '—'}</div>
-                  <div className="text-center font-mono text-gray-400">{!isNaN(currentQqq) ? `$${currentQqq.toFixed(2)}` : '—'}</div>
-                  <div className={`text-center font-mono ${nqChanged  ? 'text-amber-300 font-bold' : 'text-gray-400'}`}>
+                  <div className="font-bold text-text-secondary">{id}</div>
+                  <div className="text-center font-mono text-text-tertiary">{!isNaN(currentNq)  ? currentNq.toFixed(2)        : '—'}</div>
+                  <div className="text-center font-mono text-text-secondary">{!isNaN(currentQqq) ? `$${currentQqq.toFixed(2)}` : '—'}</div>
+                  <div className={`text-center font-mono ${nqChanged  ? 'text-amber-300 font-bold' : 'text-text-secondary'}`}>
                     {!isNaN(incomingNq)  ? incomingNq.toFixed(2)        : '—'}{nqChanged  ? ' ←' : ''}
                   </div>
-                  <div className={`text-center font-mono ${qqqChanged ? 'text-amber-300 font-bold' : 'text-gray-400'}`}>
+                  <div className={`text-center font-mono ${qqqChanged ? 'text-amber-300 font-bold' : 'text-text-secondary'}`}>
                     {!isNaN(incomingQqq) ? `$${incomingQqq.toFixed(2)}` : '—'}{qqqChanged ? ' ←' : ''}
                   </div>
                 </div>
@@ -419,7 +419,7 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
             })}
           </div>
           {pending.nq_ratio && (
-            <div className="text-xs text-gray-500 mb-3">Ratio: {parseFloat(pending.nq_ratio).toFixed(3)}</div>
+            <div className="text-xs text-text-tertiary mb-3">Ratio: {parseFloat(pending.nq_ratio).toFixed(3)}</div>
           )}
           <div className="flex gap-2">
             <button
@@ -434,7 +434,7 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
                 finally { setAccepting(false) }
               }}
               className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
-                accepting ? 'bg-amber-800 text-amber-400 cursor-wait' : 'bg-amber-600 hover:bg-amber-500 text-white'
+                accepting ? 'bg-amber-800 text-amber-400 cursor-wait' : 'bg-amber-600 hover:bg-amber-500 text-text-primary'
               }`}
             >
               {accepting ? '⟳ Accepting…' : '✓ Accept — Update Levels'}
@@ -444,7 +444,7 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
                 await fetch(`${API_URL}/webhook/dismiss`, { method: 'POST' })
                 setPending(null)
               }}
-              className="px-4 py-1.5 rounded text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white"
+              className="px-4 py-1.5 rounded text-sm font-medium bg-bg-elevated hover:bg-bg-card2 text-text-primary"
             >
               ✗ Dismiss
             </button>
@@ -455,7 +455,7 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
       {/* ── LEVEL SOURCE ── */}
       <Section title="Level Source">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-text-tertiary">
             {levelSourceMode === 'manual'
               ? 'Manual entry — levels only change when you save'
               : 'Auto-detecting from Predictive Ranges'}
@@ -475,15 +475,15 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
             className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
               levelSourceMode === 'auto'
                 ? 'border-indigo-600 bg-indigo-950/30'
-                : 'border-gray-700 bg-gray-800/30 hover:border-gray-600'
+                : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
             }`}
           >
             <div className="flex items-center justify-between">
               <div>
-                <div className={`text-xs font-bold ${levelSourceMode === 'auto' ? 'text-indigo-400' : 'text-gray-400'}`}>
+                <div className={`text-xs font-bold ${levelSourceMode === 'auto' ? 'text-indigo-400' : 'text-text-secondary'}`}>
                   🤖 Auto — QQQ + NQ
                 </div>
-                <div className="text-xs text-gray-600 mt-0.5">Both auto-calculated · updates automatically on bar close</div>
+                <div className="text-xs text-text-muted mt-0.5">Both auto-calculated · updates automatically on bar close</div>
               </div>
               {levelSourceMode === 'auto' && <span className="text-indigo-500 text-xs shrink-0 ml-2">● active</span>}
             </div>
@@ -495,7 +495,7 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
                 onClick={handleRecalculate}
                 disabled={calculating}
                 className={`w-full py-2 rounded text-xs font-bold transition-colors ${
-                  calculating ? 'bg-gray-700 text-gray-500' : 'bg-indigo-700 hover:bg-indigo-600 text-white'
+                  calculating ? 'bg-bg-elevated text-text-tertiary' : 'bg-indigo-700 hover:bg-indigo-600 text-text-primary'
                 }`}
               >
                 {calculating ? '⟳ Calculating...' : '⟳ Recalculate Levels'}
@@ -505,14 +505,14 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
                 onClick={handleForceScore}
                 disabled={scoring}
                 className={`w-full py-2 rounded text-xs font-bold transition-colors ${
-                  scoring ? 'bg-gray-700 text-gray-500' : 'bg-green-800 hover:bg-green-700 text-white'
+                  scoring ? 'bg-bg-elevated text-text-tertiary' : 'bg-green-800 hover:bg-green-700 text-text-primary'
                 }`}
               >
                 {scoring ? '⟳ Scoring...' : '⚡ Score Now'}
               </button>
               <AutoScoreToggle enabled={autoScoreEnabled} onToggle={handleAutoScoreToggle} />
               {previewLevels?.lastCalculated && (
-                <div className="text-xs text-gray-700">
+                <div className="text-xs text-text-disabled">
                   Last calculated:{' '}
                   {new Date(previewLevels.lastCalculated).toLocaleTimeString('en-US', {
                     timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit'
@@ -528,15 +528,15 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
             className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
               levelSourceMode === 'auto_qqq'
                 ? 'border-blue-600 bg-blue-950/20'
-                : 'border-gray-700 bg-gray-800/30 hover:border-gray-600'
+                : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
             }`}
           >
             <div className="flex items-center justify-between">
               <div>
-                <div className={`text-xs font-bold ${levelSourceMode === 'auto_qqq' ? 'text-blue-400' : 'text-gray-400'}`}>
+                <div className={`text-xs font-bold ${levelSourceMode === 'auto_qqq' ? 'text-blue-400' : 'text-text-secondary'}`}>
                   🤖 Auto QQQ · Manual NQ
                 </div>
-                <div className="text-xs text-gray-600 mt-0.5">QQQ auto-updates · NQ = QQQ × ratio with optional offset per level</div>
+                <div className="text-xs text-text-muted mt-0.5">QQQ auto-updates · NQ = QQQ × ratio with optional offset per level</div>
               </div>
               {levelSourceMode === 'auto_qqq' && <span className="text-blue-500 text-xs shrink-0 ml-2">● active</span>}
             </div>
@@ -545,18 +545,18 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
           {levelSourceMode === 'auto_qqq' && (
             <div className="border border-blue-900/40 bg-blue-950/10 rounded-lg p-3 ml-2 space-y-3">
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-xs text-gray-500 w-20 shrink-0">NQ Ratio</span>
+                <span className="text-xs text-text-tertiary w-20 shrink-0">NQ Ratio</span>
                 <input
                   type="number"
                   value={nqOffsets.ratio || ''}
                   onChange={e => setNqOffsets(prev => ({ ...prev, ratio: e.target.value || null }))}
                   placeholder={`${ratio?.toFixed(3) || '41.142'} (live)`}
                   step="0.001"
-                  className="bg-gray-700 text-white font-mono text-xs rounded px-2 py-1 border border-gray-600 focus:border-blue-500 focus:outline-none w-28"
+                  className="bg-bg-elevated text-text-primary font-mono text-xs rounded px-2 py-1 border border-border-strong focus:border-blue-500 focus:outline-none w-28"
                 />
-                <span className="text-xs text-gray-600">blank = use live ratio</span>
+                <span className="text-xs text-text-muted">blank = use live ratio</span>
               </div>
-              <button onClick={() => setShowOffsets(v => !v)} className="text-xs text-gray-600 hover:text-gray-400">
+              <button onClick={() => setShowOffsets(v => !v)} className="text-xs text-text-muted hover:text-text-secondary">
                 {showOffsets ? '▲ hide offsets' : '▼ per-level NQ offsets (optional)'}
               </button>
               {showOffsets && (
@@ -571,9 +571,9 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
                         value={nqOffsets[id] || 0}
                         onChange={e => setNqOffsets(prev => ({ ...prev, [id]: parseInt(e.target.value) || 0 }))}
                         step="1"
-                        className="bg-gray-700 text-white font-mono text-xs rounded px-2 py-1 border border-gray-600 w-20 text-center"
+                        className="bg-bg-elevated text-text-primary font-mono text-xs rounded px-2 py-1 border border-border-strong w-20 text-center"
                       />
-                      <span className="text-xs text-gray-700">NQ pts</span>
+                      <span className="text-xs text-text-disabled">NQ pts</span>
                     </div>
                   ))}
                 </div>
@@ -586,13 +586,13 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
               </button>
               {nqPreview && (
                 <div className="border border-blue-900/30 rounded p-2 space-y-1">
-                  <div className="text-xs text-gray-600 mb-1">Preview — review before saving</div>
+                  <div className="text-xs text-text-muted mb-1">Preview — review before saving</div>
                   {LEVEL_IDS.map(id => (
                     <div key={id} className="flex justify-between text-xs">
                       <span className={`font-bold w-8 ${
                         id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
                       }`}>{id}</span>
-                      <span className="text-white font-mono">${nqPreview[id]?.qqq?.toFixed(2)}</span>
+                      <span className="text-text-primary font-mono">${nqPreview[id]?.qqq?.toFixed(2)}</span>
                       <span className="text-blue-300 font-mono">NQ {nqPreview[id]?.nq?.toFixed(2)}</span>
                     </div>
                   ))}
@@ -603,8 +603,8 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
                 disabled={scoring || !nqPreview}
                 className={`w-full py-2 rounded text-xs font-bold transition-colors ${
                   scoring || !nqPreview
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-green-800 hover:bg-green-700 text-white'
+                    ? 'bg-bg-elevated text-text-tertiary cursor-not-allowed'
+                    : 'bg-green-800 hover:bg-green-700 text-text-primary'
                 }`}
               >
                 {scoring ? '⟳ Scoring...' : nqPreview ? '✓ Save + Score Now' : 'Calculate first to enable save'}
@@ -618,49 +618,49 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
             onClick={() => handleModeChange('manual')}
             className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
               levelSourceMode === 'manual'
-                ? 'border-gray-500 bg-gray-800/50'
-                : 'border-gray-700 bg-gray-800/30 hover:border-gray-600'
+                ? 'border-gray-500 bg-bg-elevated/50'
+                : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
             }`}
           >
             <div className="flex items-center justify-between">
               <div>
-                <div className={`text-xs font-bold ${levelSourceMode === 'manual' ? 'text-gray-300' : 'text-gray-500'}`}>
+                <div className={`text-xs font-bold ${levelSourceMode === 'manual' ? 'text-text-secondary' : 'text-text-tertiary'}`}>
                   ✏️ Manual — QQQ + NQ
                 </div>
-                <div className="text-xs text-gray-600 mt-0.5">Levels only change when you save manually or accept webhook</div>
+                <div className="text-xs text-text-muted mt-0.5">Levels only change when you save manually or accept webhook</div>
               </div>
-              {levelSourceMode === 'manual' && <span className="text-gray-400 text-xs shrink-0 ml-2">● active</span>}
+              {levelSourceMode === 'manual' && <span className="text-text-secondary text-xs shrink-0 ml-2">● active</span>}
             </div>
           </button>
 
           {levelSourceMode === 'manual' && (
-            <div className="border border-gray-700/40 bg-gray-800/20 rounded-lg p-3 ml-2 space-y-3">
-              <div className="text-xs text-gray-500">Enter levels manually. Save to apply and begin scoring.</div>
-              <div className="bg-gray-800 rounded overflow-hidden border border-gray-700">
-                <div className="grid grid-cols-3 gap-2 px-3 py-2 border-b border-gray-700 bg-gray-800/80">
-                  <span className="text-xs text-gray-500">Level</span>
-                  <span className="text-xs text-gray-500 text-center">NQ Price</span>
-                  <span className="text-xs text-gray-500 text-center">QQQ Price</span>
+            <div className="border border-border-default/40 bg-bg-elevated/20 rounded-lg p-3 ml-2 space-y-3">
+              <div className="text-xs text-text-tertiary">Enter levels manually. Save to apply and begin scoring.</div>
+              <div className="bg-bg-elevated rounded overflow-hidden border border-border-default">
+                <div className="grid grid-cols-3 gap-2 px-3 py-2 border-b border-border-default bg-bg-elevated/80">
+                  <span className="text-xs text-text-tertiary">Level</span>
+                  <span className="text-xs text-text-tertiary text-center">NQ Price</span>
+                  <span className="text-xs text-text-tertiary text-center">QQQ Price</span>
                 </div>
                 {LEVEL_IDS.map((id, i) => (
-                  <div key={id} className={`grid grid-cols-3 gap-2 px-3 py-2 ${i < LEVEL_IDS.length - 1 ? 'border-b border-gray-700' : ''}`}>
+                  <div key={id} className={`grid grid-cols-3 gap-2 px-3 py-2 ${i < LEVEL_IDS.length - 1 ? 'border-b border-border-default' : ''}`}>
                     <span className={`text-sm font-bold self-center ${LEVEL_COLORS[id]}`}>{id}</span>
                     <input
                       type="number" step="0.25" placeholder="e.g. 29995"
                       value={levels[id].nq}
                       onChange={e => updateLevel(id, 'nq', e.target.value)}
-                      className="bg-gray-700 text-white text-xs font-mono rounded px-2 py-1.5 text-center border border-gray-600 focus:border-blue-500 focus:outline-none w-full"
+                      className="bg-bg-elevated text-text-primary text-xs font-mono rounded px-2 py-1.5 text-center border border-border-strong focus:border-blue-500 focus:outline-none w-full"
                     />
                     <input
                       type="number" step="0.01" placeholder="e.g. 728.79"
                       value={levels[id].qqq}
                       onChange={e => updateLevel(id, 'qqq', e.target.value)}
-                      className="bg-gray-700 text-white text-xs font-mono rounded px-2 py-1.5 text-center border border-gray-600 focus:border-blue-500 focus:outline-none w-full"
+                      className="bg-bg-elevated text-text-primary text-xs font-mono rounded px-2 py-1.5 text-center border border-border-strong focus:border-blue-500 focus:outline-none w-full"
                     />
                   </div>
                 ))}
               </div>
-              {!allValid && <p className="text-xs text-gray-600">Enter all 5 NQ and QQQ prices to save</p>}
+              {!allValid && <p className="text-xs text-text-muted">Enter all 5 NQ and QQQ prices to save</p>}
               {saveResult === 'success' && ratio && (
                 <div className="bg-green-950 border border-green-700 rounded p-2 text-xs text-green-400">
                   ✓ Levels saved — ratio {ratio.toFixed(4)} — scoring triggered
@@ -671,10 +671,10 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
                 disabled={saving || scoring || !allValid}
                 className={`w-full py-2 rounded text-xs font-bold transition-colors ${
                   saving || scoring || !allValid
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : saveResult === 'success' ? 'bg-green-700 text-white'
-                    : saveResult === 'error'   ? 'bg-red-700 text-white'
-                    : 'bg-gray-600 hover:bg-gray-500 text-white'
+                    ? 'bg-bg-elevated text-text-tertiary cursor-not-allowed'
+                    : saveResult === 'success' ? 'bg-green-700 text-text-primary'
+                    : saveResult === 'error'   ? 'bg-red-700 text-text-primary'
+                    : 'bg-bg-card2 hover:bg-gray-500 text-text-primary'
                 }`}
               >
                 {saving ? '⟳ Saving…' : scoring ? '⟳ Scoring...'
@@ -692,28 +692,28 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
       {(ratio || isToday || history.length > 0) && (
         <Section title="Saved Levels">
           {ratio && (
-            <div className="bg-gray-800 rounded px-3 py-2 flex items-center justify-between mb-3">
-              <span className="text-xs text-gray-400">NQ/QQQ Ratio</span>
-              <span className="text-xs font-mono text-white font-bold">{ratio.toFixed(4)}</span>
+            <div className="bg-bg-elevated rounded px-3 py-2 flex items-center justify-between mb-3">
+              <span className="text-xs text-text-secondary">NQ/QQQ Ratio</span>
+              <span className="text-xs font-mono text-text-primary font-bold">{ratio.toFixed(4)}</span>
             </div>
           )}
           {isToday && (
             <button
               onClick={copyForTradingView}
-              className="w-full py-2 rounded text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors mb-3"
+              className="w-full py-2 rounded text-sm font-medium bg-bg-elevated hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors mb-3"
             >
               {copied ? '✓ Copied!' : '📋 Copy JSON for TradingView'}
             </button>
           )}
           {history.length > 0 && (
-            <div className="bg-gray-800 rounded border border-gray-700 p-3">
-              <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Recent Sessions</div>
+            <div className="bg-bg-elevated rounded border border-border-default p-3">
+              <div className="text-xs text-text-secondary uppercase tracking-wide mb-2">Recent Sessions</div>
               <div className="space-y-1.5">
                 {history.map((row, i) => (
                   <div key={i} className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-gray-500">{row.date}</span>
-                    <span className="text-gray-400">R2 {row.r2_qqq?.toFixed(2)} → S2 {row.s2_qqq?.toFixed(2)}</span>
-                    <span className="text-gray-600">×{row.nq_ratio?.toFixed(3)}</span>
+                    <span className="text-text-tertiary">{row.date}</span>
+                    <span className="text-text-secondary">R2 {row.r2_qqq?.toFixed(2)} → S2 {row.s2_qqq?.toFixed(2)}</span>
+                    <span className="text-text-muted">×{row.nq_ratio?.toFixed(3)}</span>
                   </div>
                 ))}
               </div>

@@ -15,8 +15,8 @@ export default function RestartBanner({ restarted, hasData, onDismiss }) {
       <p className="text-xs mt-1 text-amber-300">
         Railway redeployed and cleared session memory.
       </p>
-      <div className="text-xs mt-1.5 text-gray-400">
-        Open <span className="font-mono text-white">Tab 4 📐 Levels</span> → enter levels → Save → Score Now
+      <div className="text-xs mt-1.5 text-text-secondary">
+        Open <span className="font-mono text-text-primary">Tab 4 📐 Levels</span> → enter levels → Save → Score Now
       </div>
     </div>
   )

@@ -61,8 +61,8 @@ export default function TradeEntryForm({
 
   const isNQ       = activeSymbol === 'NQ'
   const prefix     = isNQ ? 'NQ ' : '$'
-  const inputClass = 'w-full bg-gray-700 border border-gray-600 text-white text-xs rounded px-2 py-1.5 font-mono focus:border-indigo-500 focus:outline-none'
-  const labelClass = 'text-xs text-gray-500 mb-0.5'
+  const inputClass = 'w-full bg-bg-elevated border border-border-strong text-text-primary text-xs rounded px-2 py-1.5 font-mono focus:border-indigo-500 focus:outline-none'
+  const labelClass = 'text-xs text-text-tertiary mb-0.5'
 
   // Quick-fill from level list
   const levelOptions = (levels || []).sort((a, b) => b.price - a.price)
@@ -71,10 +71,10 @@ export default function TradeEntryForm({
     : p.toFixed(2)
 
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
+    <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs text-gray-400 font-bold uppercase tracking-wide">Manual Entry</div>
-        <button onClick={onCancel} className="text-gray-600 hover:text-gray-400 text-xs">✕ cancel</button>
+        <div className="text-xs text-text-secondary font-bold uppercase tracking-wide">Manual Entry</div>
+        <button onClick={onCancel} className="text-text-muted hover:text-text-secondary text-xs">✕ cancel</button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -92,7 +92,7 @@ export default function TradeEntryForm({
                     ? d === 'long'
                       ? 'bg-green-800 text-green-300'
                       : 'bg-red-800 text-red-300'
-                    : 'bg-gray-700 text-gray-500 hover:text-gray-300'
+                    : 'bg-bg-elevated text-text-tertiary hover:text-text-secondary'
                 }`}
               >
                 {d === 'long' ? '↑ Long' : '↓ Short'}
@@ -111,7 +111,7 @@ export default function TradeEntryForm({
                   key={l.id}
                   type="button"
                   onClick={() => setEntry(toDisplay(l.price))}
-                  className="px-2 py-0.5 rounded bg-gray-700 text-gray-400 text-xs hover:bg-gray-600 hover:text-white font-mono"
+                  className="px-2 py-0.5 rounded bg-bg-elevated text-text-secondary text-xs hover:bg-bg-card2 hover:text-text-primary font-mono"
                 >
                   {l.id} {toDisplay(l.price)}
                 </button>
@@ -164,7 +164,7 @@ export default function TradeEntryForm({
               : 'border-red-900/50 bg-red-950/10'
           }`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-500 uppercase tracking-wider">Trade Preview</span>
+              <span className="text-xs text-text-tertiary uppercase tracking-wider">Trade Preview</span>
               <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                 preview.quality === 'excellent' ? 'bg-green-900 text-green-300'
                   : preview.quality === 'good'  ? 'bg-green-900/70 text-green-400'
@@ -175,17 +175,17 @@ export default function TradeEntryForm({
               </span>
             </div>
 
-            <div className="flex items-center justify-between py-1 border-b border-gray-800">
+            <div className="flex items-center justify-between py-1 border-b border-border-subtle">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                <span className="text-xs text-gray-500">Max Loss</span>
+                <span className="text-xs text-text-tertiary">Max Loss</span>
               </div>
               <div className="text-right">
                 <span className="text-xs text-red-400 font-mono font-bold">
                   -${preview.riskDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 {preview.instrument.type === 'futures' && (
-                  <span className="text-xs text-gray-600 font-mono ml-2">{preview.riskPoints} pts</span>
+                  <span className="text-xs text-text-muted font-mono ml-2">{preview.riskPoints} pts</span>
                 )}
               </div>
             </div>
@@ -193,21 +193,21 @@ export default function TradeEntryForm({
             <div className="flex items-center justify-between py-1">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                <span className="text-xs text-gray-500">Max Gain</span>
+                <span className="text-xs text-text-tertiary">Max Gain</span>
               </div>
               <div className="text-right">
                 <span className="text-xs text-green-400 font-mono font-bold">
                   +${preview.gainDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 {preview.instrument.type === 'futures' && (
-                  <span className="text-xs text-gray-600 font-mono ml-2">{preview.gainPoints} pts</span>
+                  <span className="text-xs text-text-muted font-mono ml-2">{preview.gainPoints} pts</span>
                 )}
               </div>
             </div>
 
             {contracts > 1 && (
-              <div className="mt-1.5 pt-1.5 border-t border-gray-800">
-                <div className="text-xs text-gray-600">
+              <div className="mt-1.5 pt-1.5 border-t border-border-subtle">
+                <div className="text-xs text-text-muted">
                   Per contract: -${(preview.riskDollars / contracts).toFixed(2)} risk · +${(preview.gainDollars / contracts).toFixed(2)} gain
                 </div>
               </div>
@@ -222,7 +222,7 @@ export default function TradeEntryForm({
         <button
           type="submit"
           disabled={!entry || !target || !stop}
-          className="w-full py-2 rounded text-xs font-bold bg-indigo-700 hover:bg-indigo-600 text-white transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
+          className="w-full py-2 rounded text-xs font-bold bg-indigo-700 hover:bg-indigo-600 text-text-primary transition-colors disabled:bg-bg-elevated disabled:text-text-tertiary disabled:cursor-not-allowed"
         >
           → Enter Trade
         </button>

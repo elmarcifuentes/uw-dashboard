@@ -24,10 +24,10 @@ export default function EarningsWarning({ apiUrl }) {
   }, [apiUrl])
 
   const skeleton = (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
-      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
-      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
-      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3 animate-pulse">
+      <div className="h-2.5 bg-bg-elevated rounded w-24 mb-2" />
+      <div className="h-2 bg-bg-elevated rounded w-full mb-1.5" />
+      <div className="h-2 bg-bg-elevated rounded w-3/4" />
     </div>
   )
 
@@ -48,12 +48,12 @@ export default function EarningsWarning({ apiUrl }) {
           return (
             <div key={i} className="flex items-center gap-3 flex-wrap">
               <span className="text-amber-400 font-bold font-mono text-sm w-16 shrink-0">{e.symbol}</span>
-              <span className="text-gray-400 text-xs shrink-0">{e.full_name}</span>
-              <span className="text-gray-500 text-xs shrink-0">
+              <span className="text-text-secondary text-xs shrink-0">{e.full_name}</span>
+              <span className="text-text-tertiary text-xs shrink-0">
                 {e.report_time === 'premarket' ? '🌅 Pre-mkt' : '🌆 AH'}
               </span>
               {e.street_mean_est && (
-                <span className="text-gray-500 text-xs">EPS est: {e.street_mean_est}</span>
+                <span className="text-text-tertiary text-xs">EPS est: {e.street_mean_est}</span>
               )}
               {movePct && (
                 <span className="text-amber-600 text-xs font-mono ml-auto shrink-0">{movePct} expected</span>

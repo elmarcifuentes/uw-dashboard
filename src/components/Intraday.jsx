@@ -197,7 +197,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
   if (!connected && !rescoreData && !priceData) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500 text-sm animate-pulse">Connecting to live data…</div>
+        <div className="text-text-tertiary text-sm animate-pulse">Connecting to live data…</div>
       </div>
     )
   }
@@ -307,13 +307,13 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
         <div className="col-span-12 md:col-span-8 space-y-3">
           <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
           {activeTrade && !expandNarrative ? (
-            <div className="border border-gray-800 bg-[#111827] rounded-lg px-3 py-2 flex items-center gap-2">
-              <span className="text-xs text-gray-500 truncate flex-1">
+            <div className="border border-border-subtle bg-bg-card rounded-lg px-3 py-2 flex items-center gap-2">
+              <span className="text-xs text-text-tertiary truncate flex-1">
                 {formatNarrative((narrativeMode === 'claude' && tacticalBrief) ? tacticalBrief : narrative?.[0] || 'Narrative paused — trade active', activeSymbol)}
               </span>
               <button
                 onClick={() => setExpandNarrative(true)}
-                className="text-xs text-gray-600 hover:text-gray-400 shrink-0"
+                className="text-xs text-text-muted hover:text-text-secondary shrink-0"
               >
                 ▼ expand
               </button>
@@ -324,7 +324,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
               {activeTrade && expandNarrative && (
                 <button
                   onClick={() => setExpandNarrative(false)}
-                  className="text-xs text-gray-600 hover:text-gray-400 text-center w-full -mt-1"
+                  className="text-xs text-text-muted hover:text-text-secondary text-center w-full -mt-1"
                 >
                   ▲ collapse narrative
                 </button>
@@ -333,7 +333,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
           )}
 
           {/* Sub-tab navigation — flat underline style */}
-          <div className="border-b border-gray-800">
+          <div className="border-b border-border-subtle">
             <div className="flex gap-0">
               {(compact ? SUB_TABS_COMPACT : SUB_TABS).map((tab, i) => (
                 <button
@@ -341,8 +341,8 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
                   onClick={() => setSubTab(i)}
                   className={`px-3 py-2 text-xs font-medium transition-colors -mb-px border-b-2 ${
                     subTab === i
-                      ? 'text-white border-indigo-500'
-                      : 'text-gray-500 hover:text-gray-300 border-transparent'
+                      ? 'text-text-primary border-indigo-500'
+                      : 'text-text-tertiary hover:text-text-secondary border-transparent'
                   }`}
                 >
                   {tab}
@@ -388,10 +388,10 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
         <div className="fixed inset-0 z-50 md:hidden" onClick={() => setBottomSheetOpen(false)}>
           <div className="absolute inset-0 bg-black/60" />
           <div
-            className="absolute bottom-0 left-0 right-0 bg-[#111827] border-t border-gray-700 rounded-t-2xl p-4 max-h-[75vh] overflow-y-auto"
+            className="absolute bottom-0 left-0 right-0 bg-bg-card border-t border-border-default rounded-t-2xl p-4 max-h-[75vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
-            <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-4" />
+            <div className="w-10 h-1 bg-bg-elevated rounded-full mx-auto mb-4" />
             <LevelDetailSheet
               levelId={bottomSheetLevel}
               levels={result?.levels}

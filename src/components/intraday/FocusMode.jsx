@@ -1,4 +1,5 @@
 import { formatNarrative } from '../../utils/formatNarrative'
+import { CircleCheck, TriangleAlert, Zap, DoorOpen } from 'lucide-react'
 
 function VelocityIndicator({ velocity }) {
   if (velocity == null) return null
@@ -8,10 +9,10 @@ function VelocityIndicator({ velocity }) {
     : abs > 0.02 ? (up ? '↑' : '↓')
     : abs > 0.005 ? (up ? '↑' : '↓')
     : '→'
-  const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse')
-    : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500')
-    : abs > 0.005 ? (up ? 'text-green-700' : 'text-red-700')
-    : 'text-gray-600'
+  const color = abs > 0.05 ? (up ? 'text-signal-support animate-pulse' : 'text-signal-resistance animate-pulse')
+    : abs > 0.02 ? (up ? 'text-signal-support' : 'text-signal-resistance')
+    : abs > 0.005 ? (up ? 'text-signal-support/60' : 'text-signal-resistance/60')
+    : 'text-text-muted'
   return <span className={`text-sm font-bold ${color}`}>{arrow}</span>
 }
 
@@ -20,16 +21,16 @@ function DpBar({ value }) {
   const pct = ((dp + 1) / 2) * 100
   return (
     <div className="flex items-center gap-2 mt-1.5">
-      <span className="text-xs text-gray-600 shrink-0" style={{ minWidth: '56px' }}>Dark Pool</span>
-      <div className="h-1.5 bg-gray-800 rounded relative overflow-hidden flex-1">
-        <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700 z-10" />
+      <span className="text-xs text-text-muted shrink-0" style={{ minWidth: '56px' }}>Dark Pool</span>
+      <div className="h-1.5 bg-bg-elevated rounded relative overflow-hidden flex-1">
+        <div className="absolute inset-y-0 left-1/2 w-px bg-text-disabled z-10" />
         {pct >= 50 ? (
-          <div className="absolute inset-y-0 left-1/2 bg-green-500" style={{ width: `${(pct - 50) * 2}%` }} />
+          <div className="absolute inset-y-0 left-1/2 bg-signal-support" style={{ width: `${(pct - 50) * 2}%` }} />
         ) : (
-          <div className="absolute inset-y-0 right-1/2 bg-red-500" style={{ width: `${(50 - pct) * 2}%` }} />
+          <div className="absolute inset-y-0 right-1/2 bg-signal-resistance" style={{ width: `${(50 - pct) * 2}%` }} />
         )}
       </div>
-      <span className="text-xs font-mono text-gray-500 shrink-0" style={{ minWidth: '40px', textAlign: 'right' }}>
+      <span className="text-xs font-price text-text-tertiary shrink-0" style={{ minWidth: '40px', textAlign: 'right' }}>
         {dp.toFixed(3)}
       </span>
     </div>
@@ -78,53 +79,59 @@ export default function FocusMode({
     ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
     : (currentPrice != null ? '$' + currentPrice.toFixed(2) : '—')
 
+  const cascadeBg = cascade?.active
+    ? 'bg-state-stopSoft border-state-stop'
+    : midDp <= -0.500
+    ? 'bg-state-cascadeWatchSoft border-state-cascadeWatch/50'
+    : 'bg-bg-card border-border-subtle'
+
   return (
-    <div className="fixed inset-0 bg-[#0a0f1e] z-50 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-bg-base z-50 flex flex-col overflow-hidden">
 
       {/* Row 1 — Live bar */}
-      <div className="border-b border-gray-800 bg-[#0d1424] px-4 py-2.5 flex items-center gap-4 flex-wrap">
+      <div className="border-b border-border-subtle bg-bg-subtle px-4 py-2.5 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
-          <span className="text-xs text-gray-500 uppercase tracking-wider">LIVE</span>
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-state-hold animate-pulse' : 'bg-state-stop'}`} />
+          <span className="text-micro text-text-tertiary uppercase tracking-wider">LIVE</span>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-white font-mono tabular-nums">{displayPrice}</span>
+          <span className="text-hero font-price tabular-nums text-text-primary">{displayPrice}</span>
           <VelocityIndicator velocity={priceVelocity} />
         </div>
         {sentiment?.state && (
           <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold ${
-            sentiment.color === 'green' ? 'bg-green-950 text-green-400'
-              : sentiment.color === 'red' ? 'bg-red-950 text-red-400'
-              : 'bg-amber-950 text-amber-400'
+            sentiment.color === 'green' ? 'bg-state-holdSoft text-state-hold'
+              : sentiment.color === 'red' ? 'bg-state-stopSoft text-state-stop'
+              : 'bg-state-cascadeWatchSoft text-state-cascadeWatch'
           }`}>
             {sentiment.state}
           </div>
         )}
         {activeTrade && (
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold bg-indigo-950 text-indigo-400 border border-indigo-900">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold bg-accent-aiSoft text-accent-ai border border-accent-ai/30">
             ● {activeTrade.direction?.toUpperCase()} {activeTrade.instrument || activeSymbol}
           </div>
         )}
         <div className="flex-1" />
         <button onClick={onExit}
-          className="text-xs text-gray-500 hover:text-gray-300 px-3 py-1 border border-gray-700 rounded">
-          ✕ Exit Focus
+          className="text-xs text-text-tertiary hover:text-text-secondary px-3 py-1 border border-border-default rounded transition-colors flex items-center gap-1">
+          <DoorOpen className="w-3 h-3" /> Exit Focus
         </button>
       </div>
 
       {/* Row 2 — Assistant strip */}
       {assistantRead && (
-        <div className="border-b border-gray-800 bg-[#0d1424] px-4 py-2">
+        <div className="border-b border-border-subtle bg-bg-subtle px-4 py-2">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {[
-              { key: 'now',          label: 'NOW',      color: 'text-white',     border: 'border-gray-700' },
-              { key: 'next',         label: 'NEXT',     color: 'text-blue-200',  border: 'border-blue-900/50' },
-              { key: 'risk',         label: 'RISK',     color: 'text-amber-200', border: 'border-amber-900/50' },
-              { key: 'invalidation', label: 'IF WRONG', color: 'text-gray-400',  border: 'border-gray-800' },
+              { key: 'now',          label: 'NOW',      color: 'text-text-primary',   border: 'border-border-default',          labelColor: 'text-text-tertiary'        },
+              { key: 'next',         label: 'NEXT',     color: 'text-text-secondary', border: 'border-signal-continuation/30',  labelColor: 'text-signal-continuation'  },
+              { key: 'risk',         label: 'RISK',     color: 'text-text-secondary', border: 'border-state-exit/30',           labelColor: 'text-state-exit'           },
+              { key: 'invalidation', label: 'IF WRONG', color: 'text-text-secondary', border: 'border-border-subtle',           labelColor: 'text-text-muted'           },
             ].map(f => (
-              <div key={f.key} className={`border rounded-lg px-3 py-2 ${f.border} bg-[#111827]/50`}>
-                <div className="text-xs font-bold text-gray-600 tracking-wider mb-1">{f.label}</div>
-                <p className={`text-xs leading-relaxed ${f.color}`}>
+              <div key={f.key} className={`border rounded-lg px-3 py-2 ${f.border} bg-bg-card/50`}>
+                <div className={`text-micro font-bold uppercase tracking-wider mb-1 ${f.labelColor}`}>{f.label}</div>
+                <p className={`text-sm2 leading-relaxed ${f.color}`}>
                   {formatNarrative(assistantRead[f.key], activeSymbol) || '—'}
                 </p>
               </div>
@@ -134,48 +141,44 @@ export default function FocusMode({
       )}
 
       {/* Row 3 — Cascade bar + verdict badge */}
-      <div className={`px-4 py-2.5 border-b ${
-        cascade?.active ? 'bg-red-950/40 border-red-800'
-          : midDp <= -0.500 ? 'bg-amber-950/20 border-amber-900/50'
-          : 'bg-[#111827] border-gray-800'
-      }`}>
+      <div className={`px-4 py-2.5 border-b ${cascadeBg}`}>
         <div className="flex items-center gap-3">
           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-            cascade?.active ? 'bg-red-500 animate-pulse'
-              : midDp <= -0.500 ? 'bg-amber-500'
-              : 'bg-green-500'
+            cascade?.active ? 'bg-state-stop animate-pulse'
+              : midDp <= -0.500 ? 'bg-state-cascadeWatch'
+              : 'bg-state-hold'
           }`} />
           <span className={`text-sm font-bold ${
-            cascade?.active ? 'text-red-400'
-              : midDp <= -0.500 ? 'text-amber-400'
-              : 'text-green-400'
+            cascade?.active ? 'text-state-stop'
+              : midDp <= -0.500 ? 'text-state-cascadeWatch'
+              : 'text-state-hold'
           }`}>
             {cascade?.active ? 'CASCADE ACTIVE' : midDp <= -0.500 ? 'APPROACHING CASCADE' : 'CASCADE SAFE'}
           </span>
-          <span className="text-xs text-gray-600 font-mono">MID dp {midDp.toFixed(3)}</span>
-          <span className={`text-xs font-mono hidden sm:inline ${midDp <= -0.500 ? 'text-amber-600' : 'text-gray-700'}`}>
+          <span className="text-xs text-text-muted font-price">MID dp {midDp.toFixed(3)}</span>
+          <span className={`text-xs font-price hidden sm:inline ${midDp <= -0.500 ? 'text-state-cascadeWatch/80' : 'text-text-disabled'}`}>
             {gap.toFixed(3)} from -0.700
           </span>
           <div className="flex-1" />
           {evaluation && (
             <div className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded border ${
-              evaluation.verdictColor === 'red'   ? 'bg-red-950/60 border-red-800 text-red-400'
-              : evaluation.verdictColor === 'amber' ? 'bg-amber-950/60 border-amber-800 text-amber-400'
-              : 'bg-green-950/60 border-green-800 text-green-400'
+              evaluation.verdictColor === 'red'   ? 'bg-state-stopSoft border-state-stop text-state-stop'
+              : evaluation.verdictColor === 'amber' ? 'bg-state-cascadeWatchSoft border-state-cascadeWatch text-state-cascadeWatch'
+              : 'bg-state-holdSoft border-state-hold text-state-hold'
             }`}>
               {evaluation.verdictLabel}
             </div>
           )}
         </div>
-        <div className="mt-2 h-1.5 bg-gray-800 rounded relative overflow-hidden">
+        <div className="mt-2 h-1.5 bg-bg-elevated rounded relative overflow-hidden">
           <div
             className="absolute inset-y-0 left-0 rounded transition-all duration-500"
             style={{
               width: `${Math.max(0, Math.min(100, ((midDp + 1) / 1.5) * 100))}%`,
-              backgroundColor: cascade?.active ? '#ef4444' : midDp <= -0.500 ? '#f59e0b' : '#22c55e',
+              backgroundColor: cascade?.active ? '#ff4d5e' : midDp <= -0.500 ? '#ffb020' : '#20c997',
             }}
           />
-          <div className="absolute inset-y-0 w-0.5 bg-red-500"
+          <div className="absolute inset-y-0 w-0.5 bg-state-stop"
                style={{ left: `${((-0.700 + 1) / 1.5) * 100}%` }} />
         </div>
       </div>
@@ -185,17 +188,17 @@ export default function FocusMode({
         <div className="max-w-2xl mx-auto w-full flex flex-col gap-3">
 
           {resistance ? (
-            <div className="border border-red-900/50 bg-red-950/10 rounded-lg px-4 py-3">
+            <div className="border border-signal-resistance/30 bg-signal-resistanceSoft rounded-lg px-4 py-3 shadow-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-red-500 font-bold uppercase tracking-wider">
+                  <span className="text-micro text-signal-resistance font-bold uppercase tracking-wider">
                     {resistance.id} — Resistance
                   </span>
-                  <div className="text-lg font-bold text-white font-mono mt-0.5">{fmtPrice(resistance.price)}</div>
+                  <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtPrice(resistance.price)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-gray-500">above by</div>
-                  <div className="text-lg font-mono font-bold text-red-400">
+                  <div className="text-micro text-text-tertiary uppercase">above by</div>
+                  <div className="text-lg2 font-price font-bold text-signal-resistance">
                     +{fmtAbsDist(resistance.price - (currentPrice || 0))}
                   </div>
                 </div>
@@ -203,33 +206,33 @@ export default function FocusMode({
               <DpBar value={resistance.dark_pool} />
             </div>
           ) : (
-            <div className="border border-gray-800 rounded-lg px-4 py-3 text-center">
-              <span className="text-xs text-gray-600">No resistance classified above</span>
+            <div className="border border-border-subtle rounded-lg px-4 py-3 text-center">
+              <span className="text-xs text-text-muted">No resistance classified above</span>
             </div>
           )}
 
-          <div className="border-2 border-yellow-400/50 bg-yellow-400/5 rounded-lg px-4 py-4 text-center">
-            <div className="text-xs text-yellow-500 uppercase tracking-wider mb-1">▶ Current Price</div>
-            <div className="text-3xl sm:text-4xl font-bold text-white font-mono tabular-nums">{displayPrice}</div>
+          <div className="border-2 border-accent-price/50 bg-accent-price/5 rounded-lg px-4 py-4 text-center shadow-elevated">
+            <div className="text-micro text-accent-price uppercase tracking-wider mb-1">▶ Current Price</div>
+            <div className="text-hero font-price tabular-nums text-text-primary">{displayPrice}</div>
             {nearest && (
-              <div className="text-xs text-gray-600 mt-2">
+              <div className="text-md2 text-text-muted mt-2">
                 {fmtAbsDist((currentPrice || 0) - nearest.price)} from {nearest.id}
               </div>
             )}
           </div>
 
           {support ? (
-            <div className="border border-green-900/50 bg-green-950/10 rounded-lg px-4 py-3">
+            <div className="border border-signal-support/30 bg-signal-supportSoft rounded-lg px-4 py-3 shadow-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-green-500 font-bold uppercase tracking-wider">
+                  <span className="text-micro text-signal-support font-bold uppercase tracking-wider">
                     {support.id} — Support
                   </span>
-                  <div className="text-lg font-bold text-white font-mono mt-0.5">{fmtPrice(support.price)}</div>
+                  <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtPrice(support.price)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-gray-500">below by</div>
-                  <div className="text-lg font-mono font-bold text-green-400">
+                  <div className="text-micro text-text-tertiary uppercase">below by</div>
+                  <div className="text-lg2 font-price font-bold text-signal-support">
                     -{fmtAbsDist((currentPrice || 0) - support.price)}
                   </div>
                 </div>
@@ -237,8 +240,8 @@ export default function FocusMode({
               <DpBar value={support.dark_pool} />
             </div>
           ) : (
-            <div className="border border-gray-800 rounded-lg px-4 py-3 text-center">
-              <span className="text-xs text-gray-600">No support classified below</span>
+            <div className="border border-border-subtle rounded-lg px-4 py-3 text-center">
+              <span className="text-xs text-text-muted">No support classified below</span>
             </div>
           )}
         </div>
@@ -246,18 +249,18 @@ export default function FocusMode({
 
       {/* Row 5 — Trade details (only when active trade) */}
       {activeTrade && (
-        <div className="border-t border-gray-800 bg-[#111827]/80 px-4 py-3">
+        <div className="border-t border-border-subtle bg-bg-card/80 px-4 py-3">
           <div className="max-w-2xl mx-auto w-full">
             {pnl && (
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-xs text-gray-500 uppercase tracking-wider shrink-0">P&L</span>
-                <span className={`text-xl font-bold font-mono ${pnl.isProfit ? 'text-green-400' : 'text-red-400'}`}>
+                <span className="text-micro text-text-tertiary uppercase tracking-wider shrink-0">P&L</span>
+                <span className={`text-xl2 font-bold font-price ${pnl.isProfit ? 'text-state-hold' : 'text-state-stop'}`}>
                   {pnl.dollarsStr}
                 </span>
-                <span className={`text-xs font-mono ${pnl.isProfit ? 'text-green-600' : 'text-red-600'}`}>
+                <span className={`text-sm2 font-price ${pnl.isProfit ? 'text-state-hold/70' : 'text-state-stop/70'}`}>
                   {pnl.pointsStr}
                 </span>
-                <span className="text-xs text-gray-600 ml-auto">
+                <span className="text-xs text-text-muted ml-auto">
                   {activeTrade.contracts || 1}× {activeTrade.instrument || activeSymbol}
                 </span>
               </div>
@@ -265,31 +268,31 @@ export default function FocusMode({
             {evaluation && (
               <div className="space-y-0.5 mb-2">
                 {evaluation.holdSignals.slice(0, 2).map((s, i) => (
-                  <div key={i} className="flex items-center gap-1.5 text-xs text-green-400">
-                    <span>✓</span><span>{s}</span>
+                  <div key={i} className="flex items-center gap-1.5 text-xs text-state-hold">
+                    <CircleCheck className="w-3 h-3 shrink-0" /><span>{s}</span>
                   </div>
                 ))}
                 {evaluation.exitSignals.slice(0, 2).map((s, i) => (
-                  <div key={i} className="flex items-center gap-1.5 text-xs text-red-400">
-                    <span>⚠</span><span>{s}</span>
+                  <div key={i} className="flex items-center gap-1.5 text-xs text-state-stop">
+                    <TriangleAlert className="w-3 h-3 shrink-0" /><span>{s}</span>
                   </div>
                 ))}
                 {evaluation.convictionSignals.slice(0, 1).map((s, i) => (
-                  <div key={i} className="flex items-center gap-1.5 text-xs text-amber-400">
-                    <span>⚡</span><span>{s}</span>
+                  <div key={i} className="flex items-center gap-1.5 text-xs text-accent-ai">
+                    <Zap className="w-3 h-3 shrink-0" /><span>{s}</span>
                   </div>
                 ))}
               </div>
             )}
             {evaluation && (
               <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-0.5">
+                <div className="flex justify-between text-xs text-text-muted mb-0.5">
                   <span>To target</span>
                   <span>{evaluation.progressPct}%</span>
                 </div>
-                <div className="h-1.5 bg-gray-800 rounded overflow-hidden">
+                <div className="h-1.5 bg-bg-elevated rounded overflow-hidden">
                   <div
-                    className={`h-full rounded transition-all ${activeTrade.direction === 'long' ? 'bg-green-500' : 'bg-red-500'}`}
+                    className={`h-full rounded transition-all ${activeTrade.direction === 'long' ? 'bg-state-hold' : 'bg-state-stop'}`}
                     style={{ width: `${evaluation.progressPct}%` }}
                   />
                 </div>
@@ -300,30 +303,30 @@ export default function FocusMode({
       )}
 
       {/* Row 6 — Action bar */}
-      <div className="border-t border-gray-800 bg-[#0d1424] px-4 py-3 flex items-center gap-2">
+      <div className="border-t border-border-subtle bg-bg-subtle px-4 py-3 flex items-center gap-2">
         {activeTrade && onExitTrade ? (
           <>
             <button
               onClick={() => onExitTrade('manual')}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors font-bold"
+              className="px-4 py-2 bg-bg-elevated hover:bg-bg-card2 text-text-primary text-xs rounded transition-colors font-bold border border-border-default"
             >
               ✓ Close
             </button>
             <button
               onClick={() => onExitTrade('stop')}
-              className="px-4 py-2 bg-red-800 hover:bg-red-700 text-white text-xs rounded transition-colors font-bold"
+              className="px-4 py-2 bg-state-stopSoft hover:bg-state-stop/30 text-state-stop text-xs rounded transition-colors font-bold border border-state-stop/60"
             >
               ✗ Stop Out
             </button>
           </>
         ) : (
           <button onClick={onExit}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
+            className="px-4 py-2 bg-bg-elevated hover:bg-bg-card2 text-text-primary text-xs rounded transition-colors border border-border-default">
             ⊞ Full View
           </button>
         )}
         <div className="flex-1" />
-        <span className="text-xs text-gray-600">Focus Mode — all signals active</span>
+        <span className="text-micro text-text-muted uppercase tracking-wider">Focus Mode — all signals active</span>
       </div>
     </div>
   )

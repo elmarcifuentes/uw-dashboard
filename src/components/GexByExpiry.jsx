@@ -31,12 +31,12 @@ function GexDecayCountdown({ todayPct }) {
 
   useEffect(() => { update(); const t = setInterval(update, 1000); return () => clearInterval(t) }, [update])
 
-  const colors = { low: 'text-gray-400', medium: 'text-yellow-400', high: 'text-amber-400', critical: 'text-red-400 animate-pulse', closed: 'text-gray-600' }
+  const colors = { low: 'text-text-secondary', medium: 'text-yellow-400', high: 'text-amber-400', critical: 'text-red-400 animate-pulse', closed: 'text-text-muted' }
   if (!todayPct) return null
 
   return (
-    <div className="flex items-center gap-2 text-xs mt-1.5 pt-1.5 border-t border-gray-700">
-      <span className="text-gray-500">0DTE</span>
+    <div className="flex items-center gap-2 text-xs mt-1.5 pt-1.5 border-t border-border-default">
+      <span className="text-text-tertiary">0DTE</span>
       <span className="font-mono font-bold text-amber-400">{todayPct.toFixed(0)}% GEX</span>
       <span className={`font-mono ${colors[urgency]}`}>{timeLeft}</span>
     </div>
@@ -89,10 +89,10 @@ export default function GexByExpiry({ apiUrl }) {
   }, [apiUrl])
 
   const skeleton = (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
-      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
-      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
-      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3 animate-pulse">
+      <div className="h-2.5 bg-bg-elevated rounded w-24 mb-2" />
+      <div className="h-2 bg-bg-elevated rounded w-full mb-1.5" />
+      <div className="h-2 bg-bg-elevated rounded w-3/4" />
     </div>
   )
 
@@ -107,13 +107,13 @@ export default function GexByExpiry({ apiUrl }) {
   const todayPct = pcts.today
 
   let warning = '✓ Low expiry — GEX cage stable through the week'
-  let warnColor = 'text-gray-500'
+  let warnColor = 'text-text-tertiary'
   if (todayPct >= 40) { warning = '⚠ High expiry today — levels less reliable after close'; warnColor = 'text-amber-400' }
   else if (todayPct >= 20) { warning = 'Moderate expiry today — watch level quality into close'; warnColor = 'text-yellow-400' }
 
   return (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">GEX by Expiry</div>
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+      <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">GEX by Expiry</div>
       <div className="flex flex-col gap-1.5 mb-2">
         {BARS.map(({ key, label, color }) => {
           const pct = pcts[key] ?? 0
@@ -122,19 +122,19 @@ export default function GexByExpiry({ apiUrl }) {
           return (
             <div key={key} className="flex items-center gap-2">
               <span style={{ minWidth: '96px', flexShrink: 0 }}
-                    className="text-xs text-gray-400 whitespace-nowrap">
+                    className="text-xs text-text-secondary whitespace-nowrap">
                 {label}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}
-                   className="bg-gray-800 rounded-full h-2 overflow-hidden">
+                   className="bg-bg-elevated rounded-full h-2 overflow-hidden">
                 <div className={`h-full rounded-full ${color}`} style={{ width: `${barW}%` }} />
               </div>
               <span style={{ minWidth: '32px', flexShrink: 0, textAlign: 'right' }}
-                    className="text-xs font-mono text-gray-400 whitespace-nowrap">
+                    className="text-xs font-mono text-text-secondary whitespace-nowrap">
                 {pct.toFixed(0)}%
               </span>
               <span style={{ minWidth: '64px', flexShrink: 0, textAlign: 'right' }}
-                    className="text-xs font-mono text-gray-500 whitespace-nowrap">
+                    className="text-xs font-mono text-text-tertiary whitespace-nowrap">
                 {fmtK(val)}
               </span>
             </div>

@@ -9,72 +9,69 @@ export default function ActiveTradePanel({ trade, currentPrice, pnl, evaluation,
   }
 
   const fmtCurrent = fmt(currentPrice)
-
   const progressPct = evaluation?.progressPct || 0
 
   return (
     <div className={`border rounded-lg p-4 relative overflow-hidden ${
-      pnl?.isProfit ? 'border-green-900/50 bg-green-950/10' : 'border-red-900/50 bg-red-950/10'
+      pnl?.isProfit
+        ? 'border-state-hold/30 bg-state-holdSoft'
+        : 'border-state-stop/30 bg-state-stopSoft'
     }`}>
-      {/* Directional gradient overlay */}
       <div className={`absolute inset-0 pointer-events-none ${
         isShort
-          ? 'bg-gradient-to-b from-red-950/20 via-transparent to-transparent'
-          : 'bg-gradient-to-t from-green-950/20 via-transparent to-transparent'
+          ? 'bg-gradient-to-b from-state-stopSoft via-transparent to-transparent'
+          : 'bg-gradient-to-t from-state-holdSoft via-transparent to-transparent'
       }`} />
-      {/* Large faded directional arrow */}
       <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-7xl font-black pointer-events-none select-none opacity-[0.04] ${
-        isShort ? 'text-red-400' : 'text-green-400'
+        isShort ? 'text-state-stop' : 'text-state-hold'
       }`}>
         {isShort ? '↓' : '↑'}
       </div>
-      {/* Direction badge + P&L */}
+
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className={`text-sm font-bold px-2 py-0.5 rounded ${
-            isShort ? 'bg-red-950 text-red-400' : 'bg-green-950 text-green-400'
+            isShort ? 'bg-state-stopSoft text-state-stop' : 'bg-state-holdSoft text-state-hold'
           }`}>
             {isShort ? '↓ SHORT' : '↑ LONG'}
           </span>
-          <span className="text-xs text-gray-500">{trade.instrument} × {trade.contracts}</span>
+          <span className="text-xs text-text-tertiary">{trade.instrument} × {trade.contracts}</span>
         </div>
         {pnl && (
-          <div className={`text-sm font-bold font-mono ${pnl.isProfit ? 'text-green-400' : 'text-red-400'}`}>
+          <div className={`text-sm font-bold font-price ${pnl.isProfit ? 'text-state-hold' : 'text-state-stop'}`}>
             {pnl.points > 0 ? '+' : ''}{pnl.points.toFixed(2)} pts · {pnl.dollars > 0 ? '+' : ''}${Math.abs(pnl.dollars).toFixed(2)}
           </div>
         )}
       </div>
 
-      {/* Price levels */}
       <div className="space-y-1.5 mb-3 text-xs">
         <div className="flex items-center justify-between">
-          <span className="text-red-400 font-bold">STOP</span>
-          <span className="text-red-400 font-mono">{fmt(trade.stop)}</span>
+          <span className="text-state-stop font-bold">STOP</span>
+          <span className="text-state-stop font-price">{fmt(trade.stop)}</span>
         </div>
-        <div className="flex items-center justify-between border-t border-b border-gray-800 py-1">
-          <span className="text-gray-400">Entry</span>
-          <span className="text-white font-mono font-bold">{fmt(trade.entry)}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-yellow-400">▶ NOW</span>
-          <span className="text-yellow-400 font-mono font-bold">{fmtCurrent}</span>
+        <div className="flex items-center justify-between border-t border-b border-border-subtle py-1">
+          <span className="text-text-secondary">Entry</span>
+          <span className="text-text-primary font-price font-bold">{fmt(trade.entry)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-green-400 font-bold">TARGET</span>
-          <span className="text-green-400 font-mono">{fmt(trade.target)}</span>
+          <span className="text-accent-price font-bold">▶ NOW</span>
+          <span className="text-accent-price font-price font-bold">{fmtCurrent}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-state-hold font-bold">TARGET</span>
+          <span className="text-state-hold font-price">{fmt(trade.target)}</span>
         </div>
       </div>
 
-      {/* Progress bar */}
       <div>
-        <div className="flex justify-between text-xs text-gray-600 mb-1">
+        <div className="flex justify-between text-xs text-text-muted mb-1">
           <span>Progress to target</span>
           <span>{progressPct}%</span>
         </div>
-        <div className="h-2 bg-gray-800 rounded overflow-hidden">
+        <div className="h-2 bg-bg-elevated rounded overflow-hidden">
           <div
             className={`h-full rounded transition-all duration-500 ${
-              progressPct >= 100 ? 'bg-green-400' : progressPct >= 50 ? 'bg-green-600' : 'bg-indigo-600'
+              progressPct >= 100 ? 'bg-state-hold' : progressPct >= 50 ? 'bg-state-hold/70' : 'bg-state-info'
             }`}
             style={{ width: `${Math.min(progressPct, 100)}%` }}
           />

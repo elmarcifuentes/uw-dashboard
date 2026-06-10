@@ -73,14 +73,14 @@ export default function Controls({ compact }) {
     <div className="flex flex-col gap-3 max-w-lg">
 
       {/* Manual controls */}
-      <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Manual Controls</div>
+      <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+        <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Manual Controls</div>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={forceRescore}
             disabled={!unlocked || rescoring}
-            className={`px-3 py-2 text-white text-sm rounded transition-colors ${
-              !unlocked ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-teal-700 hover:bg-teal-600 disabled:opacity-50'
+            className={`px-3 py-2 text-text-primary text-sm rounded transition-colors ${
+              !unlocked ? 'bg-bg-elevated text-text-muted cursor-not-allowed' : 'bg-teal-700 hover:bg-teal-600 disabled:opacity-50'
             }`}
           >
             {!unlocked ? '🔒 Rescore' : rescoreMsg ? rescoreMsg : rescoring ? '⟳ Rescoring…' : '⟳ Force Rescore Now'}
@@ -88,8 +88,8 @@ export default function Controls({ compact }) {
           <button
             onClick={toggleMode}
             disabled={!unlocked}
-            className={`px-3 py-2 text-white text-sm rounded transition-colors ${
-              !unlocked ? 'bg-gray-800 text-gray-600 cursor-not-allowed' :
+            className={`px-3 py-2 text-text-primary text-sm rounded transition-colors ${
+              !unlocked ? 'bg-bg-elevated text-text-muted cursor-not-allowed' :
               mode === 'REST' ? 'bg-green-800 hover:bg-green-700' : 'bg-blue-800 hover:bg-blue-700'
             }`}
           >
@@ -99,8 +99,8 @@ export default function Controls({ compact }) {
       </div>
 
       {/* Narrative mode */}
-      <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Session Narrative</div>
+      <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+        <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Session Narrative</div>
         <div className="flex flex-col sm:flex-row gap-1">
           {[
             { key: 'template', label: '📋 Template', desc: 'Fast — rule based' },
@@ -113,17 +113,17 @@ export default function Controls({ compact }) {
               title={desc}
               className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
                 narrativeMode === key
-                  ? key === 'claude' ? 'bg-purple-700 text-white'
-                  : key === 'off'    ? 'bg-gray-600 text-gray-300'
-                  :                    'bg-teal-700 text-white'
-                  : 'bg-gray-700 text-gray-400 hover:text-white'
+                  ? key === 'claude' ? 'bg-purple-700 text-text-primary'
+                  : key === 'off'    ? 'bg-bg-card2 text-text-secondary'
+                  :                    'bg-teal-700 text-text-primary'
+                  : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
               }`}
             >
               {label}
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-600 mt-1.5">
+        <p className="text-xs text-text-muted mt-1.5">
           {narrativeMode === 'template' && 'Rule-based — instant, always available'}
           {narrativeMode === 'claude'   && '🤖 Claude Haiku — AI narrative, always available'}
           {narrativeMode === 'off'      && 'Narrative disabled'}
@@ -132,25 +132,25 @@ export default function Controls({ compact }) {
 
       {/* Polling status */}
       {status && (
-        <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-          <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Polling Status</div>
+        <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+          <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Polling Status</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
-            <span className="text-gray-500">Interval</span>
-            <span className="text-white">{(status.currentInterval / 1000).toFixed(0)}s</span>
-            <span className="text-gray-500">Levels loaded</span>
-            <span className="text-white">{status.levelsLoaded}</span>
-            <span className="text-gray-500">Market hours</span>
-            <span className={status.isMarketHours ? 'text-green-400' : 'text-gray-400'}>
+            <span className="text-text-tertiary">Interval</span>
+            <span className="text-text-primary">{(status.currentInterval / 1000).toFixed(0)}s</span>
+            <span className="text-text-tertiary">Levels loaded</span>
+            <span className="text-text-primary">{status.levelsLoaded}</span>
+            <span className="text-text-tertiary">Market hours</span>
+            <span className={status.isMarketHours ? 'text-green-400' : 'text-text-secondary'}>
               {status.isMarketHours ? 'OPEN' : 'OVERNIGHT'}
             </span>
-            <span className="text-gray-500">Last rescore</span>
-            <span className="text-white">
+            <span className="text-text-tertiary">Last rescore</span>
+            <span className="text-text-primary">
               {status.lastRescore ? new Date(status.lastRescore).toLocaleTimeString() : '—'}
             </span>
-            <span className="text-gray-500">Last reason</span>
+            <span className="text-text-tertiary">Last reason</span>
             <span className="text-amber-400 truncate">{status.lastRescoreReason || '—'}</span>
-            <span className="text-gray-500">Polling active</span>
-            <span className={status.pollingActive ? 'text-green-400' : 'text-gray-400'}>
+            <span className="text-text-tertiary">Polling active</span>
+            <span className={status.pollingActive ? 'text-green-400' : 'text-text-secondary'}>
               {status.pollingActive ? 'YES' : 'NO'}
             </span>
           </div>
@@ -159,18 +159,18 @@ export default function Controls({ compact }) {
 
       {/* Budget */}
       {budget && (
-        <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-          <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">API Budget</div>
+        <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+          <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">API Budget</div>
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+            <div className="flex-1 bg-bg-elevated rounded-full h-2 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${budgetColor}`}
                 style={{ width: `${Math.min(budgetPct, 100)}%` }}
               />
             </div>
-            <span className="text-xs text-white font-mono w-10 text-right">{budgetPct}%</span>
+            <span className="text-xs text-text-primary font-mono w-10 text-right">{budgetPct}%</span>
           </div>
-          <div className="text-xs text-gray-400 font-mono">
+          <div className="text-xs text-text-secondary font-mono">
             {budget.callsToday.toLocaleString()} / {budget.workingBudget.toLocaleString()} calls
             &nbsp;—&nbsp;
             {(budget.workingBudget - budget.callsToday).toLocaleString()} remaining
@@ -179,22 +179,22 @@ export default function Controls({ compact }) {
       )}
 
       {/* Sound alerts */}
-      <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Sound Alerts</div>
+      <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+        <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Sound Alerts</div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">Level proximity + cascade</span>
+          <span className="text-xs text-text-secondary">Level proximity + cascade</span>
           <button
             onClick={() => {
               const next = !soundEnabled
               setSoundEnabled(next)
               localStorage.setItem('soundEnabled', String(next))
             }}
-            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${soundEnabled ? 'bg-teal-700 text-white' : 'bg-gray-700 text-gray-400'}`}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${soundEnabled ? 'bg-teal-700 text-text-primary' : 'bg-bg-elevated text-text-secondary'}`}
           >
             {soundEnabled ? '🔔 On' : '🔕 Off'}
           </button>
         </div>
-        {soundEnabled && <p className="text-xs text-gray-600 mt-1">C5 tone near buy support · Eb4 tone near sell resistance · 3-tone descend on cascade</p>}
+        {soundEnabled && <p className="text-xs text-text-muted mt-1">C5 tone near buy support · Eb4 tone near sell resistance · 3-tone descend on cascade</p>}
       </div>
 
     </div>

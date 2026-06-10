@@ -65,16 +65,16 @@ export default function NewsHeadlines({ apiUrl }) {
 
   if (loading) return (
     <div className="animate-pulse space-y-2">
-      {[1, 2, 3].map(i => <div key={i} className="h-10 bg-gray-700 rounded" />)}
+      {[1, 2, 3].map(i => <div key={i} className="h-10 bg-bg-elevated rounded" />)}
     </div>
   )
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400 uppercase tracking-wide">Market News</span>
+        <span className="text-xs text-text-secondary uppercase tracking-wide">Market News</span>
         {lastUpdate && (
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-text-muted">
             {lastUpdate.toLocaleTimeString('en-US', {
               hour: '2-digit', minute: '2-digit', hour12: true,
               timeZone: 'America/New_York',
@@ -84,14 +84,14 @@ export default function NewsHeadlines({ apiUrl }) {
       </div>
 
       {headlines.length === 0 ? (
-        <div className="text-xs text-gray-500">No headlines available</div>
+        <div className="text-xs text-text-tertiary">No headlines available</div>
       ) : (
         <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
           {headlines.map((item, i) => (
             <div key={i} className={`rounded p-2.5 border transition-colors ${
               item.is_major
-                ? 'border-gray-600 bg-gray-800'
-                : 'border-gray-700 bg-gray-900/50'
+                ? 'border-border-strong bg-bg-elevated'
+                : 'border-border-default bg-bg-card2/50'
             }`}>
               <p className={`text-xs leading-relaxed ${SENTIMENT_COLOR[item.sentiment] || 'text-gray-200'}`}>
                 {item.is_major && <span className="text-amber-400 font-bold mr-1">★</span>}
@@ -101,7 +101,7 @@ export default function NewsHeadlines({ apiUrl }) {
               {item.tickers?.length > 0 && (
                 <div className="flex gap-1 mt-1.5 flex-wrap">
                   {item.tickers.map(t => (
-                    <span key={t} className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded font-mono">
+                    <span key={t} className="text-xs bg-bg-elevated text-text-secondary px-1.5 py-0.5 rounded font-mono">
                       {t}
                     </span>
                   ))}
@@ -109,8 +109,8 @@ export default function NewsHeadlines({ apiUrl }) {
               )}
 
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-gray-600">{item.source}</span>
-                <span className="text-xs text-gray-600 ml-auto">{fmtTime(item)}</span>
+                <span className="text-xs text-text-muted">{item.source}</span>
+                <span className="text-xs text-text-muted ml-auto">{fmtTime(item)}</span>
               </div>
             </div>
           ))}

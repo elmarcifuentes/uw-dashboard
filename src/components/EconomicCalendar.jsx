@@ -34,7 +34,7 @@ function getImpact(eventName) {
 const IMPACT_COLORS = {
   high:   { bg: 'bg-red-950',   border: 'border-red-500',   text: 'text-red-400',   dot: 'bg-red-500'   },
   medium: { bg: 'bg-amber-950', border: 'border-amber-500', text: 'text-amber-400', dot: 'bg-amber-500' },
-  low:    { bg: 'bg-gray-800',  border: 'border-gray-600',  text: 'text-gray-400',  dot: 'bg-gray-600'  },
+  low:    { bg: 'bg-bg-elevated',  border: 'border-border-strong',  text: 'text-text-secondary',  dot: 'bg-bg-card2'  },
 }
 
 export default function EconomicCalendar({ apiUrl }) {
@@ -64,17 +64,17 @@ export default function EconomicCalendar({ apiUrl }) {
 
   const hasHighImpact = events.some(e => e._impact === 'high')
   const hasMediumImpact = events.some(e => e._impact === 'medium')
-  const headerColor = hasHighImpact ? 'text-red-400' : hasMediumImpact ? 'text-amber-400' : 'text-gray-400'
+  const headerColor = hasHighImpact ? 'text-red-400' : hasMediumImpact ? 'text-amber-400' : 'text-text-secondary'
   const containerCls = hasHighImpact
     ? 'bg-red-950 border-red-500'
     : hasMediumImpact
     ? 'bg-amber-950 border-amber-700'
-    : 'bg-gray-800 border-gray-700'
+    : 'bg-bg-elevated border-border-default'
 
   if (events.length === 0) {
     return (
-      <div className="bg-gray-800 border border-gray-700 rounded px-3 py-2">
-        <span className="text-gray-500 text-xs">📅 No major economic events today</span>
+      <div className="bg-bg-elevated border border-border-default rounded px-3 py-2">
+        <span className="text-text-tertiary text-xs">📅 No major economic events today</span>
       </div>
     )
   }
@@ -102,7 +102,7 @@ export default function EconomicCalendar({ apiUrl }) {
               <span className={`text-xs font-mono w-20 shrink-0 ${colors.text}`}>{etTime}</span>
               <span className="text-xs text-gray-200 flex-1">{event.event}</span>
               {event.forecast != null && (
-                <span className="text-xs text-gray-500 shrink-0">
+                <span className="text-xs text-text-tertiary shrink-0">
                   est: {formatEstimate(event.forecast) ?? event.forecast}
                 </span>
               )}
@@ -110,7 +110,7 @@ export default function EconomicCalendar({ apiUrl }) {
           )
         })}
         {events.length > 5 && (
-          <span className="text-gray-600 text-xs">+{events.length - 5} more events</span>
+          <span className="text-text-muted text-xs">+{events.length - 5} more events</span>
         )}
       </div>
     </div>

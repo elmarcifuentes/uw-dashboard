@@ -34,12 +34,12 @@ const ETF_DESCRIPTION = {
   'no data': 'No ETF tide data available for this session.',
 }
 
-function StatCard({ label, value, sub, color = 'text-white' }) {
+function StatCard({ label, value, sub, color = 'text-text-primary' }) {
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">{label}</div>
+    <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
+      <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">{label}</div>
       <div className={`text-xl font-bold ${color}`}>{value ?? '—'}</div>
-      {sub && <div className="text-xs text-gray-600 mt-1">{sub}</div>}
+      {sub && <div className="text-xs text-text-muted mt-1">{sub}</div>}
     </div>
   )
 }
@@ -56,7 +56,7 @@ function GexCageSummary({ levels }) {
   return (
     <div className="space-y-2 mb-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">GEX Cage</span>
+        <span className="text-xs font-bold text-text-tertiary uppercase tracking-wider">GEX Cage</span>
         {hasExpansion && <span className="text-xs text-orange-400 font-medium">⚡ EXPANSION</span>}
       </div>
       <div className="space-y-1.5">
@@ -66,8 +66,8 @@ function GexCageSummary({ levels }) {
           const isPeak  = l.id === peak.id
           return (
             <div key={l.id} className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 w-8">{l.id}</span>
-              <div className="flex-1 relative h-[8px] bg-gray-800 rounded overflow-hidden">
+              <span className="text-xs text-text-secondary w-8">{l.id}</span>
+              <div className="flex-1 relative h-[8px] bg-bg-elevated rounded overflow-hidden">
                 <div
                   className={`absolute left-0 top-0 h-full rounded ${pinning ? 'bg-blue-500' : 'bg-orange-500'}`}
                   style={{ width: `${pct}%` }}
@@ -194,7 +194,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
+      <div className="flex items-center justify-center py-20 text-text-secondary text-sm">
         Loading…
       </div>
     )
@@ -202,9 +202,9 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
 
   if (error === 'no-data') {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-400 text-sm">
+      <div className="flex flex-col items-center justify-center py-20 gap-3 text-text-secondary text-sm">
         <span className="text-2xl">—</span>
-        <p>No data — run <code className="bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">npm start</code></p>
+        <p>No data — run <code className="bg-bg-elevated px-1.5 py-0.5 rounded text-text-secondary">npm start</code></p>
       </div>
     )
   }
@@ -213,7 +213,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3 text-red-400 text-sm">
         <p>Could not reach API at {API}</p>
-        <button onClick={fetchLatest} className="px-3 py-1 bg-gray-800 rounded hover:bg-gray-700 text-gray-200">
+        <button onClick={fetchLatest} className="px-3 py-1 bg-bg-elevated rounded hover:bg-bg-elevated text-gray-200">
           Retry
         </button>
       </div>
@@ -223,9 +223,9 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
   if (!data || !data.levels?.length) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="text-gray-500 text-lg">No session data</div>
-        <div className="text-gray-600 text-xs">
-          Open <span className="font-mono text-white">Tab 4 📐 Levels</span> → enter levels → Save → Score Now
+        <div className="text-text-tertiary text-lg">No session data</div>
+        <div className="text-text-muted text-xs">
+          Open <span className="font-mono text-text-primary">Tab 4 📐 Levels</span> → enter levels → Save → Score Now
         </div>
       </div>
     )
@@ -297,26 +297,26 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
 
       {/* Session Brief — full-width above hero */}
       {sessionBrief && providerStatus?.narrativeMode === 'claude' && (
-        <div className="bg-[#111827] border border-purple-900/40 rounded-lg p-4">
+        <div className="bg-bg-card border border-purple-900/40 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="text-purple-500 text-xs">🤖</span>
-              <span className="text-xs text-gray-500 uppercase tracking-wider">Session Brief</span>
-              <span className="text-xs text-gray-700">Claude Haiku</span>
+              <span className="text-xs text-text-tertiary uppercase tracking-wider">Session Brief</span>
+              <span className="text-xs text-text-disabled">Claude Haiku</span>
             </div>
             <button
               onClick={() => setBriefOpen(!briefOpen)}
-              className="text-xs text-gray-600 hover:text-gray-400"
+              className="text-xs text-text-muted hover:text-text-secondary"
             >
               {briefOpen ? '▲ collapse' : '▼ expand'}
             </button>
           </div>
           {briefOpen ? (
-            <p className="text-xs text-gray-300 leading-relaxed border-l-2 border-purple-900 pl-3">
+            <p className="text-xs text-text-secondary leading-relaxed border-l-2 border-purple-900 pl-3">
               {formatNarrative(sessionBrief, activeSymbol)}
             </p>
           ) : (
-            <p className="text-xs text-gray-600 italic line-clamp-1">
+            <p className="text-xs text-text-muted italic line-clamp-1">
               {formatNarrative(sessionBrief, activeSymbol).slice(0, 120)}...
             </p>
           )}
@@ -370,8 +370,8 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
       {/* Row 3 — Signal strength + stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="col-span-1">
-          <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 h-full">
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Signal Strength</div>
+          <div className="bg-bg-card border border-border-subtle rounded-lg p-4 h-full">
+            <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Signal Strength</div>
             <SignalStrengthBar levels={levels} />
           </div>
         </div>
@@ -387,7 +387,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
           color={
             etfTide.direction === 'bullish' ? 'text-green-400'
               : etfTide.direction === 'bearish' ? 'text-red-400'
-              : 'text-gray-400'
+              : 'text-text-secondary'
           }
         />
         <StatCard

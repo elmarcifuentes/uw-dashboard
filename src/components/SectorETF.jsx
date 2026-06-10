@@ -29,10 +29,10 @@ export default function SectorETF({ apiUrl }) {
   }, [apiUrl])
 
   const skeleton = (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
-      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
-      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
-      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3 animate-pulse">
+      <div className="h-2.5 bg-bg-elevated rounded w-24 mb-2" />
+      <div className="h-2 bg-bg-elevated rounded w-full mb-1.5" />
+      <div className="h-2 bg-bg-elevated rounded w-3/4" />
     </div>
   )
 
@@ -56,8 +56,8 @@ export default function SectorETF({ apiUrl }) {
   else if (spyDown && !xlkDown)     context = 'Non-tech weakness — tech relatively resilient'
 
   return (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Sector Flow</div>
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+      <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Sector Flow</div>
       <div className="flex flex-wrap gap-1.5 mb-2">
         {sectors.map(s => {
           const pct = s.changePct
@@ -67,7 +67,7 @@ export default function SectorETF({ apiUrl }) {
             ? 'border-green-600 text-green-400'
             : isDown
             ? 'border-red-600 text-red-400'
-            : 'border-gray-600 text-gray-400'
+            : 'border-border-strong text-text-secondary'
           return (
             <span key={s.ticker} className={`border rounded px-1.5 py-0.5 text-xs font-mono ${cls}`}>
               {s.ticker} {isUp ? '↑' : isDown ? '↓' : '→'}{' '}
@@ -78,7 +78,7 @@ export default function SectorETF({ apiUrl }) {
       </div>
       <div className={`text-xs italic ${
         context.startsWith('⚠') ? 'text-amber-400' :
-        context.startsWith('✓') ? 'text-green-400' : 'text-gray-500'
+        context.startsWith('✓') ? 'text-green-400' : 'text-text-tertiary'
       }`}>
         {context}
       </div>

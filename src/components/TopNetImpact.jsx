@@ -27,10 +27,10 @@ export default function TopNetImpact({ apiUrl }) {
   }, [apiUrl])
 
   const skeleton = (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
-      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
-      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
-      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3 animate-pulse">
+      <div className="h-2.5 bg-bg-elevated rounded w-24 mb-2" />
+      <div className="h-2 bg-bg-elevated rounded w-full mb-1.5" />
+      <div className="h-2 bg-bg-elevated rounded w-3/4" />
     </div>
   )
 
@@ -40,8 +40,8 @@ export default function TopNetImpact({ apiUrl }) {
   const bearish  = impacts.filter(s => s.net_premium < 0).length
 
   return (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Top Movers</div>
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+      <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Top Movers</div>
       <div className="flex flex-col gap-1">
         {impacts.map((s, i) => {
           const up = s.net_premium > 0
@@ -50,7 +50,7 @@ export default function TopNetImpact({ apiUrl }) {
               <span className={`text-xs font-mono w-4 ${up ? 'text-green-400' : 'text-red-400'}`}>
                 {up ? '↑' : '↓'}
               </span>
-              <span className="text-xs font-mono font-bold text-white w-12">{s.ticker}</span>
+              <span className="text-xs font-mono font-bold text-text-primary w-12">{s.ticker}</span>
               <span className={`text-xs font-mono ${up ? 'text-green-400' : 'text-red-400'}`}>
                 {up ? '+' : '-'}{fmt(s.net_premium)}
               </span>
@@ -58,7 +58,7 @@ export default function TopNetImpact({ apiUrl }) {
           )
         })}
       </div>
-      <div className="text-xs text-gray-600 mt-2">
+      <div className="text-xs text-text-muted mt-2">
         Bullish: <span className="text-green-400">{bullish}</span>
         {' · '}
         Bearish: <span className="text-red-400">{bearish}</span>

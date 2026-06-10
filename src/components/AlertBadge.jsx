@@ -1,22 +1,22 @@
 export default function AlertBadge({ type, label, detail }) {
   const styles = {
     critical: {
-      wrapper: 'border border-red-700 bg-red-950/40',
-      dot:     'bg-red-500 animate-pulse',
-      label:   'text-red-400 font-bold',
-      detail:  'text-red-300',
+      wrapper: 'border border-state-stop/60 bg-state-stopSoft',
+      dot:     'bg-state-stop animate-pulse',
+      label:   'text-state-stop font-bold',
+      detail:  'text-state-stop/80',
     },
     watch: {
-      wrapper: 'border border-amber-700/60 bg-amber-950/20',
-      dot:     'bg-amber-500',
-      label:   'text-amber-400 font-medium',
-      detail:  'text-amber-300/80',
+      wrapper: 'border border-state-cascadeWatch/60 bg-state-cascadeWatchSoft',
+      dot:     'bg-state-cascadeWatch',
+      label:   'text-state-cascadeWatch font-medium',
+      detail:  'text-state-cascadeWatch/80',
     },
     info: {
-      wrapper: 'border border-gray-700/50 bg-gray-900/30',
-      dot:     'bg-gray-500',
-      label:   'text-gray-400',
-      detail:  'text-gray-500',
+      wrapper: 'border border-border-default/50 bg-bg-card2/30',
+      dot:     'bg-text-tertiary',
+      label:   'text-text-secondary',
+      detail:  'text-text-tertiary',
     },
   }
   const s = styles[type] || styles.info

@@ -1,7 +1,7 @@
 export default function MarketStateCard({ sentiment, cascadeActive }) {
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg p-4 space-y-3">
-      <div className="text-xs text-gray-500 uppercase tracking-wider">Market State</div>
+    <div className="bg-bg-card border border-border-subtle rounded-lg p-4 space-y-3">
+      <div className="text-xs text-text-tertiary uppercase tracking-wider">Market State</div>
 
       {sentiment?.state ? (
         <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold w-fit ${
@@ -19,7 +19,7 @@ export default function MarketStateCard({ sentiment, cascadeActive }) {
           {sentiment.state}
         </div>
       ) : (
-        <div className="text-xs text-gray-600">No sentiment data</div>
+        <div className="text-xs text-text-muted">No sentiment data</div>
       )}
 
       {sentiment?.signals?.length > 0 && (

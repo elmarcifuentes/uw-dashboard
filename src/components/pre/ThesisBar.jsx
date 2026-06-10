@@ -30,7 +30,7 @@ export default function ThesisBar({
     : 'text-amber-400'
 
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-lg px-4 py-3">
+    <div className="bg-bg-card border border-border-subtle rounded-lg px-4 py-3">
       <div className="flex items-center gap-4 overflow-x-auto">
 
         {/* Sentiment */}
@@ -45,21 +45,21 @@ export default function ThesisBar({
           </span>
         </div>
 
-        <span className="text-gray-700 shrink-0">|</span>
+        <span className="text-text-disabled shrink-0">|</span>
 
         {/* Dominant level */}
         {dominant && (
           <>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-xs text-gray-500">Key level</span>
+              <span className="text-xs text-text-tertiary">Key level</span>
               <span className={`text-sm font-bold ${
                 dominant.classification === 'sell_resistance' ? 'text-red-400'
                   : dominant.classification === 'buy_support' ? 'text-green-400'
-                  : 'text-gray-400'
+                  : 'text-text-secondary'
               }`}>
                 {dominant.id}
               </span>
-              <span className="text-xs text-white font-mono">
+              <span className="text-xs text-text-primary font-mono">
                 {activeSymbol === 'NQ' && nqRatio
                   ? '$' + (Math.round(dominant.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : '$' + (dominant.price?.toFixed(2) ?? '—')}
@@ -68,29 +68,29 @@ export default function ThesisBar({
                 <span className="text-xs text-yellow-400 font-bold">★</span>
               )}
             </div>
-            <span className="text-gray-700 shrink-0">|</span>
+            <span className="text-text-disabled shrink-0">|</span>
           </>
         )}
 
         {/* Risk */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-xs text-gray-500">Risk</span>
+          <span className="text-xs text-text-tertiary">Risk</span>
           <span className={`text-xs font-medium px-2 py-0.5 rounded ${
             cascade?.active
               ? 'bg-red-950 text-red-400 border border-red-800'
               : midDp <= -0.500
               ? 'bg-amber-950 text-amber-400 border border-amber-800'
-              : 'text-gray-500'
+              : 'text-text-tertiary'
           }`}>
             {riskText}
           </span>
         </div>
 
-        <span className="text-gray-700 shrink-0">|</span>
+        <span className="text-text-disabled shrink-0">|</span>
 
         {/* One-sentence setup */}
         {assistantRead?.now && (
-          <p className="text-xs text-gray-400 truncate min-w-0">{formatNarrative(assistantRead.now, activeSymbol)}</p>
+          <p className="text-xs text-text-secondary truncate min-w-0">{formatNarrative(assistantRead.now, activeSymbol)}</p>
         )}
       </div>
     </div>

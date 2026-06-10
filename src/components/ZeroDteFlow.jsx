@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react'
 
 const fmtM = n => '$' + (n / 1e6).toFixed(1) + 'M'
 const fmtK = n => (n / 1e3).toFixed(0) + 'K'
-const ratioColor = r => r > 1.2 ? 'text-green-400' : r < 0.83 ? 'text-red-400' : 'text-gray-400'
+const ratioColor = r => r > 1.2 ? 'text-green-400' : r < 0.83 ? 'text-red-400' : 'text-text-secondary'
 
 const BIAS_COLORS = {
   bullish: { bg: 'bg-green-950', border: 'border-green-700', text: 'text-green-400', badge: 'bg-green-800 text-green-300' },
   bearish: { bg: 'bg-red-950',   border: 'border-red-700',   text: 'text-red-400',   badge: 'bg-red-800 text-red-300'   },
-  mixed:   { bg: 'bg-gray-800',  border: 'border-gray-600',  text: 'text-gray-400',  badge: 'bg-gray-700 text-gray-300' },
+  mixed:   { bg: 'bg-bg-elevated',  border: 'border-border-strong',  text: 'text-text-secondary',  badge: 'bg-bg-elevated text-text-secondary' },
 }
 
 export default function ZeroDteFlow({ apiUrl }) {
@@ -57,18 +57,18 @@ export default function ZeroDteFlow({ apiUrl }) {
   }, [apiUrl])
 
   const skeleton = (
-    <div className="bg-gray-900/60 rounded border border-gray-700 p-3 animate-pulse">
-      <div className="h-2.5 bg-gray-700 rounded w-24 mb-2" />
-      <div className="h-2 bg-gray-700 rounded w-full mb-1.5" />
-      <div className="h-2 bg-gray-700 rounded w-3/4" />
+    <div className="bg-bg-card2/60 rounded border border-border-default p-3 animate-pulse">
+      <div className="h-2.5 bg-bg-elevated rounded w-24 mb-2" />
+      <div className="h-2 bg-bg-elevated rounded w-full mb-1.5" />
+      <div className="h-2 bg-bg-elevated rounded w-3/4" />
     </div>
   )
 
   if (loading) return skeleton
 
   if (data.noZdte) return (
-    <div className="bg-gray-800 border border-gray-700 rounded p-3">
-      <span className="text-xs text-gray-500">No 0DTE expiry today</span>
+    <div className="bg-bg-elevated border border-border-default rounded p-3">
+      <span className="text-xs text-text-tertiary">No 0DTE expiry today</span>
     </div>
   )
 
@@ -77,7 +77,7 @@ export default function ZeroDteFlow({ apiUrl }) {
   return (
     <div className={`border rounded p-3 ${c.bg} ${c.border}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-400 uppercase tracking-wide">0DTE Flow — {data.expiry}</span>
+        <span className="text-xs text-text-secondary uppercase tracking-wide">0DTE Flow — {data.expiry}</span>
         <span className={`text-xs font-bold px-2 py-0.5 rounded ${c.badge}`}>{data.bias.toUpperCase()}</span>
       </div>
 
@@ -88,20 +88,20 @@ export default function ZeroDteFlow({ apiUrl }) {
           { label: 'OTM Speculative', ratio: data.otmRatio, call: data.callOtmPrem, put: data.putOtmPrem },
         ].map(({ label, ratio, call, put }) => (
           <div key={label} className="text-center">
-            <div className="text-xs text-gray-500 mb-1">{label}</div>
+            <div className="text-xs text-text-tertiary mb-1">{label}</div>
             <div className={`text-xs font-mono font-bold ${ratioColor(ratio)}`}>{ratio.toFixed(2)}:1</div>
-            <div className="text-xs text-gray-600">C {fmtM(call)} / P {fmtM(put)}</div>
+            <div className="text-xs text-text-muted">C {fmtM(call)} / P {fmtM(put)}</div>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center gap-4 mb-2 text-xs text-gray-500">
+      <div className="flex items-center gap-4 mb-2 text-xs text-text-tertiary">
         <span>Vol: C {fmtK(data.callVol)} / P {fmtK(data.putVol)}</span>
         <span>Aggr: C {fmtK(data.callAggVol)} / P {fmtK(data.putAggVol)}</span>
       </div>
 
       <p className={`text-xs ${c.text}`}>{data.context}</p>
-      <p className="text-xs text-gray-600 mt-0.5">{data.bullishSignals}/3 bullish · {data.bearishSignals}/3 bearish signals</p>
+      <p className="text-xs text-text-muted mt-0.5">{data.bullishSignals}/3 bullish · {data.bearishSignals}/3 bearish signals</p>
     </div>
   )
 }
