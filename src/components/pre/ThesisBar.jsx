@@ -58,9 +58,9 @@ export default function ThesisBar({
                 {dominant.id}
               </span>
               <span className="text-xs text-white font-mono">
-                {activeSymbol === 'NQ'
-                  ? `NQ ${nqRatio ? (Math.round(dominant.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}`
-                  : `$${dominant.price?.toFixed(2)}`}
+                {activeSymbol === 'NQ' && nqRatio
+                  ? '$' + (Math.round(dominant.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : '$' + (dominant.price?.toFixed(2) ?? '—')}
               </span>
               {dominant.full_stack && (
                 <span className="text-xs text-yellow-400 font-bold">★</span>

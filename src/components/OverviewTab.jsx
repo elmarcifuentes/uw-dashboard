@@ -123,13 +123,8 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
           <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Live Price</div>
           <div className="text-4xl font-bold text-white font-mono tabular-nums">
             {activeSymbol === 'NQ'
-              ? (nqPrice != null ? nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
-              : `$${currentPrice?.toFixed(2) ?? '—'}`}
-          </div>
-          <div className="text-lg text-gray-400 font-mono mt-1">
-            {activeSymbol === 'NQ'
-              ? `QQQ $${currentPrice?.toFixed(2) ?? '—'}`
-              : `NQ ${nqPrice?.toLocaleString() ?? '—'}`}
+              ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+              : (currentPrice != null ? '$' + currentPrice.toFixed(2) : '—')}
           </div>
           <div className="flex items-center gap-2 mt-3">
             <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascade?.active ? 'animate-pulse' : ''}`} />
@@ -143,7 +138,11 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
           </div>
           {focusLevel && currentPrice != null && (
             <div className="text-xs text-gray-500 mt-2">
-              {Math.abs(currentPrice - focusLevel.price).toFixed(2)} from {focusLevel.id}
+              {(() => {
+                const d = Math.abs(currentPrice - focusLevel.price)
+                const val = activeSymbol === 'NQ' && nqRatio ? Math.round(d * nqRatio * 4) / 4 : d
+                return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from ${focusLevel.id}`
+              })()}
             </div>
           )}
           <div className="text-xs text-gray-600 mt-1">

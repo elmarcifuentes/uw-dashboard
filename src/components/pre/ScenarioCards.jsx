@@ -13,9 +13,8 @@ export default function ScenarioCards({
 
   const fmtLvl = (l) => {
     if (!l) return ''
-    return activeSymbol === 'NQ' && nqRatio
-      ? `NQ ${(Math.round(l.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-      : `$${l.price?.toFixed(2)}`
+    const val = activeSymbol === 'NQ' && nqRatio ? Math.round(l.price * nqRatio * 4) / 4 : l.price
+    return '$' + (val?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—')
   }
 
   const bullishTarget = sellLevels?.[0]

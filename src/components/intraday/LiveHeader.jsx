@@ -45,23 +45,14 @@ export default function LiveHeader({
 
       {/* Price hero */}
       <div className="flex items-baseline gap-2">
-        {activeSymbol === 'NQ' ? (
-          <span className="text-xl font-bold text-white font-mono tabular-nums">
-            NQ {nqPrice != null ? nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-          </span>
-        ) : (
-          <span className="text-xl font-bold text-white font-mono tabular-nums">
-            ${price?.toFixed(2) ?? '—'}
-          </span>
-        )}
+        <span className="text-xl font-bold text-white font-mono tabular-nums">
+          {activeSymbol === 'NQ'
+            ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+            : (price != null ? '$' + price.toFixed(2) : '—')}
+        </span>
         {velocity != null && (
           <span className={`text-xs font-bold ${arrowColor}`}>{arrow}</span>
         )}
-        <span className="text-sm text-gray-500 font-mono hidden sm:inline">
-          {activeSymbol === 'NQ'
-            ? `/ QQQ $${price?.toFixed(2) ?? '—'}`
-            : `/ NQ ${nqPrice?.toLocaleString() ?? '—'}`}
-        </span>
       </div>
 
       {/* Sentiment compact pill */}

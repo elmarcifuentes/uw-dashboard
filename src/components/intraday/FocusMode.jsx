@@ -37,19 +37,17 @@ export default function FocusMode({
       ? l : n
   }, null)
 
-  const nq = p => nqRatio ? Math.round(p * nqRatio).toLocaleString() : null
   const isNQ = activeSymbol === 'NQ'
   const fmtPrice = (p) => {
     if (p == null) return '—'
-    return isNQ
-      ? `NQ ${(Math.round(p * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-      : `$${p.toFixed(2)}`
+    const val = isNQ && nqRatio ? Math.round(p * nqRatio * 4) / 4 : p
+    return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
   const fmtDist = (d) => {
     if (d == null) return '—'
-    return isNQ
-      ? `${(Math.round(Math.abs(d) * nqRatio * 4) / 4).toFixed(2)} NQ`
-      : `$${Math.abs(d).toFixed(2)}`
+    const sign = d > 0 ? '+' : d < 0 ? '-' : ''
+    const val = isNQ && nqRatio ? Math.round(Math.abs(d) * nqRatio * 4) / 4 : Math.abs(d)
+    return `${sign}$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   return (
@@ -64,13 +62,10 @@ export default function FocusMode({
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-white font-mono tabular-nums">
             {isNQ
-              ? `NQ ${nqPrice?.toLocaleString('en-US', { minimumFractionDigits: 2 }) ?? '—'}`
-              : `$${currentPrice?.toFixed(2)}`}
+              ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+              : (currentPrice != null ? '$' + currentPrice.toFixed(2) : '—')}
           </span>
           <VelocityIndicator velocity={priceVelocity} />
-          {isNQ
-            ? <span className="text-sm text-gray-500 font-mono">QQQ ${currentPrice?.toFixed(2)}</span>
-            : <span className="text-sm text-gray-500 font-mono">NQ {nqPrice?.toLocaleString()}</span>}
         </div>
         {sentiment?.state && (
           <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold ${
@@ -182,13 +177,8 @@ export default function FocusMode({
           <div className="text-xs text-yellow-500 uppercase tracking-wider mb-1">▶ Current Price</div>
           <div className="text-3xl sm:text-4xl font-bold text-white font-mono tabular-nums">
             {isNQ
-              ? `NQ ${nqPrice?.toLocaleString('en-US', { minimumFractionDigits: 2 }) ?? '—'}`
-              : `$${currentPrice?.toFixed(2)}`}
-          </div>
-          <div className="text-lg text-yellow-500/70 font-mono mt-1">
-            {isNQ
-              ? `QQQ $${currentPrice?.toFixed(2)}`
-              : `NQ ${nqPrice?.toLocaleString()}`}
+              ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+              : (currentPrice != null ? '$' + currentPrice.toFixed(2) : '—')}
           </div>
           {nearest && (
             <div className="text-xs text-gray-600 mt-2">

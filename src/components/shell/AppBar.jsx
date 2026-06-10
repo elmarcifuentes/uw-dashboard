@@ -85,15 +85,11 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
         {/* Live price — changes with symbol */}
         <div className="flex items-center gap-2 text-xs">
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascadeActive ? 'animate-pulse' : ''}`} />
-          {activeSymbol === 'NQ' ? (
-            <span className="text-white font-mono font-bold text-sm">
-              NQ {nqPrice != null ? nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-            </span>
-          ) : (
-            <span className="text-white font-mono font-bold text-sm">
-              QQQ ${price?.toFixed(2) ?? '—'}
-            </span>
-          )}
+          <span className="text-white font-mono font-bold text-sm">
+            {activeSymbol === 'NQ'
+              ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+              : (price != null ? '$' + price.toFixed(2) : '—')}
+          </span>
           <span className="text-gray-600 hidden sm:block">
             {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' })}
           </span>

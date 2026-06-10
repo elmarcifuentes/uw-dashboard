@@ -48,15 +48,11 @@ export default function LevelCard({
       <div className="px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className={`text-base font-bold shrink-0 ${classColor}`}>{level.id}</span>
-          {activeSymbol === 'NQ' ? (
-            <span className="text-white font-mono font-semibold text-sm tabular-nums">
-              NQ {nq?.toFixed(2) ?? '—'}
-            </span>
-          ) : (
-            <span className="text-white font-mono font-semibold text-sm tabular-nums">
-              ${level.price?.toFixed(2)}
-            </span>
-          )}
+          <span className="text-white font-mono font-semibold text-sm tabular-nums">
+            {activeSymbol === 'NQ'
+              ? (nq != null ? '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+              : (level.price != null ? '$' + level.price.toFixed(2) : '—')}
+          </span>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
@@ -69,17 +65,17 @@ export default function LevelCard({
         </div>
 
         <div className="text-right shrink-0">
-          {activeSymbol === 'NQ' ? (
-            distNq != null && (
-              <div className="text-sm font-mono font-bold text-gray-300">
-                {dist >= 0 ? '+' : '-'}{distNq.toFixed(2)} NQ
-              </div>
-            )
-          ) : (
-            distStr && (
-              <div className="text-sm font-mono font-bold text-gray-300">{distStr}</div>
-            )
-          )}
+          {(() => {
+            if (activeSymbol === 'NQ') {
+              if (distNq == null) return null
+              const sign = dist >= 0 ? '+' : '-'
+              return <div className="text-sm font-mono font-bold text-gray-300">{sign}${distNq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            } else {
+              if (dist == null) return null
+              const sign = dist >= 0 ? '+' : '-'
+              return <div className="text-sm font-mono font-bold text-gray-300">{sign}${Math.abs(dist).toFixed(2)}</div>
+            }
+          })()}
         </div>
       </div>
 

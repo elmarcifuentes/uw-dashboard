@@ -35,16 +35,24 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
     <div className={`border rounded-lg p-3 bg-[#111827] ${borderCls}`}>
       <div className="flex items-center justify-between">
         <span className={`text-sm font-bold ${textColor}`}>{level.id}</span>
-        {activeSymbol === 'NQ' ? (
-          <span className="text-xs font-mono text-white">NQ {nq?.toFixed(2) ?? '—'}</span>
-        ) : (
-          <span className="text-xs font-mono text-white">${level.price?.toFixed(2)}</span>
-        )}
+        <span className="text-xs font-mono text-white">
+          {activeSymbol === 'NQ'
+            ? (nq != null ? '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+            : (level.price != null ? '$' + level.price.toFixed(2) : '—')}
+        </span>
       </div>
       <div className="text-xs text-gray-500 mt-0.5">{clsCls.replace('_', ' ').toUpperCase()}</div>
-      {activeSymbol === 'NQ'
-        ? distNq != null && <div className="text-xs text-gray-600 mt-1">{dist >= 0 ? '+' : '-'}{distNq.toFixed(2)} NQ</div>
-        : distStr && <div className="text-xs text-gray-600 mt-1">{distStr}</div>}
+      {(() => {
+        if (activeSymbol === 'NQ') {
+          if (distNq == null) return null
+          const sign = dist >= 0 ? '+' : '-'
+          return <div className="text-xs text-gray-600 mt-1">{sign}${distNq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        } else {
+          if (dist == null) return null
+          const sign = dist >= 0 ? '+' : '-'
+          return <div className="text-xs text-gray-600 mt-1">{sign}${Math.abs(dist).toFixed(2)}</div>
+        }
+      })()}
     </div>
   )
 
@@ -65,20 +73,11 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
         <div>
           <div className="flex items-baseline gap-2">
             <span className={`text-xl font-bold ${textColor}`}>{level.id}</span>
-            {activeSymbol === 'NQ' ? (
-              <span className="text-white font-mono font-semibold text-lg">
-                NQ {nq?.toFixed(2) ?? '—'}
-              </span>
-            ) : (
-              <span className="text-white font-mono font-semibold text-lg">
-                ${level.price?.toFixed(2)}
-              </span>
-            )}
-          </div>
-          <div className="text-xs text-gray-500 font-mono mt-0.5">
-            {activeSymbol === 'NQ'
-              ? `QQQ $${level.price?.toFixed(2)}`
-              : (nq ? `NQ ${nq.toLocaleString()}` : null)}
+            <span className="text-white font-mono font-semibold text-lg">
+              {activeSymbol === 'NQ'
+                ? (nq != null ? '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+                : (level.price != null ? '$' + level.price.toFixed(2) : '—')}
+            </span>
           </div>
           <div className={`text-xs font-medium mt-1 ${textColor}`}>
             {level.classification?.replace('_', ' ').toUpperCase()}
@@ -92,17 +91,17 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
 
         {/* Distance — right side */}
         <div className="text-right shrink-0">
-          {activeSymbol === 'NQ' ? (
-            distNq != null && (
-              <div className="text-base font-mono font-bold text-gray-300">
-                {dist >= 0 ? '+' : '-'}{distNq.toFixed(2)} NQ
-              </div>
-            )
-          ) : (
-            distStr && (
-              <div className="text-base font-mono font-bold text-gray-300">{distStr}</div>
-            )
-          )}
+          {(() => {
+            if (activeSymbol === 'NQ') {
+              if (distNq == null) return null
+              const sign = dist >= 0 ? '+' : '-'
+              return <div className="text-base font-mono font-bold text-gray-300">{sign}${distNq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            } else {
+              if (dist == null) return null
+              const sign = dist >= 0 ? '+' : '-'
+              return <div className="text-base font-mono font-bold text-gray-300">{sign}${Math.abs(dist).toFixed(2)}</div>
+            }
+          })()}
         </div>
       </div>
 
