@@ -1913,7 +1913,7 @@ app.get('/narrative', (req, res) => {
 // ─── LABS: Auto Level Detection ─────────────────────────────────────────────
 
 let labsAutoLevels  = { qqq: null, nq: null, lastCalculated: null }
-let labsSettings    = { interval: '5m', activeInterval: '5m', length: 200, mult: 6.0 }
+let labsSettings    = { interval: '5m', activeInterval: '5m', length: 200, mult: 6.0, avgMode: 'daily' }
 let labsDataSources = { qqq: 'yahoo', nq: 'polygon' }
 
 const YAHOO_INTERVAL_MAP = {
@@ -1922,6 +1922,7 @@ const YAHOO_INTERVAL_MAP = {
   '15m': { interval: '15m', range: '60d' },
   '1h':  { interval: '60m', range: '730d' },
   '1d':  { interval: '1d',  range: '2y'  },
+  '1wk': { interval: '1wk', range: '5y'  },
 }
 const POLYGON_INTERVAL_MAP = {
   '1m':  { multiplier: 1,  timespan: 'minute' },
@@ -2044,112 +2045,217 @@ async function fetchOHLC(ticker, bars = 250, interval = '1d') {
   return await fetchFromYahoo(ticker, bars, interval)
 }
 
-function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0) {
-  console.log(`[labs] predictiveRanges: length=${length} mult=${mult}`)
-  const valid = closes.reduce((acc, c, i) => {
-    if (c && highs[i] && lows[i]) acc.push({ c, h: highs[i], l: lows[i] })
-    return acc
-  }, [])
-  const n = valid.length
-  if (n < length + 1) return null
-
-  let atr = 0
-  for (let i = 1; i <= length; i++) {
-    const tr = Math.max(
-      valid[i].h - valid[i].l,
-      Math.abs(valid[i].h - valid[i-1].c),
-      Math.abs(valid[i].l - valid[i-1].c)
-    )
-    atr += tr
+// Raw Wilder-smoothed ATR (no mult applied)
+function calcATR(highs, lows, closes, length) {
+  const n   = closes.length
+  if (n < 2) return 0
+  const len = Math.min(length, n - 1)
+  let atr = 0, count = 0
+  for (let i = 1; i <= len; i++) {
+    if (!closes[i] || !highs[i] || !lows[i]) continue
+    atr += Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i-1]), Math.abs(lows[i] - closes[i-1]))
+    count++
   }
-  atr = atr / length
-  for (let i = length + 1; i < n; i++) {
-    const tr = Math.max(
-      valid[i].h - valid[i].l,
-      Math.abs(valid[i].h - valid[i-1].c),
-      Math.abs(valid[i].l - valid[i-1].c)
-    )
-    atr = (atr * (length - 1) + tr) / length
+  if (!count) return 0
+  atr = atr / count
+  for (let i = len + 1; i < n; i++) {
+    if (!closes[i] || !highs[i] || !lows[i]) continue
+    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i-1]), Math.abs(lows[i] - closes[i-1]))
+    atr = (atr * (len - 1) + tr) / len
   }
-  atr = atr * mult
+  return atr
+}
 
-  let avg = valid[0].c
-  let holdAtr = 0
-  let prevAvg = avg
-  for (let i = 1; i < n; i++) {
-    const src = valid[i].c
-    prevAvg = avg
-    if (src - avg > atr)      avg = avg + atr
-    else if (avg - src > atr) avg = avg - atr
-    if (avg !== prevAvg) holdAtr = atr / 2
+function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0, startAvg = null) {
+  if (!closes?.length || closes.length < 2) return null
+  const atr     = calcATR(highs, lows, closes, length) * mult
+  if (!atr) return null
+  const holdAtr = atr / 2
+  let avg = startAvg !== null ? startAvg : closes[0]
+  for (let i = 1; i < closes.length; i++) {
+    if (!closes[i]) continue
+    if (closes[i] > avg + holdAtr)      avg = closes[i] - holdAtr
+    else if (closes[i] < avg - holdAtr) avg = closes[i] + holdAtr
   }
-  if (holdAtr === 0) return null
-
+  if (!avg || isNaN(avg)) return null
   return {
-    R2:      parseFloat((avg + holdAtr * 2).toFixed(2)),
-    R1:      parseFloat((avg + holdAtr).toFixed(2)),
-    MID:     parseFloat(avg.toFixed(2)),
-    S1:      parseFloat((avg - holdAtr).toFixed(2)),
-    S2:      parseFloat((avg - holdAtr * 2).toFixed(2)),
-    atr:     parseFloat(atr.toFixed(4)),
-    holdAtr: parseFloat(holdAtr.toFixed(4)),
-    avgBase: parseFloat(avg.toFixed(2)),
+    R2:  parseFloat((avg + atr * 2).toFixed(2)),
+    R1:  parseFloat((avg + atr).toFixed(2)),
+    MID: parseFloat(avg.toFixed(2)),
+    S1:  parseFloat((avg - atr).toFixed(2)),
+    S2:  parseFloat((avg - atr * 2).toFixed(2)),
+    atr: parseFloat(atr.toFixed(4)),
+    avg: parseFloat(avg.toFixed(4)),
   }
 }
 
-async function calculateLabsLevels(interval = labsSettings.interval) {
-  console.log(`[labs] calculating levels (${interval})...`)
-  const { length, mult } = labsSettings
+// Weekly-anchored average via ratcheting on 52 weekly bars
+async function calcWeeklyAvg(ticker, length, mult) {
   try {
-    const qqq       = await fetchOHLC('QQQ', length + 50, interval)
-    const qqqLevels = predictiveRanges(qqq.closes, qqq.highs, qqq.lows, length, mult)
-    if (qqqLevels) {
-      qqqLevels.ticker   = 'QQQ'
-      qqqLevels.source   = qqq.source
-      qqqLevels.interval = interval
-      console.log(`[labs] QQQ: R1=${qqqLevels.R1} MID=${qqqLevels.MID} S1=${qqqLevels.S1}`)
+    const weekly = await fetchFromYahoo(ticker, 52, '1wk')
+    if (!weekly?.closes?.length) return null
+    const len     = Math.min(length, weekly.closes.length - 1)
+    const atr     = calcATR(weekly.highs, weekly.lows, weekly.closes, len) * mult
+    const holdAtr = atr / 2
+    let avg = weekly.closes[0]
+    for (let i = 1; i < weekly.closes.length; i++) {
+      if (!weekly.closes[i]) continue
+      if (weekly.closes[i] > avg + holdAtr)      avg = weekly.closes[i] - holdAtr
+      else if (weekly.closes[i] < avg - holdAtr) avg = weekly.closes[i] + holdAtr
+    }
+    return avg
+  } catch (e) {
+    console.warn(`[labs] calcWeeklyAvg failed for ${ticker}:`, e.message)
+    return null
+  }
+}
+
+function deriveNQfromQQQ(qqqResult, ratio) {
+  const r = ratio || 41.14
+  return {
+    R2:  Math.round(qqqResult.R2  * r * 4) / 4,
+    R1:  Math.round(qqqResult.R1  * r * 4) / 4,
+    MID: Math.round(qqqResult.MID * r * 4) / 4,
+    S1:  Math.round(qqqResult.S1  * r * 4) / 4,
+    S2:  Math.round(qqqResult.S2  * r * 4) / 4,
+    atr: Math.round(qqqResult.atr * r * 4) / 4,
+    avg: Math.round(qqqResult.avg * r * 4) / 4,
+    source: 'derived_from_qqq', derivedRatio: r,
+  }
+}
+
+function buildLevelsResult(result, ticker, source, interval) {
+  if (!result) return null
+  return { ...result, ticker, source, interval }
+}
+
+function saveLevels(qqqResult, nqResult, interval) {
+  labsAutoLevels = {
+    qqq: qqqResult, nq: nqResult,
+    lastCalculated: new Date().toISOString(),
+    interval, settings: labsSettings
+  }
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('labs_auto_levels', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(JSON.stringify(labsAutoLevels))
+  console.log('[labs] levels saved')
+  return labsAutoLevels
+}
+
+async function calculateLabsLevels(interval = labsSettings.interval) {
+  const INIT_BARS  = 1000
+  const LEVEL_BARS = labsSettings.length + 50
+  const { length, mult, avgMode = 'daily' } = labsSettings
+  console.log(`[labs] calculating: mode=${avgMode} interval=${interval}`)
+
+  try {
+    // ── WEEKLY AVG MODE ────────────────────────────────────────────────────────
+    if (avgMode === 'weekly') {
+      const [weeklyAvgQQQ, weeklyAvgNQ_raw] = await Promise.all([
+        calcWeeklyAvg('QQQ',  length, mult),
+        calcWeeklyAvg('NQ=F', length, mult),
+      ])
+      if (!weeklyAvgQQQ) { console.warn('[labs] weekly QQQ avg unavailable'); return null }
+
+      const [qqqData, nqData] = await Promise.all([
+        fetchOHLC('QQQ',  LEVEL_BARS, interval),
+        fetchOHLC('NQ=F', LEVEL_BARS, interval).catch(() => null),
+      ])
+
+      const atr5mQQQ = calcATR(qqqData.highs, qqqData.lows, qqqData.closes, length) * mult
+      const qqqResult = {
+        R2:  parseFloat((weeklyAvgQQQ + atr5mQQQ * 2).toFixed(2)),
+        R1:  parseFloat((weeklyAvgQQQ + atr5mQQQ).toFixed(2)),
+        MID: parseFloat(weeklyAvgQQQ.toFixed(2)),
+        S1:  parseFloat((weeklyAvgQQQ - atr5mQQQ).toFixed(2)),
+        S2:  parseFloat((weeklyAvgQQQ - atr5mQQQ * 2).toFixed(2)),
+        avg: parseFloat(weeklyAvgQQQ.toFixed(4)),
+        atr: parseFloat(atr5mQQQ.toFixed(4)),
+        mode: 'weekly',
+      }
+      console.log(`[labs] weekly QQQ: avg=${weeklyAvgQQQ.toFixed(3)} atr=${atr5mQQQ.toFixed(3)} MID=${qqqResult.MID}`)
+
+      let nqResult = null
+      if (weeklyAvgNQ_raw && nqData) {
+        const atr5mNQ = calcATR(nqData.highs, nqData.lows, nqData.closes, length) * mult
+        nqResult = {
+          R2:  parseFloat((weeklyAvgNQ_raw + atr5mNQ * 2).toFixed(2)),
+          R1:  parseFloat((weeklyAvgNQ_raw + atr5mNQ).toFixed(2)),
+          MID: parseFloat(weeklyAvgNQ_raw.toFixed(2)),
+          S1:  parseFloat((weeklyAvgNQ_raw - atr5mNQ).toFixed(2)),
+          S2:  parseFloat((weeklyAvgNQ_raw - atr5mNQ * 2).toFixed(2)),
+          avg: parseFloat(weeklyAvgNQ_raw.toFixed(4)),
+          atr: parseFloat(atr5mNQ.toFixed(4)),
+          mode: 'weekly',
+        }
+        console.log(`[labs] weekly NQ: avg=${weeklyAvgNQ_raw.toFixed(1)} atr=${atr5mNQ.toFixed(1)} MID=${nqResult.MID}`)
+      }
+      if (!nqResult) nqResult = deriveNQfromQQQ(qqqResult, getActiveRatio())
+
+      return saveLevels(
+        buildLevelsResult(qqqResult, 'QQQ', qqqData.source, interval),
+        buildLevelsResult(nqResult,  'NQ',  nqData?.source || 'derived', interval),
+        interval
+      )
     }
 
-    let nqLevels = null
+    // ── DAILY PERSISTENT AVG MODE ──────────────────────────────────────────────
+    let savedAvgQQQ = null, savedAvgNQ = null
     try {
-      const nq   = await fetchOHLC('NQ=F', length + 50, interval)
-      nqLevels   = predictiveRanges(nq.closes, nq.highs, nq.lows, length, mult)
-      if (nqLevels) {
-        nqLevels.ticker   = 'NQ'
-        nqLevels.source   = nq.source
-        nqLevels.interval = interval
-        console.log(`[labs] NQ: R1=${nqLevels.R1} MID=${nqLevels.MID} S1=${nqLevels.S1}`)
+      const saved = db.prepare(`SELECT value FROM settings WHERE key = 'labs_pr_avg'`).get()
+      if (saved?.value) {
+        const data = JSON.parse(saved.value)
+        savedAvgQQQ = data.avgQQQ
+        savedAvgNQ  = data.avgNQ
+        console.log(`[labs] cached avg: QQQ=${savedAvgQQQ?.toFixed(3)} NQ=${savedAvgNQ?.toFixed(1)}`)
       }
-    } catch (nqErr) {
-      console.warn('[labs] NQ fetch failed:', nqErr.message)
+    } catch (e) {}
+
+    if (!savedAvgQQQ) {
+      console.log(`[labs] initializing avg from ${INIT_BARS} bars...`)
+      const [qqqInit, nqInit] = await Promise.all([
+        fetchOHLC('QQQ',  INIT_BARS, interval),
+        fetchOHLC('NQ=F', INIT_BARS, interval).catch(() => null),
+      ])
+      const qqqInitR = predictiveRanges(qqqInit.closes, qqqInit.highs, qqqInit.lows, length, mult, null)
+      savedAvgQQQ = qqqInitR?.avg ?? qqqInit.closes[qqqInit.closes.length - 1]
+      if (nqInit) {
+        const nqInitR = predictiveRanges(nqInit.closes, nqInit.highs, nqInit.lows, length, mult, null)
+        savedAvgNQ = nqInitR?.avg ?? null
+      }
+      console.log(`[labs] converged avg: QQQ=${savedAvgQQQ?.toFixed(3)} NQ=${savedAvgNQ?.toFixed(1)}`)
     }
 
-    if (!nqLevels && qqqLevels) {
-      const ratio = latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
-      nqLevels = {
-        R2:      Math.round(qqqLevels.R2      * ratio * 4) / 4,
-        R1:      Math.round(qqqLevels.R1      * ratio * 4) / 4,
-        MID:     Math.round(qqqLevels.MID     * ratio * 4) / 4,
-        S1:      Math.round(qqqLevels.S1      * ratio * 4) / 4,
-        S2:      Math.round(qqqLevels.S2      * ratio * 4) / 4,
-        atr:     Math.round(qqqLevels.atr     * ratio * 4) / 4,
-        holdAtr: Math.round(qqqLevels.holdAtr * ratio * 4) / 4,
-        avgBase: Math.round(qqqLevels.avgBase * ratio * 4) / 4,
-        ticker: 'NQ', source: 'derived_from_qqq', interval,
-        derivedRatio: ratio,
-        note: 'Derived from QQQ × ratio (add POLYGON_API_KEY for native NQ)'
-      }
-      console.log(`[labs] NQ derived from QQQ: ratio=${ratio} R1=${nqLevels.R1} MID=${nqLevels.MID}`)
-    }
+    const [qqqData, nqData] = await Promise.all([
+      fetchOHLC('QQQ',  LEVEL_BARS, interval),
+      fetchOHLC('NQ=F', LEVEL_BARS, interval).catch(() => null),
+    ])
 
-    labsAutoLevels = { qqq: qqqLevels, nq: nqLevels, lastCalculated: new Date().toISOString(), interval, settings: labsSettings }
+    const qqqResult = predictiveRanges(qqqData.closes, qqqData.highs, qqqData.lows, length, mult, savedAvgQQQ)
+    if (!qqqResult) { console.warn('[labs] QQQ predictiveRanges returned null'); return null }
+    console.log(`[labs] QQQ: R1=${qqqResult.R1} MID=${qqqResult.MID} S1=${qqqResult.S1}`)
+
+    const nqResult_raw = nqData
+      ? predictiveRanges(nqData.closes, nqData.highs, nqData.lows, length, mult, savedAvgNQ)
+      : null
+    const nqResult = nqResult_raw || deriveNQfromQQQ(qqqResult, getActiveRatio())
+    if (nqResult) console.log(`[labs] NQ: R1=${nqResult.R1} MID=${nqResult.MID} S1=${nqResult.S1}`)
+
+    // Persist updated avg
     db.prepare(`
       INSERT INTO settings (key, value, updated_at)
-      VALUES ('labs_auto_levels', ?, datetime('now'))
+      VALUES ('labs_pr_avg', ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-    `).run(JSON.stringify(labsAutoLevels))
-    console.log('[labs] levels saved')
-    return labsAutoLevels
+    `).run(JSON.stringify({ avgQQQ: qqqResult.avg, avgNQ: nqResult_raw?.avg ?? savedAvgNQ, savedAt: new Date().toISOString() }))
+    console.log(`[labs] avg saved: QQQ=${qqqResult.avg?.toFixed(3)} NQ=${(nqResult_raw?.avg ?? savedAvgNQ)?.toFixed(1)}`)
+
+    return saveLevels(
+      buildLevelsResult(qqqResult, 'QQQ', qqqData.source, interval),
+      buildLevelsResult(nqResult,  'NQ',  nqData?.source || 'derived', interval),
+      interval
+    )
   } catch (err) {
     console.error('[labs] calculation failed:', err.message)
     return null
@@ -2239,8 +2345,10 @@ async function applyAutoLevelsIfEnabled() {
 
   // Skip write + rescore if levels haven't meaningfully changed
   const today    = getTodayET()
-  const existing = db.prepare(`SELECT r1_qqq FROM daily_levels WHERE date = ?`).get(today)
-  const changed  = !existing || Math.abs((existing.r1_qqq || 0) - levelData.r1_qqq) > 0.10
+  const existing = db.prepare(`SELECT mid_nq, mid_qqq FROM daily_levels WHERE date = ?`).get(today)
+  const nqChanged  = !existing || Math.abs((existing.mid_nq  || 0) - levelData.mid_nq)  > 20
+  const qqqChanged = !existing || Math.abs((existing.mid_qqq || 0) - levelData.mid_qqq) > 0.50
+  const changed = nqChanged || qqqChanged
   if (!changed) return
 
   db.prepare(`
@@ -2414,7 +2522,7 @@ app.post('/labs/recalculate', async (req, res) => {
 })
 
 app.post('/labs/settings', async (req, res) => {
-  const { interval, length, mult } = req.body
+  const { interval, length, mult, avgMode } = req.body
   const validIntervals = ['1m', '5m', '15m', '1h', '1d']
   if (interval && !validIntervals.includes(interval))
     return res.status(400).json({ error: 'Invalid interval' })
@@ -2422,6 +2530,7 @@ app.post('/labs/settings', async (req, res) => {
   if (interval) labsSettings.interval = interval  // preview only — does NOT affect active cron
   if (length)   labsSettings.length   = parseInt(length)
   if (mult)     labsSettings.mult     = parseFloat(mult)
+  if (avgMode && ['daily', 'weekly'].includes(avgMode)) labsSettings.avgMode = avgMode
   db.prepare(`
     INSERT INTO settings (key, value, updated_at)
     VALUES ('labs_settings', ?, datetime('now'))
@@ -2446,6 +2555,12 @@ app.post('/labs/active-interval', async (req, res) => {
   if (labsCron) setupLabsCron(labsCron, interval)
   console.log('[labs] active interval set:', interval)
   res.json({ success: true, activeInterval: interval })
+})
+
+app.post('/labs/reset-avg', (req, res) => {
+  db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
+  console.log('[labs] avg reset — will re-initialize on next calculation')
+  res.json({ success: true })
 })
 
 app.post('/labs/apply-to-main', async (req, res) => {

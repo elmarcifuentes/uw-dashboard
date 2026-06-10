@@ -21,7 +21,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
   const [currentPrice, setCurrentPrice]   = useState(null)
   const [nqRatio, setNqRatio]             = useState(41.14)
   const [scoredLevels, setScoredLevels]   = useState(null)
-  const [settings, setSettings]     = useState({ interval: '5m', length: 200, mult: 6.0 })
+  const [settings, setSettings]     = useState({ interval: '5m', length: 200, mult: 6.0, avgMode: 'daily' })
   const [dataSources, setDataSources] = useState({ qqq: 'yahoo', nq: 'polygon' })
 
   useEffect(() => {
@@ -196,6 +196,38 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
           />
         </div>
 
+        {/* Avg Mode */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-tertiary">Avg</span>
+          <div className="flex gap-1">
+            {[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }].map(m => (
+              <button
+                key={m.value}
+                onClick={() => handleSettingsChange({ ...settings, avgMode: m.value })}
+                disabled={loading}
+                className={`px-2.5 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-40 ${
+                  settings.avgMode === m.value
+                    ? 'bg-indigo-700 text-text-primary'
+                    : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {settings.avgMode === 'daily' && (
+            <button
+              onClick={async () => {
+                await fetch(`${API_URL}/labs/reset-avg`, { method: 'POST' })
+                handleRecalculate()
+              }}
+              className="text-xs text-text-muted hover:text-red-400 transition-colors underline underline-offset-2"
+            >
+              reset avg
+            </button>
+          )}
+        </div>
+
         {/* QQQ source */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-tertiary">QQQ</span>
@@ -299,6 +331,11 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
               <div>
                 <span className="text-micro font-bold text-text-secondary">Timeframe</span>
                 <p className="text-micro text-text-muted mt-0.5">Bar size for calculation. 5m matches intraday session structure. Preview only — active levels always use 5m.</p>
+              </div>
+              <div>
+                <span className="text-micro font-bold text-text-secondary">Avg Mode</span>
+                <span className="text-micro text-text-muted ml-1">(default Daily)</span>
+                <p className="text-micro text-text-muted mt-0.5">Daily — persistent ratchet avg that carries forward across restarts, keeping levels stable session-to-session. Weekly — anchors MID to last week's closing avg, uses intraday ATR for band spacing.</p>
               </div>
               <div>
                 <span className="text-micro font-bold text-text-secondary">Data Sources</span>
