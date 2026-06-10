@@ -121,6 +121,7 @@ export default function LevelPlanCard({
                 stop:        isNQ ? setup.stop.nq   : setup.stop.qqq,
                 entryLevel:  level.id,
                 targetLevel: setup.target.level,
+                priceUnit:   activeSymbol,
               })}
               className="w-full py-2 rounded text-xs font-bold bg-indigo-700 hover:bg-indigo-600 text-white transition-colors"
             >

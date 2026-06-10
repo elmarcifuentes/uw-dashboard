@@ -131,11 +131,12 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
     } catch { /* audio not supported */ }
   }, [cascade?.active, soundEnabled])
 
+  const tradePrice = activeTrade?.priceUnit === 'NQ' ? nqPrice : currentPrice
   const tradeEvaluation = useMemo(() =>
-    activeTrade && currentPrice
-      ? evaluateHoldExit(activeTrade, result?.levels || [], currentPrice, cascade, dpHistory)
+    activeTrade && tradePrice
+      ? evaluateHoldExit(activeTrade, result?.levels || [], tradePrice, cascade, dpHistory)
       : null
-  , [activeTrade, currentPrice, result?.levels, cascade, dpHistory])
+  , [activeTrade, tradePrice, result?.levels, cascade, dpHistory])
 
   useEffect(() => {
     if (!activeTrade || !tradeEvaluation) return
@@ -156,7 +157,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
       tradeSoundPlayedRef.current.target = true
       ;[523, 659, 784].forEach((f, i) => setTimeout(() => playTone(f, 0.4), i * 200))
     }
-    const distToStop = currentPrice != null ? Math.abs(currentPrice - activeTrade.stop) : Infinity
+    const distToStop = tradePrice != null ? Math.abs(tradePrice - activeTrade.stop) : Infinity
     const stopRange  = Math.abs(activeTrade.entry - activeTrade.stop)
     if (stopRange > 0 && distToStop / stopRange < 0.25 && !tradeSoundPlayedRef.current.stop) {
       tradeSoundPlayedRef.current.stop = true
@@ -166,7 +167,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
       tradeSoundPlayedRef.current.cascade = true
       ;[311, 277, 233].forEach((f, i) => setTimeout(() => playTone(f, 0.4), i * 150))
     }
-  }, [tradeEvaluation, cascade?.active, currentPrice, activeTrade])
+  }, [tradeEvaluation, cascade?.active, tradePrice, activeTrade])
 
   useEffect(() => {
     tradeSoundPlayedRef.current = { target: false, stop: false, cascade: false }
@@ -303,6 +304,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
           <RightRail
             levels={result?.levels}
             currentPrice={currentPrice}
+            nqPrice={nqPrice}
             nqRatio={nqRatio}
             cascade={cascade}
             dpHistory={dpHistory}

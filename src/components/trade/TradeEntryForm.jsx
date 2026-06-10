@@ -29,6 +29,7 @@ export default function TradeEntryForm({
       stop:        parseFloat(stop),
       entryLevel:  prefill?.entryLevel  || null,
       targetLevel: prefill?.targetLevel || null,
+      priceUnit:   activeSymbol,
     })
   }
 
@@ -98,9 +99,9 @@ export default function TradeEntryForm({
           <div>
             <div className={labelClass}>Entry ({prefix})</div>
             <input
-              type="number" step="0.01" value={entry}
+              type="number" step={isNQ ? '0.25' : '0.01'} value={entry}
               onChange={e => setEntry(e.target.value)}
-              placeholder="0.00"
+              placeholder={isNQ ? '29000.00' : '700.00'}
               className={inputClass}
               required
             />
@@ -108,9 +109,9 @@ export default function TradeEntryForm({
           <div>
             <div className={`${labelClass} text-green-600`}>Target ({prefix})</div>
             <input
-              type="number" step="0.01" value={target}
+              type="number" step={isNQ ? '0.25' : '0.01'} value={target}
               onChange={e => setTarget(e.target.value)}
-              placeholder="0.00"
+              placeholder={isNQ ? '29000.00' : '700.00'}
               className={`${inputClass} border-green-900/50`}
               required
             />
@@ -118,9 +119,9 @@ export default function TradeEntryForm({
           <div>
             <div className={`${labelClass} text-red-600`}>Stop ({prefix})</div>
             <input
-              type="number" step="0.01" value={stop}
+              type="number" step={isNQ ? '0.25' : '0.01'} value={stop}
               onChange={e => setStop(e.target.value)}
-              placeholder="0.00"
+              placeholder={isNQ ? '29000.00' : '700.00'}
               className={`${inputClass} border-red-900/50`}
               required
             />

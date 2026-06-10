@@ -12,7 +12,7 @@ import InstrumentSelector from '../trade/InstrumentSelector'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export default function RightRail({
-  levels, currentPrice, nqRatio,
+  levels, currentPrice, nqPrice, nqRatio,
   dpHistory, levelNarratives,
   cascade, activeSymbol,
   activeTrade, setActiveTrade,
@@ -64,17 +64,19 @@ export default function RightRail({
     }
   }, [pendingTrade])
 
-  const pnl = activeTrade && currentPrice
+  const tradePrice = activeTrade?.priceUnit === 'NQ' ? nqPrice : currentPrice
+
+  const pnl = activeTrade && tradePrice
     ? calcPnL(
         activeTrade.direction, activeTrade.entry,
-        currentPrice,
+        tradePrice,
         activeTrade.instrument || instrument,
         activeTrade.contracts || contracts
       )
     : null
 
-  const evaluation = activeTrade && currentPrice
-    ? evaluateHoldExit(activeTrade, levels || [], currentPrice, cascade, dpHistory)
+  const evaluation = activeTrade && tradePrice
+    ? evaluateHoldExit(activeTrade, levels || [], tradePrice, cascade, dpHistory)
     : null
 
   const mid    = levels?.find(l => l.id === 'MID')
@@ -386,11 +388,10 @@ export default function RightRail({
             <>
               <ActiveTradePanel
                 trade={activeTrade}
-                currentPrice={currentPrice}
+                currentPrice={tradePrice}
                 pnl={pnl}
                 evaluation={evaluation}
                 activeSymbol={activeSymbol}
-                nqRatio={nqRatio}
               />
               <CascadeHealth cascade={cascade} levels={levels} trade={activeTrade} />
               <HoldExitGuide evaluation={evaluation} />

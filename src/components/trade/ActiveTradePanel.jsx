@@ -1,18 +1,14 @@
-export default function ActiveTradePanel({ trade, currentPrice, pnl, evaluation, activeSymbol, nqRatio }) {
-  const isNQ    = activeSymbol === 'NQ'
+export default function ActiveTradePanel({ trade, currentPrice, pnl, evaluation, activeSymbol }) {
   const isShort = trade.direction === 'short'
 
-  const fmt = (price) => price != null
-    ? (isNQ
+  const fmt = (price) => {
+    if (price == null) return '—'
+    return trade.priceUnit === 'NQ'
       ? price.toLocaleString('en-US', { minimumFractionDigits: 2 })
-      : `$${price.toFixed(2)}`)
-    : '—'
+      : `$${price.toFixed(2)}`
+  }
 
-  const fmtCurrent = currentPrice != null
-    ? (isNQ
-      ? (Math.round(currentPrice * (nqRatio || 41.14) * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })
-      : `$${currentPrice.toFixed(2)}`)
-    : '—'
+  const fmtCurrent = fmt(currentPrice)
 
   const progressPct = evaluation?.progressPct || 0
 
