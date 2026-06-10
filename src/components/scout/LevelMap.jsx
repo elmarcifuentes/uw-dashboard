@@ -1,0 +1,100 @@
+import { getLevelProximity } from '../../utils/proximity'
+
+export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, onLevelSelect, selectedLevel }) {
+  if (!levels?.length) return null
+
+  const sorted = [...levels].sort((a, b) => b.price - a.price)
+  const r = nqRatio || 41.14
+
+  const fmt = (p) => activeSymbol === 'NQ'
+    ? (Math.round(p * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })
+    : `$${p?.toFixed(2)}`
+
+  const fmtCurrent = currentPrice != null
+    ? activeSymbol === 'NQ'
+      ? (Math.round(currentPrice * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })
+      : `$${currentPrice.toFixed(2)}`
+    : '—'
+
+  const barColor = (level) => ({
+    sell_resistance: 'bg-red-500',
+    buy_support:     'bg-green-500',
+    continuation:    'bg-blue-500',
+    no_edge:         'bg-gray-700',
+  }[level.classification] || 'bg-gray-700')
+
+  const barWidth = (level) =>
+    level.classification === 'no_edge' ? 15 : Math.max(20, Math.min(100, level.score || 0))
+
+  const idColor = (level) => ({
+    sell_resistance: 'text-red-400',
+    buy_support:     'text-green-400',
+    no_edge:         'text-gray-500',
+  }[level.classification] || (level.id === 'MID' ? 'text-blue-400' : 'text-gray-500'))
+
+  return (
+    <div className="space-y-1 font-mono text-xs">
+      {sorted.map((level, i) => {
+        const isSelected  = selectedLevel === level.id
+        const proximity   = getLevelProximity(currentPrice, level.price)
+        const isNear      = proximity?.zone === 'critical' || proximity?.zone === 'near'
+        const nextLevel   = sorted[i + 1]
+        const priceIsHere = nextLevel && currentPrice != null &&
+          currentPrice < level.price && currentPrice > nextLevel.price
+
+        return (
+          <div key={level.id}>
+            <button
+              onClick={() => onLevelSelect(level.id)}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all text-left ${
+                isSelected
+                  ? 'bg-indigo-900/40 border border-indigo-700'
+                  : 'hover:bg-gray-800/50'
+              }`}
+            >
+              <span className={`w-8 shrink-0 font-bold ${idColor(level)}`}>{level.id}</span>
+              <span className="w-24 shrink-0 text-white">{fmt(level.price)}</span>
+              <div className="flex-1 h-3 bg-gray-900 rounded overflow-hidden">
+                <div
+                  className={`h-full rounded transition-all ${barColor(level)}`}
+                  style={{ width: `${barWidth(level)}%`, opacity: isNear ? 1 : 0.6 }}
+                />
+              </div>
+              <span className={`w-12 text-right shrink-0 ${
+                level.classification === 'no_edge' ? 'text-gray-700' : 'text-gray-400'
+              }`}>
+                {level.classification === 'no_edge' ? '—' : level.score}
+              </span>
+            </button>
+
+            {priceIsHere && (
+              <div className="flex items-center gap-2 py-0.5 px-2">
+                <div className="flex-1 h-px bg-yellow-400/40" />
+                <span className="text-yellow-400 text-xs font-bold shrink-0">▶ {fmtCurrent}</span>
+                <div className="flex-1 h-px bg-yellow-400/40" />
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {/* Price above all levels */}
+      {currentPrice != null && sorted.length > 0 && currentPrice > sorted[0].price && (
+        <div className="flex items-center gap-2 py-0.5 px-2">
+          <div className="flex-1 h-px bg-yellow-400/40" />
+          <span className="text-yellow-400 text-xs font-bold shrink-0">▶ {fmtCurrent} — above structure</span>
+          <div className="flex-1 h-px bg-yellow-400/40" />
+        </div>
+      )}
+
+      {/* Price below all levels */}
+      {currentPrice != null && sorted.length > 0 && currentPrice < sorted[sorted.length - 1].price && (
+        <div className="flex items-center gap-2 py-0.5 px-2">
+          <div className="flex-1 h-px bg-yellow-400/40" />
+          <span className="text-yellow-400 text-xs font-bold shrink-0">▶ {fmtCurrent} — below structure</span>
+          <div className="flex-1 h-px bg-yellow-400/40" />
+        </div>
+      )}
+    </div>
+  )
+}

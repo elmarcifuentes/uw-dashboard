@@ -13,6 +13,8 @@ import LabsDashboard from './components/labs/LabsDashboard'
 import LockModal from './components/LockModal'
 import RestartBanner from './components/RestartBanner'
 import LevelsTab from './components/LevelsTab'
+import ScoutTab from './components/scout/ScoutTab'
+import TradeTab from './components/trade/TradeTab'
 import { useServerHealth } from './hooks/useServerHealth'
 import { useSSE } from './hooks/useSSE'
 import { useSymbol } from './hooks/useSymbol'
@@ -30,6 +32,7 @@ function AppInner() {
   const { unlocked } = useAuth()
   const { restarted, hasData, dismiss } = useServerHealth(API_URL)
   const { activeSymbol, changeSymbol } = useSymbol()
+  const [pendingTrade, setPendingTrade] = useState(null)
 
   const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt } = useSSE(`${API_URL}/stream`)
 
@@ -69,6 +72,8 @@ function AppInner() {
 
         <div className="mt-4">
           {activeTab === 'Overview'     && <OverviewTab onNavigate={setActiveTab} activeSymbol={activeSymbol} />}
+          {activeTab === 'Scout'        && <ScoutTab activeSymbol={activeSymbol} onEnterTrade={(t) => { setPendingTrade(t); setActiveTab('Trade') }} />}
+          {activeTab === 'Trade'        && <TradeTab activeSymbol={activeSymbol} pendingTrade={pendingTrade} />}
           {activeTab === 'Pre-Session'  && <PreSession assistantRead={assistantRead} activeSymbol={activeSymbol} />}
           {activeTab === 'Intraday'     && <Intraday activeSymbol={activeSymbol} />}
           {activeTab === 'Post-Session' && <PostSession />}

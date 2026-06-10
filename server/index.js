@@ -70,6 +70,9 @@ const MAX_HISTORY     = 20
 // Pause state
 let systemPaused = false
 
+// Active trade — one at a time
+let activeTrade = null
+
 // Expansion GEX tracking
 let expansionGexHistory  = []
 let allPinningSessions   = 0
@@ -130,6 +133,38 @@ try {
       console.log('[server] System pause state restored from DB — polling disabled')
     }
   } catch { /* settings table may not exist on first boot */ }
+}
+
+// Trade log table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS trade_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT, symbol TEXT, instrument TEXT, contracts INTEGER DEFAULT 1,
+    direction TEXT, entry_price REAL, target_price REAL, stop_price REAL,
+    exit_price REAL, exit_reason TEXT, pnl_points REAL, pnl_dollars REAL,
+    duration_minutes INTEGER, entry_level TEXT, target_level TEXT,
+    cascade_active INTEGER DEFAULT 0, setup_rr REAL, actual_rr REAL,
+    notes TEXT, entered_at TEXT DEFAULT (datetime('now')), exited_at TEXT
+  )
+`)
+
+// Restore active trade
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'active_trade'`).get()
+  if (saved?.value) {
+    activeTrade = JSON.parse(saved.value)
+    console.log('[trade] restored:', activeTrade?.direction, activeTrade?.entry)
+  }
+} catch (e) {}
+
+// Instrument config
+const INSTRUMENTS = {
+  NQ:  { type: 'futures', pointValue: 20,  tickSize: 0.25 },
+  MNQ: { type: 'futures', pointValue: 2,   tickSize: 0.25 },
+  ES:  { type: 'futures', pointValue: 50,  tickSize: 0.25 },
+  MES: { type: 'futures', pointValue: 5,   tickSize: 0.25 },
+  QQQ: { type: 'equity',  pointValue: 1,   tickSize: 0.01 },
+  SPY: { type: 'equity',  pointValue: 1,   tickSize: 0.01 },
 }
 
 function hashSessionState(result) {
@@ -2269,6 +2304,88 @@ app.post('/levels/nq-offsets', async (req, res) => {
   console.log('[levels] NQ offsets updated:', nqOffsets)
   if (levelSourceMode === 'auto_qqq') await applyAutoLevelsIfEnabled()
   res.json({ success: true, offsets: nqOffsets })
+})
+
+// ─── TRADE ENDPOINTS ─────────────────────────────────────────────────────────
+
+app.post('/trade/enter', (req, res) => {
+  const { direction, entry, target, stop, instrument, contracts, entryLevel, targetLevel, symbol } = req.body
+  const inst = INSTRUMENTS[instrument]
+  if (!inst) return res.status(400).json({ error: 'Unknown instrument' })
+
+  activeTrade = {
+    id:                   Date.now(),
+    direction,
+    entry:                parseFloat(entry),
+    target:               parseFloat(target),
+    stop:                 parseFloat(stop),
+    instrument,
+    contracts:            parseInt(contracts) || 1,
+    symbol:               symbol || 'NQ',
+    entryLevel:           entryLevel || null,
+    targetLevel:          targetLevel || null,
+    pointValue:           inst.pointValue,
+    isFutures:            inst.type === 'futures',
+    cascadeActiveAtEntry: latest?.cascade?.active || false,
+    enteredAt:            new Date().toISOString(),
+    setupRR:              Math.abs(entry - target) / Math.abs(entry - stop),
+  }
+
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES ('active_trade', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(JSON.stringify(activeTrade))
+
+  console.log('[trade] entered:', direction, instrument, entry, '→ target:', target, 'stop:', stop)
+
+  sseEmitter.emit('event', { type: 'trade_entered', trade: activeTrade, timestamp: new Date().toISOString() })
+  res.json({ success: true, trade: activeTrade })
+})
+
+app.post('/trade/exit', (req, res) => {
+  if (!activeTrade) return res.status(400).json({ error: 'No active trade' })
+
+  const { exitPrice, exitReason, notes } = req.body
+  const price       = parseFloat(exitPrice)
+  const pnlPoints   = activeTrade.direction === 'short' ? activeTrade.entry - price : price - activeTrade.entry
+  const pnlDollars  = pnlPoints * activeTrade.pointValue * activeTrade.contracts
+  const enteredAt   = new Date(activeTrade.enteredAt)
+  const exitedAt    = new Date()
+  const durationMin = Math.round((exitedAt - enteredAt) / 60000)
+  const actualRR    = pnlPoints / Math.abs(activeTrade.entry - activeTrade.stop)
+
+  db.prepare(`
+    INSERT INTO trade_log (
+      date, symbol, instrument, contracts, direction,
+      entry_price, target_price, stop_price, exit_price, exit_reason,
+      pnl_points, pnl_dollars, duration_minutes, entry_level, target_level,
+      cascade_active, setup_rr, actual_rr, notes, entered_at, exited_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+    activeTrade.symbol, activeTrade.instrument, activeTrade.contracts, activeTrade.direction,
+    activeTrade.entry, activeTrade.target, activeTrade.stop, price, exitReason || 'manual',
+    pnlPoints, pnlDollars, durationMin, activeTrade.entryLevel, activeTrade.targetLevel,
+    activeTrade.cascadeActiveAtEntry ? 1 : 0, activeTrade.setupRR, actualRR,
+    notes || '', activeTrade.enteredAt, exitedAt.toISOString()
+  )
+
+  console.log('[trade] exited:', exitReason, `P&L: ${pnlPoints.toFixed(2)} pts $${pnlDollars.toFixed(2)}`)
+
+  activeTrade = null
+  db.prepare(`DELETE FROM settings WHERE key = 'active_trade'`).run()
+
+  sseEmitter.emit('event', { type: 'trade_exited', pnlPoints, pnlDollars, exitReason, timestamp: new Date().toISOString() })
+  res.json({ success: true, pnlPoints, pnlDollars, durationMin })
+})
+
+app.get('/trade/active', (req, res) => {
+  res.json({ trade: activeTrade, timestamp: new Date().toISOString() })
+})
+
+app.get('/trade/history', (req, res) => {
+  const rows = db.prepare(`SELECT * FROM trade_log ORDER BY entered_at DESC LIMIT 50`).all()
+  res.json({ trades: rows })
 })
 
 app.listen(PORT, () => {
