@@ -26,14 +26,14 @@ export default function HeatmapView({ levels, currentPrice, nqRatio, activeSourc
   const rows = []
   let price = gridMax
   while (price >= gridMin - step) {
-    rows.push(parseFloat(price.toFixed(isNQ ? 0 : 2)))
+    rows.push(parseFloat(price.toFixed(showNQ ? 0 : 2)))
     price -= step
   }
 
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
       <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">
-        Level Heatmap — {isNQ ? 'NQ' : 'QQQ'}
+        Level Heatmap — {showNQ ? 'NQ' : 'QQQ'}
       </div>
 
       <div className="space-y-0.5 font-mono text-xs">
