@@ -130,6 +130,7 @@ export function useSSE(url) {
             return
           }
           lastRescoreRef.current = now
+          console.log('[SSE] rescore levels:', data.result?.levels?.length, '| S1:', data.result?.levels?.find(l => l.id === 'S1')?.classification, 'dp:', data.result?.levels?.find(l => l.id === 'S1')?.dark_pool)
           setRescoreData(data)
           setHistory(prev => [data, ...prev].slice(0, 50))
           if (data.expansionGex !== undefined) setExpansionGex(data.expansionGex || [])
@@ -146,6 +147,17 @@ export function useSSE(url) {
           if (data.result?.current_price != null) {
             setPriceData({ price: data.result.current_price, timestamp: data.timestamp, interval: null })
           }
+          // Safety fetch: ensure rescoreData always reflects current server state
+          const apiBase = url.replace(/\/stream$/, '')
+          fetch(`${apiBase}/latest`)
+            .then(r => r.json())
+            .then(latestResult => {
+              if (latestResult?.levels?.length > 0) {
+                console.log('[SSE] /latest sync: S1:', latestResult.levels.find(l => l.id === 'S1')?.classification, 'dp:', latestResult.levels.find(l => l.id === 'S1')?.dark_pool)
+                setRescoreData(prev => prev ? { ...prev, result: latestResult } : { type: 'rescore', result: latestResult })
+              }
+            })
+            .catch(() => {})
           return
         }
 
