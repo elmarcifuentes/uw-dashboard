@@ -2309,7 +2309,7 @@ app.post('/levels/nq-offsets', async (req, res) => {
 // ─── TRADE ENDPOINTS ─────────────────────────────────────────────────────────
 
 app.post('/trade/enter', (req, res) => {
-  const { direction, entry, target, stop, instrument, contracts, entryLevel, targetLevel, symbol } = req.body
+  const { direction, entry, target, stop, instrument, contracts, entryLevel, targetLevel, symbol, priceUnit } = req.body
   const inst = INSTRUMENTS[instrument]
   if (!inst) return res.status(400).json({ error: 'Unknown instrument' })
 
@@ -2322,6 +2322,7 @@ app.post('/trade/enter', (req, res) => {
     instrument,
     contracts:            parseInt(contracts) || 1,
     symbol:               symbol || 'NQ',
+    priceUnit:            priceUnit || symbol || 'NQ',
     entryLevel:           entryLevel || null,
     targetLevel:          targetLevel || null,
     pointValue:           inst.pointValue,

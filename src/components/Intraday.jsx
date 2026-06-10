@@ -131,7 +131,13 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
     } catch { /* audio not supported */ }
   }, [cascade?.active, soundEnabled])
 
-  const tradePrice = activeTrade?.priceUnit === 'NQ' ? nqPrice : currentPrice
+  const tradeUnit  = activeTrade?.priceUnit || activeTrade?.symbol || activeSymbol
+  const tradePrice = (() => {
+    if (tradeUnit === 'NQ' || tradeUnit === 'MNQ') return nqPrice
+    if (tradeUnit === 'QQQ') return currentPrice
+    if (tradeUnit === 'ES'  || tradeUnit === 'MES') return nqPrice
+    return currentPrice
+  })()
   const tradeEvaluation = useMemo(() =>
     activeTrade && tradePrice
       ? evaluateHoldExit(activeTrade, result?.levels || [], tradePrice, cascade, dpHistory)

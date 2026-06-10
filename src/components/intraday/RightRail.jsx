@@ -64,19 +64,25 @@ export default function RightRail({
     }
   }, [pendingTrade])
 
-  const tradePrice = activeTrade?.priceUnit === 'NQ' ? nqPrice : currentPrice
+  const tradeUnit = activeTrade?.priceUnit || activeTrade?.symbol || activeSymbol
+  const tradeCurrentPrice = (() => {
+    if (tradeUnit === 'NQ' || tradeUnit === 'MNQ') return nqPrice
+    if (tradeUnit === 'QQQ') return currentPrice
+    if (tradeUnit === 'ES'  || tradeUnit === 'MES') return nqPrice // replace with ES price when available
+    return currentPrice
+  })()
 
-  const pnl = activeTrade && tradePrice
+  const pnl = activeTrade && tradeCurrentPrice
     ? calcPnL(
         activeTrade.direction, activeTrade.entry,
-        tradePrice,
+        tradeCurrentPrice,
         activeTrade.instrument || instrument,
         activeTrade.contracts || contracts
       )
     : null
 
-  const evaluation = activeTrade && tradePrice
-    ? evaluateHoldExit(activeTrade, levels || [], tradePrice, cascade, dpHistory)
+  const evaluation = activeTrade && tradeCurrentPrice
+    ? evaluateHoldExit(activeTrade, levels || [], tradeCurrentPrice, cascade, dpHistory)
     : null
 
   const mid    = levels?.find(l => l.id === 'MID')
@@ -388,7 +394,7 @@ export default function RightRail({
             <>
               <ActiveTradePanel
                 trade={activeTrade}
-                currentPrice={tradePrice}
+                currentPrice={tradeCurrentPrice}
                 pnl={pnl}
                 evaluation={evaluation}
                 activeSymbol={activeSymbol}
