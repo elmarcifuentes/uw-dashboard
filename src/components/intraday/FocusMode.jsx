@@ -86,7 +86,7 @@ export default function FocusMode({
     : 'bg-bg-card border-border-subtle'
 
   return (
-    <div className="fixed inset-0 bg-bg-base z-50 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-bg-base z-[100] flex flex-col overflow-hidden">
 
       {/* Row 1 — Live bar */}
       <div className="border-b border-border-subtle bg-bg-subtle px-4 py-2.5 flex items-center gap-4 flex-wrap">

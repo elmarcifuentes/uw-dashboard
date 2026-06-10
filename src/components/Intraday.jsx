@@ -353,7 +353,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
 
           {/* Sub-tab content */}
           <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
-            {subTab === 0 && <>
+            {subTab === 0 && !focusMode && <>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
               <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} expansionGex={expansionGex} />
             </>}
