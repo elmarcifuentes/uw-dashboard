@@ -72,8 +72,8 @@ export function evaluateHoldExit(trade, levels, currentPrice, cascade, dpHistory
   const exitConditions = []
   exitConditions.push(
     isShort
-      ? `Price reclaims ${stop.toFixed(2)}`
-      : `Price breaks below ${stop.toFixed(2)}`
+      ? `Price reclaims $${stop.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : `Price breaks below $${stop.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   )
   if (isShort && midDp < -0.300) {
     exitConditions.push('MID DP recovers above -0.300')

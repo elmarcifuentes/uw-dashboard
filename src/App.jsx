@@ -74,12 +74,12 @@ function AppInner() {
           {activeTab === 'Scout'        && <ScoutTab activeSymbol={activeSymbol} onEnterTrade={(t) => { setPendingTrade(t); setActiveTab('Intraday') }} />}
           {activeTab === 'Pre-Session'  && <PreSession assistantRead={assistantRead} activeSymbol={activeSymbol} />}
           {activeTab === 'Intraday'     && <Intraday activeSymbol={activeSymbol} activeTrade={activeTrade} setActiveTrade={setActiveTrade} pendingTrade={pendingTrade} onPendingTradeConsumed={() => setPendingTrade(null)} />}
-          {activeTab === 'Post-Session' && <PostSession />}
+          {activeTab === 'Post-Session' && <PostSession activeSymbol={activeSymbol} nqRatio={nqRatio} />}
           {activeTab === 'News'         && <NewsTab />}
           {activeTab === 'Levels'       && <LevelsTab />}
           {activeTab === 'Controls'     && <ControlsTab systemPaused={systemPaused} pausedAt={pausedAt} />}
           {activeTab === 'Guide'        && <GuideTab />}
-          {activeTab === 'Labs'         && <LabsDashboard />}
+          {activeTab === 'Labs'         && <LabsDashboard activeSymbol={activeSymbol} />}
         </div>
       </main>
 

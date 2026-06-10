@@ -1,8 +1,19 @@
 import { calculateTradeSetup } from '../../utils/tradeSetup'
 
-export default function TradeSetupCard({ level, allLevels, currentPrice, nqRatio }) {
+export default function TradeSetupCard({ level, allLevels, currentPrice, nqRatio, activeSymbol = 'QQQ' }) {
   const setup = calculateTradeSetup(level, allLevels, currentPrice, nqRatio)
   if (!setup) return null
+
+  const isNQ = activeSymbol === 'NQ'
+
+  const fmtPrice = (qqq, nq) => {
+    if (isNQ) {
+      const val = nq ?? (qqq != null && nqRatio ? Math.round(qqq * nqRatio * 4) / 4 : null)
+      if (val == null) return '—'
+      return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
+    return qqq != null ? `$${qqq.toFixed(2)}` : '—'
+  }
 
   const rrColor     = setup.quality === 'excellent' ? 'text-green-400' : setup.quality === 'good' ? 'text-green-500' : setup.quality === 'acceptable' ? 'text-amber-400' : 'text-red-400'
   const dirColor    = setup.direction === 'short' ? 'text-red-400' : 'text-green-400'
@@ -28,22 +39,19 @@ export default function TradeSetupCard({ level, allLevels, currentPrice, nqRatio
       <div className="grid grid-cols-3 gap-3 mb-3">
         <div className="bg-gray-900/50 rounded p-2">
           <div className="text-xs text-gray-600 mb-1">Entry</div>
-          <div className="text-sm font-mono font-bold text-white">${setup.entry.qqq?.toFixed(2)}</div>
-          {setup.entry.nq && <div className="text-xs text-gray-500 font-mono">NQ {setup.entry.nq.toLocaleString()}</div>}
+          <div className="text-sm font-mono font-bold text-white">{fmtPrice(setup.entry.qqq, setup.entry.nq)}</div>
           <div className="text-xs text-gray-700 mt-0.5">{setup.entry.level}</div>
         </div>
 
         <div className="bg-green-950/30 border border-green-900/30 rounded p-2">
           <div className="text-xs text-gray-600 mb-1">Target</div>
-          <div className="text-sm font-mono font-bold text-green-400">${setup.target.qqq?.toFixed(2)}</div>
-          {setup.target.nq && <div className="text-xs text-green-600 font-mono">NQ {setup.target.nq.toLocaleString()}</div>}
+          <div className="text-sm font-mono font-bold text-green-400">{fmtPrice(setup.target.qqq, setup.target.nq)}</div>
           <div className="text-xs text-gray-700 mt-0.5">{setup.target.level}</div>
         </div>
 
         <div className="bg-red-950/30 border border-red-900/30 rounded p-2">
           <div className="text-xs text-gray-600 mb-1">Stop</div>
-          <div className="text-sm font-mono font-bold text-red-400">${setup.stop.qqq?.toFixed(2)}</div>
-          {setup.stop.nq && <div className="text-xs text-red-600 font-mono">NQ {setup.stop.nq.toLocaleString()}</div>}
+          <div className="text-sm font-mono font-bold text-red-400">{fmtPrice(setup.stop.qqq, setup.stop.nq)}</div>
         </div>
       </div>
 
@@ -51,13 +59,13 @@ export default function TradeSetupCard({ level, allLevels, currentPrice, nqRatio
         <div>
           <span className="text-gray-600">Move </span>
           <span className="text-white font-mono">
-            ${setup.move.qqq}{setup.move.nq ? ` / ${setup.move.nq} NQ` : ''}
+            {isNQ ? `${setup.move.nq ?? '—'} pts` : `$${setup.move.qqq}`}
           </span>
         </div>
         <div>
           <span className="text-gray-600">Risk </span>
           <span className="text-white font-mono">
-            ${setup.risk.qqq}{setup.risk.nq ? ` / ${setup.risk.nq} NQ` : ''}
+            {isNQ ? `${setup.risk.nq ?? '—'} pts` : `$${setup.risk.qqq}`}
           </span>
         </div>
       </div>

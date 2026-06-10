@@ -11,7 +11,7 @@ const INTERVALS = [
   { value: '15m', label: '15 min' },
 ]
 
-export default function LabsDashboard() {
+export default function LabsDashboard({ activeSymbol = 'QQQ' }) {
   const [autoLevels, setAutoLevels]     = useState(null)
   const [loading, setLoading]           = useState(true)
   const [applying, setApplying]         = useState(null)
@@ -191,6 +191,7 @@ export default function LabsDashboard() {
               currentPrice={currentPrice}
               nqRatio={nqRatio}
               activeSource={activeSource}
+              activeSymbol={activeSymbol}
             />
             <LevelComparison
               autoLevels={levels}
@@ -200,6 +201,8 @@ export default function LabsDashboard() {
               interval={settings.interval}
               onApply={() => handleApply(activeSource)}
               applying={applying === activeSource}
+              activeSymbol={activeSymbol}
+              nqRatio={nqRatio}
             />
           </div>
 
@@ -244,6 +247,7 @@ export default function LabsDashboard() {
                     allLevels={scoredLevels}
                     currentPrice={currentPrice}
                     nqRatio={nqRatio}
+                    activeSymbol={activeSymbol}
                   />
                 ))
               }

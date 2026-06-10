@@ -1,8 +1,15 @@
-export default function HeatmapView({ levels, currentPrice, nqRatio, activeSource }) {
+export default function HeatmapView({ levels, currentPrice, nqRatio, activeSource, activeSymbol = 'QQQ' }) {
   if (!levels) return null
 
-  const isNQ = activeSource === 'nq'
-  const p    = (v) => isNQ ? v?.toLocaleString() : `$${v?.toFixed(2)}`
+  const showNQ = activeSymbol === 'NQ' || activeSource === 'nq'
+  const p = (v) => {
+    if (v == null) return '—'
+    if (showNQ) {
+      const val = activeSource === 'nq' ? v : Math.round(v * (nqRatio || 41.14) * 4) / 4
+      return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
+    return `$${v.toFixed(2)}`
+  }
 
   const step    = levels.holdAtr / 4
   const gridMin = levels.S2 - levels.holdAtr

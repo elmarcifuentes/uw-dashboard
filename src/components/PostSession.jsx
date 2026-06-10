@@ -49,7 +49,7 @@ function getEventStyle(eventType) {
 
 const KEY_EVENTS = new Set(['cascade_fired', 'cascade_resolved', 'structure_break', 'expansion_gex', 'level_cross'])
 
-function SessionTimeline({ events }) {
+function SessionTimeline({ events, activeSymbol, nqRatio }) {
   const [selected, setSelected] = useState(null)
 
   return (
@@ -85,11 +85,11 @@ function SessionTimeline({ events }) {
                 {style.label}
               </span>
               <span className="text-xs text-gray-500 truncate">
-                {event.description || event.detail || (event.price != null ? `$${Number(event.price).toFixed(2)}` : '')}
+                {event.description || event.detail || (event.price != null ? fmtSessionPrice(Number(event.price), activeSymbol, nqRatio) : '')}
               </span>
               {event.price != null && (
                 <span className="text-xs text-gray-600 font-mono shrink-0 ml-auto">
-                  ${Number(event.price).toFixed(2)}
+                  {fmtSessionPrice(Number(event.price), activeSymbol, nqRatio)}
                 </span>
               )}
             </div>
@@ -117,7 +117,16 @@ function SessionTimeline({ events }) {
   )
 }
 
-export default function PostSession() {
+function fmtSessionPrice(qqqPrice, activeSymbol, nqRatio) {
+  if (qqqPrice == null) return '—'
+  if (activeSymbol === 'NQ' && nqRatio) {
+    const nq = Math.round(qqqPrice * nqRatio * 4) / 4
+    return '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+  return '$' + Number(qqqPrice).toFixed(2)
+}
+
+export default function PostSession({ activeSymbol = 'QQQ', nqRatio = null }) {
   const [sessions, setSessions]       = useState([])
   const [selectedDate, setSelectedDate] = useState(null)
   const [story, setStory]             = useState(null)
@@ -206,15 +215,15 @@ export default function PostSession() {
             <div className="bg-gray-900/60 rounded border border-gray-700 p-3">
               <div className="text-xs text-gray-500 mb-1">Price Range</div>
               <div className="font-mono text-sm">
-                <span className="text-white">${story.session.session_low?.toFixed(2)}</span>
+                <span className="text-white">{fmtSessionPrice(story.session.session_low, activeSymbol, nqRatio)}</span>
                 <span className="text-gray-500 mx-1">—</span>
-                <span className="text-white">${story.session.session_high?.toFixed(2)}</span>
+                <span className="text-white">{fmtSessionPrice(story.session.session_high, activeSymbol, nqRatio)}</span>
               </div>
               <div className="text-xs mt-1 font-mono">
                 <span className="text-gray-500">Open </span>
-                <span className="text-white">${story.session.open_price?.toFixed(2)}</span>
+                <span className="text-white">{fmtSessionPrice(story.session.open_price, activeSymbol, nqRatio)}</span>
                 <span className="text-gray-500 mx-1">→ Close </span>
-                <span className="text-white">{story.session.close_price != null ? `$${story.session.close_price.toFixed(2)}` : '—'}</span>
+                <span className="text-white">{fmtSessionPrice(story.session.close_price, activeSymbol, nqRatio)}</span>
               </div>
             </div>
 
@@ -256,8 +265,8 @@ export default function PostSession() {
                   <div className="text-red-400 text-sm font-bold mb-1">⚠ Cascade Fired</div>
                   {(story.cascade_events || []).map((ce, i) => (
                     <div key={i} className="text-xs text-gray-400 font-mono pl-2 space-y-0.5">
-                      <div>Fired:    <span className="text-white">${ce.price_at_fire?.toFixed(2) ?? '—'}</span></div>
-                      <div>Resolved: <span className="text-white">{ce.price_at_resolve != null ? `$${ce.price_at_resolve.toFixed(2)}` : '—'}</span></div>
+                      <div>Fired:    <span className="text-white">{fmtSessionPrice(ce.price_at_fire, activeSymbol, nqRatio)}</span></div>
+                      <div>Resolved: <span className="text-white">{fmtSessionPrice(ce.price_at_resolve, activeSymbol, nqRatio)}</span></div>
                       <div>Drawdown: <span className="text-amber-400">{ce.drawdown != null ? `$${ce.drawdown}` : '—'}</span></div>
                       <div className="flex gap-3 mt-0.5">
                         <span className={ce.reached_s1 ? 'text-red-400' : 'text-gray-600'}>S1 {ce.reached_s1 ? '✓' : '✗'}</span>
@@ -393,7 +402,7 @@ export default function PostSession() {
           )}
 
           {story.timeline?.length > 0 && (
-            <SessionTimeline events={story.timeline} />
+            <SessionTimeline events={story.timeline} activeSymbol={activeSymbol} nqRatio={nqRatio} />
           )}
         </>
       )}

@@ -1,5 +1,6 @@
 import { calculateTradeSetup } from '../../utils/tradeSetup'
 import { stripMarkdown } from '../../utils/stripMarkdown'
+import { formatNarrative } from '../../utils/formatNarrative'
 
 export default function LevelPlanCard({
   level, allLevels, currentPrice, nqRatio,
@@ -11,7 +12,7 @@ export default function LevelPlanCard({
   const r     = nqRatio || 41.14
 
   const fmt = (qqq, nq) => isNQ
-    ? (nq ?? Math.round(qqq * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })
+    ? '$' + (nq ?? Math.round(qqq * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : `$${qqq?.toFixed(2)}`
 
   const classColor = {
@@ -140,7 +141,7 @@ export default function LevelPlanCard({
       {narrative && (
         <div className="border-t border-gray-800 pt-3">
           <div className="text-xs text-purple-500 mb-1">🤖 Analysis</div>
-          <p className="text-xs text-gray-400 leading-relaxed">{stripMarkdown(narrative)}</p>
+          <p className="text-xs text-gray-400 leading-relaxed">{formatNarrative(stripMarkdown(narrative), activeSymbol)}</p>
         </div>
       )}
     </div>

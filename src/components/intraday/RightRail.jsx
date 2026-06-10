@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import DpSparkline from '../DpSparkline'
 import { stripMarkdown } from '../../utils/stripMarkdown'
+import { formatNarrative } from '../../utils/formatNarrative'
 import { calcPnL } from '../../utils/pnl'
 import { evaluateHoldExit } from '../../utils/holdExit'
 import ActiveTradePanel from '../trade/ActiveTradePanel'
@@ -220,18 +221,21 @@ export default function RightRail({
             {activeLevelData ? (
               <div className="space-y-2">
                 <div className="flex justify-between items-baseline">
-                  <span className="text-sm font-bold text-white">
-                    ${activeLevelData.price?.toFixed(2)}
-                    {nqRatio && (
-                      <span className="text-xs text-gray-500 ml-1">
-                        NQ {Math.round(activeLevelData.price * nqRatio).toLocaleString()}
-                      </span>
-                    )}
+                  <span className="text-sm font-bold text-white font-mono">
+                    {activeSymbol === 'NQ' && nqRatio
+                      ? '$' + (Math.round(activeLevelData.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : '$' + (activeLevelData.price?.toFixed(2) ?? '—')}
                   </span>
                   {currentPrice != null && (
                     <span className="text-xs font-mono text-gray-400">
-                      {(currentPrice - activeLevelData.price) >= 0 ? '+' : ''}
-                      {(currentPrice - activeLevelData.price).toFixed(2)}
+                      {(() => {
+                        const rawDist = currentPrice - activeLevelData.price
+                        const sign = rawDist >= 0 ? '+' : '-'
+                        const val = activeSymbol === 'NQ' && nqRatio
+                          ? Math.round(Math.abs(rawDist) * nqRatio * 4) / 4
+                          : Math.abs(rawDist)
+                        return `${sign}$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      })()}
                     </span>
                   )}
                 </div>
@@ -308,7 +312,7 @@ export default function RightRail({
                 {levelNarratives?.[activeLevelData.id] && (
                   <div className="border-t border-gray-800 pt-2 mt-1">
                     <p className={`text-xs text-gray-300 leading-relaxed italic border-l-2 border-purple-900 pl-2 ${narrativeExpanded ? '' : 'line-clamp-4'}`}>
-                      {stripMarkdown(levelNarratives[activeLevelData.id])}
+                      {formatNarrative(stripMarkdown(levelNarratives[activeLevelData.id]), activeSymbol)}
                     </p>
                     {levelNarratives[activeLevelData.id].length > 300 && (
                       <button

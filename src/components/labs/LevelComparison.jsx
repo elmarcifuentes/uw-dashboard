@@ -1,10 +1,18 @@
 export default function LevelComparison({
-  autoLevels, currentLevels, activeSource, lastCalculated, interval, onApply, applying
+  autoLevels, currentLevels, activeSource, lastCalculated, interval, onApply, applying,
+  activeSymbol = 'QQQ', nqRatio,
 }) {
   const isNQ     = activeSource === 'nq'
   const levelIds = ['R2', 'R1', 'MID', 'S1', 'S2']
 
-  const fmt = (v) => isNQ ? v?.toLocaleString() : `$${v?.toFixed(2)}`
+  const fmt = (v) => {
+    if (v == null) return '—'
+    if (isNQ || activeSymbol === 'NQ') {
+      const val = isNQ ? v : Math.round(v * (nqRatio || 41.14) * 4) / 4
+      return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
+    return `$${v.toFixed(2)}`
+  }
 
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-lg p-4">
@@ -68,7 +76,7 @@ export default function LevelComparison({
       <div className="mt-3 pt-3 border-t border-gray-800 space-y-1.5">
         <div className="text-xs text-gray-600">
           Predictive Ranges · {interval || autoLevels.interval || '1d'} bars · length=200 factor=6.0
-          · {isNQ ? 'NQ' : 'QQQ'} · ATR {isNQ ? autoLevels.atr?.toFixed(0) : `$${autoLevels.atr?.toFixed(2)}`}
+          · {isNQ || activeSymbol === 'NQ' ? 'NQ' : 'QQQ'} · ATR {fmt(autoLevels.atr)}
         </div>
         {autoLevels?.source === 'derived_from_qqq' && (
           <div className="text-xs text-amber-600 flex items-center gap-1">
