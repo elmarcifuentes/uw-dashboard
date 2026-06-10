@@ -94,8 +94,8 @@ if (!process.env.NARRATIVE_MODE) {
 }
 console.log('[server] Narrative mode initialized:', narrativeMode, `(${narrativeModeSource})`)
 
-// Level source mode: 'auto' | 'auto_qqq' | 'manual'
-let levelSourceMode = 'auto'
+// Level source mode: 'auto' | 'auto_qqq' | 'auto_nq' | 'manual'
+let levelSourceMode = 'auto_nq'
 try {
   const saved = db.prepare(`SELECT value FROM settings WHERE key = 'level_source_mode'`).get()
   if (saved?.value) {

@@ -174,6 +174,21 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
   const [calculating, setCalculating]           = useState(false)
   const [scoring, setScoring]                   = useState(false)
   const [nqPreview, setNqPreview]               = useState(null)
+  const [ratioInput, setRatioInput]             = useState('')
+  const [ratioPreview, setRatioPreview]         = useState(null)
+
+  const calcRatioPreview = (value) => {
+    const r = parseFloat(value)
+    if (!r || isNaN(r)) return null
+    const nq = previewLevels?.nq
+    if (!nq) return null
+    const cur = sessionRatio || 41.14
+    return {
+      ratio: r,
+      levels:  { R2: (nq.R2/r).toFixed(2), R1: (nq.R1/r).toFixed(2), MID: (nq.MID/r).toFixed(2), S1: (nq.S1/r).toFixed(2), S2: (nq.S2/r).toFixed(2) },
+      current: { R2: (nq.R2/cur).toFixed(2), R1: (nq.R1/cur).toFixed(2), MID: (nq.MID/cur).toFixed(2), S1: (nq.S1/cur).toFixed(2), S2: (nq.S2/cur).toFixed(2) },
+    }
+  }
 
   useEffect(() => {
     fetch(`${API_URL}/levels`)
@@ -652,24 +667,75 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                   <span>yesterday · updates at 9:30 AM ET</span>
                 </div>
               )}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-text-tertiary shrink-0">Manual override</span>
-                <input
-                  type="number"
-                  placeholder={sessionRatio || ratio?.toFixed(3) || '41.14'}
-                  step="0.001"
-                  className="bg-bg-elevated text-text-primary font-mono text-xs rounded px-2 py-1 border border-border-strong focus:border-emerald-500 focus:outline-none w-28"
-                  onBlur={e => {
-                    if (!e.target.value) return
-                    fetch(`${API_URL}/ratio/lock`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ratio: parseFloat(e.target.value) })
-                    }).catch(() => {})
-                    e.target.value = ''
-                  }}
-                />
-                <span className="text-xs text-text-disabled">locks immediately</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-tertiary shrink-0">Override ratio</span>
+                  <input
+                    type="number"
+                    value={ratioInput}
+                    placeholder={sessionRatio?.toFixed(4) || '41.1420'}
+                    step="0.001"
+                    onChange={e => {
+                      setRatioInput(e.target.value)
+                      setRatioPreview(calcRatioPreview(e.target.value))
+                    }}
+                    className="bg-bg-elevated text-text-primary font-mono text-xs rounded px-2 py-1 border border-border-default focus:border-emerald-500 focus:outline-none w-28"
+                  />
+                  {ratioInput && (
+                    <button
+                      onClick={() => { setRatioInput(''); setRatioPreview(null) }}
+                      className="text-xs text-text-disabled hover:text-text-muted leading-none"
+                    >✕</button>
+                  )}
+                </div>
+
+                {ratioPreview && (
+                  <div className="bg-bg-elevated border border-accent-ai/30 rounded-lg p-3 space-y-2">
+                    <div className="text-xs font-bold text-accent-ai uppercase tracking-wider">
+                      Preview · Ratio {ratioPreview.ratio.toFixed(4)}
+                    </div>
+                    <div className="space-y-1">
+                      {['R2','R1','MID','S1','S2'].map(id => {
+                        const nv = ratioPreview.levels[id]
+                        const cv = ratioPreview.current[id]
+                        const d  = (parseFloat(nv) - parseFloat(cv)).toFixed(2)
+                        const moved = Math.abs(parseFloat(d)) > 0.01
+                        return (
+                          <div key={id} className="flex items-center justify-between text-xs">
+                            <span className={`font-bold w-8 ${id === 'MID' ? 'text-yellow-400' : id[0] === 'R' ? 'text-red-400' : 'text-blue-400'}`}>{id}</span>
+                            <span className="font-mono text-text-primary">${nv}</span>
+                            <span className="font-mono text-text-muted w-16 text-right">was ${cv}</span>
+                            <span className={`font-mono w-14 text-right ${!moved ? 'text-text-disabled' : parseFloat(d) > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {moved ? `${parseFloat(d) > 0 ? '+' : ''}${d}` : '—'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="flex gap-2 pt-1 border-t border-border-subtle">
+                      <button
+                        onClick={async () => {
+                          await fetch(`${API_URL}/ratio/lock`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ratio: ratioPreview.ratio })
+                          }).catch(() => {})
+                          setRatioInput('')
+                          setRatioPreview(null)
+                        }}
+                        className="flex-1 py-1.5 rounded text-xs font-bold bg-state-holdSoft text-state-hold hover:bg-green-700 hover:text-white transition-colors"
+                      >
+                        ✓ Accept
+                      </button>
+                      <button
+                        onClick={() => { setRatioInput(''); setRatioPreview(null) }}
+                        className="flex-1 py-1.5 rounded text-xs font-bold bg-bg-card2 text-text-muted hover:text-text-secondary transition-colors"
+                      >
+                        ✕ Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <AutoScoreToggle enabled={autoScoreEnabled} onToggle={handleAutoScoreToggle} />
             </div>
