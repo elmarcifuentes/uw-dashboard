@@ -75,7 +75,7 @@ function AppInner() {
           {activeTab === 'Pre-Session'  && <PreSession assistantRead={assistantRead} activeSymbol={activeSymbol} />}
           {activeTab === 'Intraday'     && <Intraday activeSymbol={activeSymbol} activeTrade={activeTrade} setActiveTrades={setActiveTrades} pendingTrade={pendingTrade} onPendingTradeConsumed={() => setPendingTrade(null)} />}
           {activeTab === 'Post-Session' && <PostSession activeSymbol={activeSymbol} nqRatio={nqRatio} />}
-          {activeTab === 'News'         && <NewsTab activeSymbol={activeSymbol} />}
+          {activeTab === 'News'         && <NewsTab />}
           {activeTab === 'Catalyst'     && (
             <CatalystTab
               levels={result?.levels}
