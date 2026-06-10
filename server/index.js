@@ -135,6 +135,16 @@ try {
   } catch { /* settings table may not exist on first boot */ }
 }
 
+// Active symbol preference — synced from frontend
+let activeSymbolPref = 'NQ'
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'active_symbol'`).get()
+  if (saved?.value) {
+    activeSymbolPref = saved.value
+    console.log('[settings] active symbol restored:', activeSymbolPref)
+  }
+} catch {}
+
 // Trade log table
 db.exec(`
   CREATE TABLE IF NOT EXISTS trade_log (
@@ -200,19 +210,14 @@ async function generateSessionBrief(result) {
   const cascade      = result?.cascade
   const mid          = levels.find(l => l.id === 'MID')
 
-  const levelSummary = levels.map(l => {
-    const nq    = nqRatio ? Math.round(l.price * nqRatio) : null
-    const nqStr = nq ? ` (NQ ${nq.toLocaleString()})` : ''
-    return `${l.id}: $${l.price?.toFixed(2)}${nqStr} — ` +
-      `${l.classification} | DP ${l.dark_pool?.toFixed(3)} | score ${l.score} | conf ${l.confidence}` +
-      `${l.full_stack ? ' | FULL STACK ★' : ''}` +
-      `${(l.net_gex || 0) < 0 ? ' | EXPANSION GEX ⚠' : ''}`
-  }).join('\n')
+  const levelSummary = levels.map(l =>
+    `${l.id}: ${fmtForSymbol(l.price, nqRatio)} — ` +
+    `${l.classification} | DP ${l.dark_pool?.toFixed(3)} | score ${l.score} | conf ${l.confidence}` +
+    `${l.full_stack ? ' | FULL STACK ★' : ''}` +
+    `${(l.net_gex || 0) < 0 ? ' | EXPANSION GEX ⚠' : ''}`
+  ).join('\n')
 
-  const currentNq  = nqRatio ? Math.round(currentPrice * nqRatio) : null
-  const currentStr = currentNq
-    ? `$${currentPrice?.toFixed(2)} (NQ ${currentNq.toLocaleString()})`
-    : `$${currentPrice?.toFixed(2)}`
+  const currentStr = fmtForSymbol(currentPrice, nqRatio)
 
   const cascadeStr = cascade?.active
     ? 'CASCADE ACTIVE ⚠ — no institutional floor below MID'
@@ -220,7 +225,7 @@ async function generateSessionBrief(result) {
     ? `Cascade armed — MID DP ${mid?.dark_pool?.toFixed(3)}, ${Math.abs(-0.700 - (mid?.dark_pool || 0)).toFixed(3)} from trigger`
     : 'Cascade inactive'
 
-  const sessionPrompt = `You are a professional QQQ/NQ futures trading analyst preparing a pre-session brief.
+  const sessionPrompt = `You are a professional ${activeSymbolPref} trading analyst preparing a pre-session brief.
 
 CURRENT MARKET STATE:
 Price: ${currentStr}
@@ -236,13 +241,13 @@ ETF TIDE: ${result?.etf_tide?.direction || 'unknown'}
 Write EXACTLY 3 sentences. No more than 3 sentences total. Each sentence max 25 words.
 Sentence 1: Overall structure — dominant level and why (include DP value).
 Sentence 2: Primary risk — cascade threshold or key level with exact gap.
-Sentence 3: Key thresholds — specific prices QQQ (NQ) to watch.
+Sentence 3: Key thresholds — specific prices to watch.
 
-Every price must include NQ in parentheses: $703.54 (NQ 28,945).
+Use ONLY ${activeSymbolPref} prices. Do NOT include QQQ/NQ cross-references in parentheses.
 Cascade fires when MID dark pool crosses -0.700 only. No bullets, no headers.
 CRITICAL: Return ONLY 3 sentences. Stop after the third sentence.`
 
-  const tacticalPrompt = `You are analyzing live QQQ/NQ futures flow.
+  const tacticalPrompt = `You are analyzing live ${activeSymbolPref} futures flow.
 
 CURRENT STATE: Price ${currentStr}
 LEVELS:\n${levelSummary}
@@ -252,7 +257,7 @@ Write exactly 2 sentences:
 1. Where price is right now relative to the most important level
 2. The single most important thing to watch next
 
-Include NQ prices in parentheses. Be specific with DP values. Max 2 sentences.
+Use ${activeSymbolPref} prices only — no cross-reference prices in parentheses. Be specific with DP values. Max 2 sentences.
 Return ONLY the 2 sentences.`
 
   try {
@@ -313,6 +318,16 @@ function formatPrice(qqq, nqRatio) {
   return nq ? `$${qqq?.toFixed(2)} (NQ ${nq.toLocaleString()})` : `$${qqq?.toFixed(2)}`
 }
 
+// Format a QQQ price in the active symbol's native units
+function fmtForSymbol(qqqPrice, nqRatio) {
+  if (qqqPrice == null) return '—'
+  if (activeSymbolPref === 'NQ' && nqRatio) {
+    const nq = Math.round(qqqPrice * nqRatio * 4) / 4
+    return '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+  return '$' + qqqPrice.toFixed(2)
+}
+
 async function generateLevelNarratives(result) {
   if (narrativeMode !== 'claude') return {}
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -339,15 +354,19 @@ async function generateLevelNarratives(result) {
     const above    = distQqq != null ? parseFloat(distQqq) > 0 : null
 
     const otherLevels = levels.filter(l => l.id !== level.id).map(l =>
-      `${l.id}: ${formatPrice(l.price, nqRatio)} — ${l.classification} (DP ${l.dark_pool?.toFixed(3)}, score ${l.score})`
+      `${l.id}: ${fmtForSymbol(l.price, nqRatio)} — ${l.classification} (DP ${l.dark_pool?.toFixed(3)}, score ${l.score})`
     ).join('\n')
 
-    const prompt = `You are a professional QQQ/NQ futures trading analyst.
+    const distStr = distQqq != null
+      ? `${above ? '+' : '-'}${fmtForSymbol(Math.abs(distQqq), nqRatio ? 1 / nqRatio * nqRatio : null)} ${above ? 'above' : 'below'} this level`
+      : ''
+
+    const prompt = `You are a professional ${activeSymbolPref} trading analyst.
 
 Analyze this specific level and provide actionable trading guidance.
 
 CURRENT LEVEL — ${level.id}:
-  Price: ${formatPrice(level.price, nqRatio)}
+  Price: ${fmtForSymbol(level.price, nqRatio)}
   Classification: ${level.classification}
   Confidence: ${level.confidence}
   Score: ${level.score}
@@ -356,9 +375,7 @@ CURRENT LEVEL — ${level.id}:
   ETF Direction: ${level.etf_direction || 'none'}
   ${(level.net_gex || 0) < 0 ? '⚠ EXPANSION GEX — no mechanical friction' : 'GEX pinning active'}
 
-CURRENT PRICE:
-  ${currentPrice ? `QQQ: $${currentPrice.toFixed(2)}` : ''}
-  ${distNq ? `${above ? '+' : '-'}$${Math.abs(distQqq)} / ${distNq} NQ ${above ? 'above' : 'below'} this level` : ''}
+CURRENT PRICE: ${fmtForSymbol(currentPrice, nqRatio)} ${distStr}
 
 OTHER LEVELS:
 ${otherLevels}
@@ -367,7 +384,7 @@ CASCADE: ${cascade?.active ? 'ACTIVE ⚠' : cascade?.conditions?.[0] ? 'ARMED (c
 STRUCTURE BREAK: ${result?.structure_break?.active ? 'ACTIVE — ' + result.structure_break.direction : 'intact'}
 
 Write 3-4 sentences: what the classification/DP means, what to watch for, retest scenario, target on confirmation.
-Always include NQ price in parentheses: $703.54 (NQ 28,945).
+Use ONLY ${activeSymbolPref} prices — no QQQ/NQ cross-references in parentheses.
 Plain English, no bullets. Return ONLY the analysis text.`
 
     try {
@@ -450,20 +467,19 @@ async function generateAssistantRead(result) {
   const cascade      = result?.cascade
   const mid          = levels.find(l => l.id === 'MID')
 
-  const levelSummary = levels.map(l => {
-    const nq = nqRatio ? ` (NQ ${Math.round(l.price * nqRatio).toLocaleString()})` : ''
-    return `${l.id} $${l.price?.toFixed(2)}${nq} — ${l.classification} DP ${l.dark_pool?.toFixed(3)}${l.full_stack ? ' FULL STACK ★' : ''}`
-  }).join('\n')
+  const levelSummary = levels.map(l =>
+    `${l.id} ${fmtForSymbol(l.price, nqRatio)} — ${l.classification} DP ${l.dark_pool?.toFixed(3)}${l.full_stack ? ' FULL STACK ★' : ''}`
+  ).join('\n')
 
-  const currentNq = nqRatio ? Math.round(currentPrice * nqRatio).toLocaleString() : '—'
   const cascadeStr = cascade?.active ? 'ACTIVE' : mid?.dark_pool <= -0.700 ? 'threshold met' : `${Math.abs(-0.700 - (mid?.dark_pool || 0)).toFixed(3)} from trigger`
 
-  const prompt = `Analyze this QQQ/NQ scoring result.
+  const prompt = `Analyze this ${activeSymbolPref} scoring result.
 
-Price: $${currentPrice?.toFixed(2)} (NQ ${currentNq})
+Price: ${fmtForSymbol(currentPrice, nqRatio)}
 Levels: ${levelSummary}
 Cascade: ${cascadeStr}
 
+Use ONLY ${activeSymbolPref} prices. No QQQ/NQ cross-reference prices.
 Return ONLY this JSON. Each value MAX 10 words.
 No markdown. No explanation.
 
@@ -534,7 +550,7 @@ async function generateNarrativeForMode(result, dpHist) {
     return generateNarrative(result, dpHist)
   }
 
-  const prompt = `You are analyzing live QQQ institutional flow data.
+  const prompt = `You are analyzing live ${activeSymbolPref} institutional flow data.
 
 Current scoring result:
 ${JSON.stringify(result, null, 2)}
@@ -547,6 +563,7 @@ Write a 3-4 sentence trading narrative that covers:
 
 Rules:
 - Be specific with prices and level IDs
+- Use ONLY ${activeSymbolPref} prices — no QQQ/NQ cross-references in parentheses
 - Mention dark pool values when significant (±0.500+)
 - Flag cascade if MID dark pool approaching -0.700
 - Flag FULL STACK ★ if any level shows it
@@ -1167,6 +1184,7 @@ app.get('/status', (req, res) => {
     levelSourceMode,
     nqOffsets,
     autoScoreEnabled,
+    activeSymbolPref,
   })
 })
 
@@ -1243,6 +1261,27 @@ app.post('/narrative-mode', async (req, res) => {
       })
       .catch(err => console.warn('[narrative] immediate generation failed:', err.message))
   }
+})
+
+app.post('/settings/symbol', async (req, res) => {
+  const { symbol } = req.body
+  if (!['NQ', 'QQQ'].includes(symbol)) {
+    return res.status(400).json({ error: 'Invalid symbol — use NQ|QQQ' })
+  }
+  activeSymbolPref = symbol
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('active_symbol', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(symbol)
+  // Invalidate all narrative caches so next rescore regenerates with new symbol context
+  lastNarrativeHash        = null
+  lastAssistantReadHash    = null
+  lastLevelNarrativeHashes = {}
+  lastSessionBriefHash     = null
+  console.log('[settings] active symbol set:', symbol)
+  sseEmitter.emit('event', { type: 'symbol_change', symbol, timestamp: new Date().toISOString() })
+  res.json({ success: true, symbol })
 })
 
 app.get('/budget', (req, res) => {
