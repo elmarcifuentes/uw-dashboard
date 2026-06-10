@@ -396,6 +396,26 @@ export default function RightRail({
 
           {activeTrade && (
             <>
+              {evaluation && (
+                <div className={`border rounded-lg px-3 py-2 flex items-center gap-2 ${
+                  evaluation.verdictColor === 'red'   ? 'bg-red-950/40 border-red-800'
+                  : evaluation.verdictColor === 'amber' ? 'bg-amber-950/40 border-amber-800'
+                  : 'bg-green-950/40 border-green-800'
+                }`}>
+                  <span className={`text-sm font-bold ${
+                    evaluation.verdictColor === 'red'   ? 'text-red-400'
+                    : evaluation.verdictColor === 'amber' ? 'text-amber-400'
+                    : 'text-green-400'
+                  }`}>
+                    {evaluation.verdictLabel}
+                  </span>
+                  {pnl && (
+                    <span className={`text-xs font-mono ml-auto ${pnl.isProfit ? 'text-green-400' : 'text-red-400'}`}>
+                      {pnl.dollarsStr}
+                    </span>
+                  )}
+                </div>
+              )}
               <ActiveTradePanel
                 trade={activeTrade}
                 currentPrice={tradeCurrentPrice}

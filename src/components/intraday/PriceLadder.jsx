@@ -122,9 +122,16 @@ const formatTime = (iso) => {
   }) + ' ET'
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel, activeSymbol = 'NQ' }) {
+function getLevelTier(level) {
+  if (level.full_stack || level.confidence === 'high') return 1
+  if (level.classification !== 'no_edge' && ((level.score || 0) >= 60 || level.confidence === 'medium')) return 2
+  return 3
+}
+
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel, activeSymbol = 'NQ', expansionGex = [] }) {
   const [expandedLevel, setExpandedLevel] = useState(null)
   const [flashLevel, setFlashLevel]       = useState(null)
+  const [showGamma, setShowGamma]         = useState(false)
   const prevPriceRef = useRef(currentPrice)
   const sorted = result ? [...result.levels].sort((a, b) => b.price - a.price) : []
 
@@ -167,6 +174,21 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
 
       <StructureBreakBar sb={result.structure_break} currentPrice={cp} nqRatio={nqRatio} activeSymbol={activeSymbol} />
 
+      {expansionGex?.length > 0 && (
+        <div className="flex items-center justify-end px-1 pb-0.5">
+          <button
+            onClick={() => setShowGamma(g => !g)}
+            className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+              showGamma
+                ? 'bg-purple-950 border-purple-700 text-purple-300'
+                : 'bg-gray-900 border-gray-700 text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            γ
+          </button>
+        </div>
+      )}
+
       {/* Price above all levels */}
       {cp != null && !isNaN(cp) && sorted.length > 0 && cp > sorted[0].price && (
         <div className="flex items-center gap-2 px-2 py-1">
@@ -183,6 +205,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
       {sorted.map((level, i) => {
         const nextLevel  = sorted[i + 1]
         const colors     = CLASS_COLORS[level.classification] || CLASS_COLORS.no_edge
+        const tier       = getLevelTier(level)
         const dist       = cp != null ? (cp - level.price) : null
         const distStr    = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
         const nqDist     = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio * 4) / 4 : null
@@ -201,7 +224,8 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           <div className="relative">
           <div
             onClick={() => onSelect?.(level.id)}
-            className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse && level.id === criticalLevel?.id ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''} ${onSelect ? 'cursor-pointer' : ''}`}
+            className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse && level.id === criticalLevel?.id ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-white' : ''} ${onSelect ? 'cursor-pointer' : ''} ${tier === 3 ? 'opacity-60 hover:opacity-100' : ''}`}
+            style={tier === 1 ? { borderLeftWidth: '4px', borderLeftColor: colors.border } : undefined}
           >
             {/* Proximity label */}
             {styles.label && (
@@ -254,28 +278,47 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
               )}
             </div>
 
-            {/* Layer 2 — DP bar (always visible) */}
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-xs text-gray-600 whitespace-nowrap" style={{ minWidth: '64px', flexShrink: 0 }}>Dark Pool</span>
-              <div className="h-1.5 bg-gray-800 rounded relative overflow-hidden" style={{ flex: 1, minWidth: 0 }}>
-                <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700 z-10" />
-                {(() => {
-                  const dp  = level.dark_pool || 0
-                  const pct = ((dp + 1) / 2) * 100
-                  return pct >= 50 ? (
-                    <div className="absolute inset-y-0 left-1/2 bg-green-500" style={{ width: `${(pct - 50) * 2}%` }} />
-                  ) : (
-                    <div className="absolute inset-y-0 right-1/2 bg-red-500" style={{ width: `${(50 - pct) * 2}%` }} />
-                  )
-                })()}
+            {/* Layer 2 — DP bar (hidden for tier 3) */}
+            {tier !== 3 && (
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-xs text-gray-600 whitespace-nowrap" style={{ minWidth: '64px', flexShrink: 0 }}>Dark Pool</span>
+                <div className="h-1.5 bg-gray-800 rounded relative overflow-hidden" style={{ flex: 1, minWidth: 0 }}>
+                  <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700 z-10" />
+                  {(() => {
+                    const dp  = level.dark_pool || 0
+                    const pct = ((dp + 1) / 2) * 100
+                    return pct >= 50 ? (
+                      <div className="absolute inset-y-0 left-1/2 bg-green-500" style={{ width: `${(pct - 50) * 2}%` }} />
+                    ) : (
+                      <div className="absolute inset-y-0 right-1/2 bg-red-500" style={{ width: `${(50 - pct) * 2}%` }} />
+                    )
+                  })()}
+                </div>
+                <span className="text-xs font-mono text-gray-400" style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}>
+                  {level.dark_pool?.toFixed(3)}
+                </span>
               </div>
-              <span className="text-xs font-mono text-gray-400" style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}>
-                {level.dark_pool?.toFixed(3)}
-              </span>
-            </div>
+            )}
 
-            {/* Layer 2 — expand toggle (non-compact only) */}
-            {!compact && (
+            {/* Score bar — tier 1 only */}
+            {tier === 1 && (
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-xs text-gray-600 whitespace-nowrap" style={{ minWidth: '64px', flexShrink: 0 }}>Score</span>
+                <div className="h-1.5 bg-gray-800 rounded overflow-hidden" style={{ flex: 1, minWidth: 0 }}>
+                  <div className={`h-full ${
+                    level.classification === 'sell_resistance' ? 'bg-red-500'
+                      : level.classification === 'buy_support' ? 'bg-green-500'
+                      : 'bg-gray-600'
+                  }`} style={{ width: `${Math.min(level.score || 0, 100)}%` }} />
+                </div>
+                <span className="text-xs font-mono text-gray-400" style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}>
+                  {level.score || 0}/100
+                </span>
+              </div>
+            )}
+
+            {/* Layer 2 — expand toggle (non-compact, non-tier-3 only) */}
+            {!compact && tier !== 3 && (
               <button
                 onClick={(e) => { e.stopPropagation(); setExpandedLevel(expandedLevel === level.id ? null : level.id) }}
                 className="w-full text-center text-xs text-gray-600 hover:text-gray-400 mt-1.5 pt-1.5 border-t border-gray-800/50 transition-colors"
@@ -449,6 +492,30 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
               <div className="flex-1 h-px bg-yellow-400/60" />
             </div>
           )}
+
+          {/* Gamma overlay — between this level and next */}
+          {showGamma && nextLevel && (() => {
+            const gexEntry = expansionGex?.find(g => g.level === nextLevel.id)
+            if (!gexEntry) return null
+            const gexVal = gexEntry.net_gex ?? 0
+            const maxGex = 200000
+            const pct    = Math.min(Math.abs(gexVal) / maxGex * 100, 100)
+            const pos    = gexVal > 0
+            return (
+              <div className="flex items-center gap-2 px-3 py-0.5">
+                <span className="text-xs text-gray-700 font-mono shrink-0 w-5">γ</span>
+                <div className="flex-1 h-1 bg-gray-900 rounded overflow-hidden">
+                  <div
+                    className={`h-full rounded transition-all ${pos ? 'bg-green-600' : 'bg-red-600'}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className={`text-xs font-mono shrink-0 w-8 text-right ${pos ? 'text-green-700' : 'text-red-700'}`}>
+                  {pos ? 'PIN' : 'EXP'}
+                </span>
+              </div>
+            )
+          })()}
           </Fragment>
         )
       })}

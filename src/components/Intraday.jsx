@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSSE } from '../hooks/useSSE'
 import { evaluateHoldExit } from '../utils/holdExit'
+import { calcPnL } from '../utils/pnl'
 import { useLayout } from '../context/LayoutContext'
 import { useAuth } from '../context/AuthContext'
 import PriceLadder from './intraday/PriceLadder'
@@ -51,6 +52,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
   const [selectedLevel, setSelectedLevel] = useState(null)
   const [bottomSheetOpen, setBottomSheetOpen]   = useState(false)
   const [bottomSheetLevel, setBottomSheetLevel] = useState(null)
+  const [expandNarrative, setExpandNarrative]   = useState(false)
 
   const handleLevelSelect = (levelId) => {
     if (window.innerWidth < 768) {
@@ -144,6 +146,18 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
       : null
   , [activeTrade, tradePrice, result?.levels, cascade, dpHistory])
 
+  const tradePnl = useMemo(() =>
+    activeTrade && tradePrice
+      ? calcPnL(
+          activeTrade.direction, activeTrade.entry, tradePrice,
+          activeTrade.instrument || (activeSymbol === 'NQ' ? 'MNQ' : 'QQQ'),
+          activeTrade.contracts || 1
+        )
+      : null
+  , [activeTrade, tradePrice, activeSymbol])
+
+  useEffect(() => { setExpandNarrative(false) }, [activeTrade?.id])
+
   useEffect(() => {
     if (!activeTrade || !tradeEvaluation) return
     const playTone = (freq, duration = 0.5) => {
@@ -203,6 +217,24 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
           nqRatio={nqRatio}
           onExit={() => setFocusMode(false)}
           activeSymbol={activeSymbol}
+          activeTrade={activeTrade}
+          evaluation={tradeEvaluation}
+          pnl={tradePnl}
+          dpHistory={dpHistory}
+          onExitTrade={async (reason) => {
+            try {
+              const res = await fetch(`${API_URL}/trade/exit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol: activeSymbol, exitPrice: currentPrice, exitReason: reason || 'manual' }),
+              })
+              const data = await res.json()
+              if (data.success) {
+                setActiveTrades(prev => ({ ...prev, [activeSymbol]: null }))
+                setFocusMode(false)
+              }
+            } catch (e) { console.warn('[trade] focus exit failed:', e.message) }
+          }}
         />
       )}
 
@@ -273,7 +305,31 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
         {/* Left column */}
         <div className="col-span-12 md:col-span-8 space-y-3">
           <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
-          <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} tacticalBrief={tacticalBrief} activeSymbol={activeSymbol} />
+          {activeTrade && !expandNarrative ? (
+            <div className="border border-gray-800 bg-[#111827] rounded-lg px-3 py-2 flex items-center gap-2">
+              <span className="text-xs text-gray-500 truncate flex-1">
+                {(narrativeMode === 'claude' && tacticalBrief) ? tacticalBrief : narrative?.[0] || 'Narrative paused — trade active'}
+              </span>
+              <button
+                onClick={() => setExpandNarrative(true)}
+                className="text-xs text-gray-600 hover:text-gray-400 shrink-0"
+              >
+                ▼ expand
+              </button>
+            </div>
+          ) : (
+            <>
+              <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} tacticalBrief={tacticalBrief} activeSymbol={activeSymbol} />
+              {activeTrade && expandNarrative && (
+                <button
+                  onClick={() => setExpandNarrative(false)}
+                  className="text-xs text-gray-600 hover:text-gray-400 text-center w-full -mt-1"
+                >
+                  ▲ collapse narrative
+                </button>
+              )}
+            </>
+          )}
 
           {/* Sub-tab navigation — flat underline style */}
           <div className="border-b border-gray-800">
@@ -298,7 +354,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
           <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
             {subTab === 0 && <>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} />
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} expansionGex={expansionGex} />
             </>}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
             {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
