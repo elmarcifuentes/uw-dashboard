@@ -19,7 +19,7 @@ import LevelDetailSheet from './intraday/LevelDetailSheet'
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log']
 
-export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setActiveTrade, pendingTrade = null, onPendingTradeConsumed }) {
+export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setActiveTrades, pendingTrade = null, onPendingTradeConsumed }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
   const {
     rescoreData, priceData, connected,
@@ -318,7 +318,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
             levelNarratives={levelNarratives}
             activeSymbol={activeSymbol}
             activeTrade={activeTrade}
-            setActiveTrade={setActiveTrade}
+            setActiveTrades={setActiveTrades}
             pendingTrade={pendingTrade}
             onPendingTradeConsumed={onPendingTradeConsumed}
             selectedLevel={selectedLevel}

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { getInstrument } from '../../utils/pnl'
 
 export default function TradeEntryForm({
   levels, currentPrice, nqRatio, activeSymbol,
@@ -32,6 +33,31 @@ export default function TradeEntryForm({
       priceUnit:   activeSymbol,
     })
   }
+
+  const preview = useMemo(() => {
+    const e = parseFloat(entry)
+    const t = parseFloat(target)
+    const s = parseFloat(stop)
+    const c = parseInt(contracts) || 1
+    const inst = getInstrument(instrument)
+    if (!e || !t || !s || !inst) return null
+    const riskPoints = Math.abs(e - s)
+    const gainPoints = Math.abs(t - e)
+    if (riskPoints === 0) return null
+    const rr = gainPoints / riskPoints
+    const riskDollars = riskPoints * inst.pointValue * c
+    const gainDollars = gainPoints * inst.pointValue * c
+    const quality = rr >= 3 ? 'excellent' : rr >= 2 ? 'good' : rr >= 1.5 ? 'acceptable' : 'poor'
+    return {
+      riskPoints:  parseFloat(riskPoints.toFixed(2)),
+      gainPoints:  parseFloat(gainPoints.toFixed(2)),
+      riskDollars: parseFloat(riskDollars.toFixed(2)),
+      gainDollars: parseFloat(gainDollars.toFixed(2)),
+      rr:          parseFloat(rr.toFixed(1)),
+      quality,
+      instrument:  inst,
+    }
+  }, [entry, target, stop, contracts, instrument])
 
   const isNQ       = activeSymbol === 'NQ'
   const prefix     = isNQ ? 'NQ ' : '$'
@@ -128,23 +154,70 @@ export default function TradeEntryForm({
           </div>
         </div>
 
-        {/* R:R preview */}
-        {entry && target && stop && (() => {
-          const e = parseFloat(entry), t = parseFloat(target), s = parseFloat(stop)
-          if (!e || !t || !s) return null
-          const move = Math.abs(t - e)
-          const risk = Math.abs(s - e)
-          const rr   = risk > 0 ? (move / risk).toFixed(2) : '—'
-          return (
-            <div className="flex gap-4 text-xs text-gray-500 bg-gray-900/50 rounded px-3 py-2">
-              <span>Move <span className="text-gray-300 font-mono">{move.toFixed(2)}</span></span>
-              <span>Risk <span className="text-gray-300 font-mono">{risk.toFixed(2)}</span></span>
-              <span className={`font-bold font-mono ${parseFloat(rr) >= 2 ? 'text-green-400' : parseFloat(rr) >= 1.5 ? 'text-amber-400' : 'text-red-400'}`}>
-                {rr}:1
+        {/* Trade preview panel */}
+        {preview && (
+          <div className={`border rounded-lg p-3 ${
+            preview.quality === 'excellent' || preview.quality === 'good'
+              ? 'border-green-900/50 bg-green-950/10'
+              : preview.quality === 'acceptable'
+              ? 'border-amber-900/50 bg-amber-950/10'
+              : 'border-red-900/50 bg-red-950/10'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-500 uppercase tracking-wider">Trade Preview</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                preview.quality === 'excellent' ? 'bg-green-900 text-green-300'
+                  : preview.quality === 'good'  ? 'bg-green-900/70 text-green-400'
+                  : preview.quality === 'acceptable' ? 'bg-amber-900 text-amber-300'
+                  : 'bg-red-900 text-red-300'
+              }`}>
+                {preview.rr}:1 R/R
               </span>
             </div>
-          )
-        })()}
+
+            <div className="flex items-center justify-between py-1 border-b border-gray-800">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                <span className="text-xs text-gray-500">Max Loss</span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-red-400 font-mono font-bold">
+                  -${preview.riskDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                {preview.instrument.type === 'futures' && (
+                  <span className="text-xs text-gray-600 font-mono ml-2">{preview.riskPoints} pts</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-1">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                <span className="text-xs text-gray-500">Max Gain</span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-green-400 font-mono font-bold">
+                  +${preview.gainDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                {preview.instrument.type === 'futures' && (
+                  <span className="text-xs text-gray-600 font-mono ml-2">{preview.gainPoints} pts</span>
+                )}
+              </div>
+            </div>
+
+            {contracts > 1 && (
+              <div className="mt-1.5 pt-1.5 border-t border-gray-800">
+                <div className="text-xs text-gray-600">
+                  Per contract: -${(preview.riskDollars / contracts).toFixed(2)} risk · +${(preview.gainDollars / contracts).toFixed(2)} gain
+                </div>
+              </div>
+            )}
+
+            {preview.quality === 'poor' && (
+              <div className="mt-1.5 text-xs text-red-400">⚠ Poor R/R — consider adjusting target or stop</div>
+            )}
+          </div>
+        )}
 
         <button
           type="submit"

@@ -16,7 +16,7 @@ export default function RightRail({
   levels, currentPrice, nqPrice, nqRatio,
   dpHistory, levelNarratives,
   cascade, activeSymbol,
-  activeTrade, setActiveTrade,
+  activeTrade, setActiveTrades,
   pendingTrade, onPendingTradeConsumed,
   selectedLevel,
 }) {
@@ -97,11 +97,11 @@ export default function RightRail({
       const res = await fetch(`${API_URL}/trade/enter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...tradeData, instrument, contracts, symbol: activeSymbol }),
+        body: JSON.stringify({ ...tradeData, instrument, contracts, symbol: activeSymbol, priceUnit: activeSymbol }),
       })
       const data = await res.json()
       if (data.trade) {
-        setActiveTrade(data.trade)
+        setActiveTrades(prev => ({ ...prev, [activeSymbol]: data.trade }))
         setShowEntryForm(false)
         setRailMode('trade')
         onPendingTradeConsumed?.()
@@ -115,11 +115,11 @@ export default function RightRail({
       const res = await fetch(`${API_URL}/trade/exit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exitPrice: currentPrice, exitReason: reason || 'manual' }),
+        body: JSON.stringify({ symbol: activeSymbol, exitPrice: currentPrice, exitReason: reason || 'manual' }),
       })
       const data = await res.json()
       if (data.success) {
-        setActiveTrade(null)
+        setActiveTrades(prev => ({ ...prev, [activeSymbol]: null }))
         setRailMode('evidence')
       }
     } catch (e) { console.warn('[trade] exit failed:', e.message) }

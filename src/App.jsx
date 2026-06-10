@@ -33,7 +33,8 @@ function AppInner() {
   const { activeSymbol, changeSymbol } = useSymbol()
   const [pendingTrade, setPendingTrade] = useState(null)
 
-  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt, activeTrade, setActiveTrade } = useSSE(`${API_URL}/stream`)
+  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt, activeTrades, setActiveTrades } = useSSE(`${API_URL}/stream`)
+  const activeTrade = activeTrades?.[activeSymbol] || null
 
   const result        = useMemo(() => rescoreData?.result ?? null, [rescoreData])
   const currentPrice  = priceData?.price ?? result?.current_price
@@ -73,7 +74,7 @@ function AppInner() {
           {activeTab === 'Overview'     && <OverviewTab onNavigate={setActiveTab} activeSymbol={activeSymbol} />}
           {activeTab === 'Scout'        && <ScoutTab activeSymbol={activeSymbol} onEnterTrade={(t) => { setPendingTrade(t); setActiveTab('Intraday') }} />}
           {activeTab === 'Pre-Session'  && <PreSession assistantRead={assistantRead} activeSymbol={activeSymbol} />}
-          {activeTab === 'Intraday'     && <Intraday activeSymbol={activeSymbol} activeTrade={activeTrade} setActiveTrade={setActiveTrade} pendingTrade={pendingTrade} onPendingTradeConsumed={() => setPendingTrade(null)} />}
+          {activeTab === 'Intraday'     && <Intraday activeSymbol={activeSymbol} activeTrade={activeTrade} setActiveTrades={setActiveTrades} pendingTrade={pendingTrade} onPendingTradeConsumed={() => setPendingTrade(null)} />}
           {activeTab === 'Post-Session' && <PostSession activeSymbol={activeSymbol} nqRatio={nqRatio} />}
           {activeTab === 'News'         && <NewsTab />}
           {activeTab === 'Levels'       && <LevelsTab />}
