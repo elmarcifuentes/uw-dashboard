@@ -190,7 +190,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
       } catch {}
     }
     return () => es.close()
-  }, [])
+  }, [activeSymbol])
 
   if (loading) {
     return (

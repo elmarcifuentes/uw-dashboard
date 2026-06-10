@@ -1286,19 +1286,28 @@ app.post('/settings/symbol', (req, res) => {
   if (!['NQ', 'QQQ'].includes(symbol)) {
     return res.status(400).json({ error: 'Invalid symbol — use NQ|QQQ' })
   }
+  if (symbol === activeSymbolPref) {
+    return res.json({ success: true, symbol, unchanged: true })
+  }
   activeSymbolPref = symbol
   db.prepare(`
     INSERT INTO settings (key, value, updated_at)
     VALUES ('active_symbol', ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(symbol)
-  // Invalidate all narrative caches so regeneration uses new symbol context
+  // Clear hash caches so regeneration is not skipped
   lastNarrativeHash        = null
   lastAssistantReadHash    = null
   lastLevelNarrativeHashes = {}
   lastSessionBriefHash     = null
-  console.log('[settings] symbol:', symbol, '— cache cleared, triggering narrative regeneration')
-  sseEmitter.emit('event', { type: 'symbol_change', symbol, timestamp: new Date().toISOString() })
+  // Clear content caches so reconnecting clients get empty state, not stale symbol content
+  lastNarrative     = []
+  lastAssistantRead = null
+  lastSessionBrief  = null
+  lastTacticalBrief = null
+  lastLevelNarratives = {}
+  console.log('[settings] symbol:', symbol, '— all caches cleared, triggering narrative regeneration')
+  sseEmitter.emit('event', { type: 'symbol_changed', symbol, timestamp: new Date().toISOString() })
   res.json({ success: true, symbol })
 
   // Regenerate all narratives in background so SSE pushes updated content immediately

@@ -1,3 +1,5 @@
+import { formatNarrative } from '../../utils/formatNarrative'
+
 function VelocityIndicator({ velocity }) {
   if (velocity == null) return null
   const abs = Math.abs(velocity)
@@ -96,7 +98,7 @@ export default function FocusMode({
               <div key={f.key} className={`border rounded-lg px-3 py-2 ${f.border} bg-[#111827]/50`}>
                 <div className="text-xs font-bold text-gray-600 tracking-wider mb-1">{f.label}</div>
                 <p className={`text-xs leading-relaxed ${f.color}`}>
-                  {assistantRead[f.key] || '—'}
+                  {formatNarrative(assistantRead[f.key], activeSymbol) || '—'}
                 </p>
               </div>
             ))}

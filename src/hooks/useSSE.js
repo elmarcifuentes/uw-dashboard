@@ -200,6 +200,14 @@ export function useSSE(url) {
         if (data.type === 'system_resumed')   { setSystemPaused(false); setPausedAt(null);                   return }
         if (data.type === 'level_source_mode_changed') { console.log('[levels] source mode:', data.mode);          return }
         if (data.type === 'levels_auto_updated')       { console.log('[levels] auto-updated:', data.mode, data.levelData?.r1_qqq); return }
+        if (data.type === 'symbol_changed') {
+          setNarrative([])
+          setAssistantRead(null)
+          setSessionBrief(null)
+          setTacticalBrief(null)
+          setLevelNarratives({})
+          return
+        }
         if (data.type === 'trade_entered') {
           setActiveTrades(prev => ({ ...prev, [data.symbol]: data.trade }))
           return

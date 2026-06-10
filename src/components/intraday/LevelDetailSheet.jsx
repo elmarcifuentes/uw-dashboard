@@ -1,7 +1,8 @@
 import DpSparkline from '../DpSparkline'
 import { stripMarkdown } from '../../utils/stripMarkdown'
+import { formatNarrative } from '../../utils/formatNarrative'
 
-export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRatio, dpHistory, levelNarrative, onClose }) {
+export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRatio, dpHistory, levelNarrative, onClose, activeSymbol = 'NQ' }) {
   const level = levels?.find(l => l.id === levelId)
   if (!level) return null
 
@@ -100,7 +101,7 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
         <div className="border-t border-gray-800 pt-3">
           <div className="text-xs text-purple-500 mb-2">🤖 Claude Analysis</div>
           <p className="text-xs text-gray-300 leading-relaxed border-l-2 border-purple-900 pl-2">
-            {stripMarkdown(levelNarrative)}
+            {formatNarrative(stripMarkdown(levelNarrative), activeSymbol)}
           </p>
         </div>
       )}

@@ -343,6 +343,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
               dpHistory={dpHistory}
               levelNarrative={levelNarratives?.[bottomSheetLevel]}
               onClose={() => setBottomSheetOpen(false)}
+              activeSymbol={activeSymbol}
             />
           </div>
         </div>

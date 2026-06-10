@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useSSE } from '../../hooks/useSSE'
+import { formatNarrative } from '../../utils/formatNarrative'
 import LevelMap from './LevelMap'
 import LevelPlanCard from './LevelPlanCard'
 
@@ -26,7 +27,7 @@ export default function ScoutTab({ activeSymbol, onEnterTrade }) {
         </div>
         {assistantRead?.now && (
           <div className="text-xs text-gray-400 max-w-xs text-right hidden sm:block">
-            {assistantRead.now}
+            {formatNarrative(assistantRead.now, activeSymbol)}
           </div>
         )}
       </div>

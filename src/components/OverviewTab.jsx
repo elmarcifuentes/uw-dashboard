@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSSE } from '../hooks/useSSE'
+import { formatNarrative } from '../utils/formatNarrative'
 import ImmediateRiskCard from './ImmediateRiskCard'
 import EvidenceMeter from './EvidenceMeter'
 import SmartLevelCard from './SmartLevelCard'
@@ -96,7 +97,7 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
           {/* NOW text */}
           {assistantRead?.now && (
             <p className="text-xs text-gray-400 leading-relaxed">
-              {assistantRead.now}
+              {formatNarrative(assistantRead.now, activeSymbol)}
             </p>
           )}
 
@@ -111,7 +112,7 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
               </button>
               {showBrief && (
                 <p className="text-xs text-gray-400 mt-2 leading-relaxed border-l-2 border-purple-900 pl-2">
-                  {sessionBrief}
+                  {formatNarrative(sessionBrief, activeSymbol)}
                 </p>
               )}
             </div>

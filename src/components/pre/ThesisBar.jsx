@@ -1,3 +1,5 @@
+import { formatNarrative } from '../../utils/formatNarrative'
+
 export default function ThesisBar({
   sentiment, levels, cascade, assistantRead, currentPrice, nqRatio, activeSymbol = 'NQ'
 }) {
@@ -88,7 +90,7 @@ export default function ThesisBar({
 
         {/* One-sentence setup */}
         {assistantRead?.now && (
-          <p className="text-xs text-gray-400 truncate min-w-0">{assistantRead.now}</p>
+          <p className="text-xs text-gray-400 truncate min-w-0">{formatNarrative(assistantRead.now, activeSymbol)}</p>
         )}
       </div>
     </div>
