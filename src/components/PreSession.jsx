@@ -16,6 +16,7 @@ import SessionHeaderCard from './pre/SessionHeaderCard'
 import AlertsCard from './pre/AlertsCard'
 import ScenarioCards from './pre/ScenarioCards'
 import ThesisBar from './pre/ThesisBar'
+import ThreeColLayout from './layout/ThreeColLayout'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STATUS_POLL_MS = 10_000
@@ -282,161 +283,153 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
   }
 
   return (
-    <div className="space-y-3 py-3">
-
-      {/* Thesis bar — always first */}
-      <ThesisBar
-        sentiment={sentiment}
-        levels={levels}
-        cascade={cascade}
-        assistantRead={assistantRead}
-        currentPrice={data?.current_price}
-        nqRatio={nqRatio}
-        activeSymbol={activeSymbol}
-      />
-
-      {/* Session Brief — full-width above hero */}
-      {sessionBrief && providerStatus?.narrativeMode === 'claude' && (
-        <div className="bg-bg-card border border-purple-900/40 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-purple-500 text-xs">🤖</span>
-              <span className="text-xs text-text-tertiary uppercase tracking-wider">Session Brief</span>
-              <span className="text-xs text-text-disabled">Claude Haiku</span>
-            </div>
-            <button
-              onClick={() => setBriefOpen(!briefOpen)}
-              className="text-xs text-text-muted hover:text-text-secondary"
-            >
-              {briefOpen ? '▲ collapse' : '▼ expand'}
-            </button>
-          </div>
-          {briefOpen ? (
-            <p className="text-xs text-text-secondary leading-relaxed border-l-2 border-purple-900 pl-3">
-              {formatNarrative(sessionBrief, activeSymbol)}
-            </p>
-          ) : (
-            <p className="text-xs text-text-muted italic line-clamp-1">
-              {formatNarrative(sessionBrief, activeSymbol).slice(0, 120)}...
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Scenario cards */}
-      <ScenarioCards
-        assistantRead={assistantRead}
-        levels={levels}
-        cascade={cascade}
-        currentPrice={data?.current_price}
-        nqRatio={nqRatio}
-        activeSymbol={activeSymbol}
-      />
-
-      {/* Row 1 — Three hero cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <MarketStateCard sentiment={sentiment} cascadeActive={data?.cascade?.active} />
-        <SessionHeaderCard
-          date={data.session}
-          sessionType={sessionType}
-          price={data.current_price}
-          nqPrice={nqPrice}
-          nqRatio={nqRatio}
-          lastFetch={lastFetch}
-          budget={budget}
-          mode={mode}
-          onToggleMode={toggleMode}
-          onRefresh={fetchLatest}
-          providerStatus={providerStatus}
-          lastPolled={lastPolled}
-          activeSymbol={activeSymbol}
-        />
-        <AlertsCard
-          cascade={cascade}
-          structureBreak={structureBreak}
-          levels={levels}
-          currentPrice={data.current_price}
-        />
-      </div>
-
-      {/* Earnings warning — conditional, not collapsible */}
-      <EarningsWarning apiUrl={API} />
-
-      {/* Row 2 — Economic events (collapsible) */}
-      <CollapsibleSection title="Economic Calendar" defaultOpen={true}>
-        <EconomicCalendar apiUrl={API} />
-      </CollapsibleSection>
-
-      {/* Row 3 — Signal strength + stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="col-span-1">
-          <div className="bg-bg-card border border-border-subtle rounded-lg p-4 h-full">
-            <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Signal Strength</div>
-            <SignalStrengthBar levels={levels} />
-          </div>
-        </div>
-        <StatCard
-          label="Streak"
-          value={streak}
-          sub="consecutive sessions"
-        />
-        <StatCard
-          label="ETF Tide"
-          value={etfTide.direction?.toUpperCase()}
-          sub={etfTide.description?.slice(0, 48)}
-          color={
-            etfTide.direction === 'bullish' ? 'text-green-400'
-              : etfTide.direction === 'bearish' ? 'text-red-400'
-              : 'text-text-secondary'
-          }
-        />
-        <StatCard
-          label="GEX Regime"
-          value={gexRegime.label}
-          sub={gexRegime.active ? 'no pinning friction' : `${providerStatus?.allPinningSessions ?? '—'} sessions`}
-          color={gexRegime.active ? 'text-red-400' : 'text-green-400'}
-        />
-      </div>
-
-      {/* Row 4 — Five level cards */}
-      <div className="space-y-2">
-        {sortedLevels.map(level => (
-          <LevelCard
-            key={level.id}
-            level={level}
-            allLevels={sortedLevels}
-            nqRatio={nqRatio}
-            dpHistory={providerStatus?.dpHistory || {}}
-            levelNarrative={levelNarratives[level.id]}
+    <ThreeColLayout
+      whereWidth="lg:w-[28%]"
+      whyWidth="lg:w-[44%]"
+      whatWidth="lg:w-[28%]"
+      where={
+        <>
+          <ThesisBar
+            sentiment={sentiment}
+            levels={levels}
+            cascade={cascade}
+            assistantRead={assistantRead}
             currentPrice={data?.current_price}
-            levelTouches={levelTouches[level.id]}
+            nqRatio={nqRatio}
             activeSymbol={activeSymbol}
           />
-        ))}
-      </div>
-
-      {/* Row 5 — GEX by expiry (collapsible, includes cage) */}
-      <CollapsibleSection title="GEX by Expiry" defaultOpen={true}>
-        <GexCageSummary levels={levels} />
-        <GexByExpiry apiUrl={API} />
-      </CollapsibleSection>
-
-      {/* Row 6 — Market context grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <SectorETF apiUrl={API} />
-        <TopNetImpact apiUrl={API} />
-      </div>
-
-      {/* Row 7 — Flow signals grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <CollapsibleSection title="0DTE Flow" defaultOpen={false}>
-          <ZeroDteFlow apiUrl={API} />
-        </CollapsibleSection>
-        <CollapsibleSection title="Greek Flow" defaultOpen={false}>
-          <GreekFlow apiUrl={API} />
-        </CollapsibleSection>
-      </div>
-
-    </div>
+          <MarketStateCard sentiment={sentiment} cascadeActive={data?.cascade?.active} />
+          <SessionHeaderCard
+            date={data.session}
+            sessionType={sessionType}
+            price={data.current_price}
+            nqPrice={nqPrice}
+            nqRatio={nqRatio}
+            lastFetch={lastFetch}
+            budget={budget}
+            mode={mode}
+            onToggleMode={toggleMode}
+            onRefresh={fetchLatest}
+            providerStatus={providerStatus}
+            lastPolled={lastPolled}
+            activeSymbol={activeSymbol}
+          />
+          <ScenarioCards
+            assistantRead={assistantRead}
+            levels={levels}
+            cascade={cascade}
+            currentPrice={data?.current_price}
+            nqRatio={nqRatio}
+            activeSymbol={activeSymbol}
+          />
+        </>
+      }
+      why={
+        <>
+          {sessionBrief && providerStatus?.narrativeMode === 'claude' && (
+            <div className="bg-bg-card border border-purple-900/40 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-purple-500 text-xs">🤖</span>
+                  <span className="text-xs text-text-tertiary uppercase tracking-wider">Session Brief</span>
+                  <span className="text-xs text-text-disabled">Claude Haiku</span>
+                </div>
+                <button
+                  onClick={() => setBriefOpen(!briefOpen)}
+                  className="text-xs text-text-muted hover:text-text-secondary"
+                >
+                  {briefOpen ? '▲ collapse' : '▼ expand'}
+                </button>
+              </div>
+              {briefOpen ? (
+                <p className="text-xs text-text-secondary leading-relaxed border-l-2 border-purple-900 pl-3">
+                  {formatNarrative(sessionBrief, activeSymbol)}
+                </p>
+              ) : (
+                <p className="text-xs text-text-muted italic line-clamp-1">
+                  {formatNarrative(sessionBrief, activeSymbol).slice(0, 120)}...
+                </p>
+              )}
+            </div>
+          )}
+          <div className="space-y-2">
+            {sortedLevels.map(level => (
+              <LevelCard
+                key={level.id}
+                level={level}
+                allLevels={sortedLevels}
+                nqRatio={nqRatio}
+                dpHistory={providerStatus?.dpHistory || {}}
+                levelNarrative={levelNarratives[level.id]}
+                currentPrice={data?.current_price}
+                levelTouches={levelTouches[level.id]}
+                activeSymbol={activeSymbol}
+              />
+            ))}
+          </div>
+        </>
+      }
+      what={
+        <>
+          <AlertsCard
+            cascade={cascade}
+            structureBreak={structureBreak}
+            levels={levels}
+            currentPrice={data.current_price}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
+              <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Signal Strength</div>
+              <SignalStrengthBar levels={levels} />
+            </div>
+            <StatCard
+              label="Streak"
+              value={streak}
+              sub="consecutive sessions"
+            />
+            <StatCard
+              label="ETF Tide"
+              value={etfTide.direction?.toUpperCase()}
+              sub={etfTide.description?.slice(0, 48)}
+              color={
+                etfTide.direction === 'bullish' ? 'text-green-400'
+                  : etfTide.direction === 'bearish' ? 'text-red-400'
+                  : 'text-text-secondary'
+              }
+            />
+            <StatCard
+              label="GEX Regime"
+              value={gexRegime.label}
+              sub={gexRegime.active ? 'no pinning friction' : `${providerStatus?.allPinningSessions ?? '—'} sessions`}
+              color={gexRegime.active ? 'text-red-400' : 'text-green-400'}
+            />
+          </div>
+          <CollapsibleSection title="GEX by Expiry" defaultOpen={true}>
+            <GexCageSummary levels={levels} />
+            <GexByExpiry apiUrl={API} />
+          </CollapsibleSection>
+        </>
+      }
+      secondary={
+        <>
+          <EarningsWarning apiUrl={API} />
+          <CollapsibleSection title="Economic Calendar" defaultOpen={true}>
+            <EconomicCalendar apiUrl={API} />
+          </CollapsibleSection>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <SectorETF apiUrl={API} />
+            <TopNetImpact apiUrl={API} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <CollapsibleSection title="0DTE Flow" defaultOpen={false}>
+              <ZeroDteFlow apiUrl={API} />
+            </CollapsibleSection>
+            <CollapsibleSection title="Greek Flow" defaultOpen={false}>
+              <GreekFlow apiUrl={API} />
+            </CollapsibleSection>
+          </div>
+        </>
+      }
+    />
   )
 }
