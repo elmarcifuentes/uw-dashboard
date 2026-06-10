@@ -25,6 +25,7 @@ export function useSSE(url) {
   const [priceHistory, setPriceHistory]       = useState([])
   const [systemPaused, setSystemPaused]       = useState(false)
   const [pausedAt, setPausedAt]               = useState(null)
+  const [activeTrade, setActiveTrade]         = useState(null)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
   const priceHistoryRef = useRef([])
@@ -91,6 +92,11 @@ export function useSSE(url) {
         fetch(`${apiBase}/level-touches`)
           .then(r => r.json())
           .then(data => { if (data?.touches) setLevelTouches(data.touches) })
+          .catch(() => {})
+        // Restore active trade
+        fetch(`${apiBase}/trade/active`)
+          .then(r => r.json())
+          .then(data => { if (data.trade) setActiveTrade(data.trade) })
           .catch(() => {})
         // Restore last narrative content immediately
         fetch(`${apiBase}/narrative`)
@@ -186,6 +192,8 @@ export function useSSE(url) {
         if (data.type === 'system_resumed')   { setSystemPaused(false); setPausedAt(null);                   return }
         if (data.type === 'level_source_mode_changed') { console.log('[levels] source mode:', data.mode);          return }
         if (data.type === 'levels_auto_updated')       { console.log('[levels] auto-updated:', data.mode, data.levelData?.r1_qqq); return }
+        if (data.type === 'trade_entered') { setActiveTrade(data.trade); return }
+        if (data.type === 'trade_exited')  { setActiveTrade(null);       return }
       }
 
       es.onerror = () => {
@@ -227,5 +235,7 @@ export function useSSE(url) {
     priceHistory,
     systemPaused,
     pausedAt,
+    activeTrade,
+    setActiveTrade,
   }
 }

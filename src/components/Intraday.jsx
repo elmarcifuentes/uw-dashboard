@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSSE } from '../hooks/useSSE'
+import { evaluateHoldExit } from '../utils/holdExit'
 import { useLayout } from '../context/LayoutContext'
 import { useAuth } from '../context/AuthContext'
 import PriceLadder from './intraday/PriceLadder'
@@ -18,7 +19,7 @@ import LevelDetailSheet from './intraday/LevelDetailSheet'
 const SUB_TABS         = ['Price Ladder', 'Dark Pool', 'ETF Tide', 'Log']
 const SUB_TABS_COMPACT = ['PL', 'DP', 'ETF', 'Log']
 
-export default function Intraday({ activeSymbol = 'NQ' }) {
+export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setActiveTrade, pendingTrade = null, onPendingTradeConsumed }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
   const {
     rescoreData, priceData, connected,
@@ -33,8 +34,9 @@ export default function Intraday({ activeSymbol = 'NQ' }) {
   const { unlocked, authPost } = useAuth()
   const sentiment     = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundEnabled') === 'true')
-  const soundCooldownRef    = useRef({})
-  const cascadeSoundPlayed  = useRef(false)
+  const soundCooldownRef      = useRef({})
+  const cascadeSoundPlayed    = useRef(false)
+  const tradeSoundPlayedRef   = useRef({ target: false, stop: false, cascade: false })
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'soundEnabled') setSoundEnabled(e.newValue === 'true') }
@@ -128,6 +130,47 @@ export default function Intraday({ activeSymbol = 'NQ' }) {
       setTimeout(() => ctx.close(), 1000)
     } catch { /* audio not supported */ }
   }, [cascade?.active, soundEnabled])
+
+  const tradeEvaluation = useMemo(() =>
+    activeTrade && currentPrice
+      ? evaluateHoldExit(activeTrade, result?.levels || [], currentPrice, cascade, dpHistory)
+      : null
+  , [activeTrade, currentPrice, result?.levels, cascade, dpHistory])
+
+  useEffect(() => {
+    if (!activeTrade || !tradeEvaluation) return
+    const playTone = (freq, duration = 0.5) => {
+      try {
+        const ctx  = new (window.AudioContext || window.webkitAudioContext)()
+        const osc  = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = freq
+        gain.gain.setValueAtTime(0.15, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + duration)
+        setTimeout(() => { try { ctx.close() } catch(e) {} }, 1000)
+      } catch(e) {}
+    }
+    if (tradeEvaluation.targetHit && !tradeSoundPlayedRef.current.target) {
+      tradeSoundPlayedRef.current.target = true
+      ;[523, 659, 784].forEach((f, i) => setTimeout(() => playTone(f, 0.4), i * 200))
+    }
+    const distToStop = currentPrice != null ? Math.abs(currentPrice - activeTrade.stop) : Infinity
+    const stopRange  = Math.abs(activeTrade.entry - activeTrade.stop)
+    if (stopRange > 0 && distToStop / stopRange < 0.25 && !tradeSoundPlayedRef.current.stop) {
+      tradeSoundPlayedRef.current.stop = true
+      ;[440, 370].forEach((f, i) => setTimeout(() => playTone(f, 0.3), i * 200))
+    }
+    if (cascade?.active && !tradeSoundPlayedRef.current.cascade) {
+      tradeSoundPlayedRef.current.cascade = true
+      ;[311, 277, 233].forEach((f, i) => setTimeout(() => playTone(f, 0.4), i * 150))
+    }
+  }, [tradeEvaluation, cascade?.active, currentPrice, activeTrade])
+
+  useEffect(() => {
+    tradeSoundPlayedRef.current = { target: false, stop: false, cascade: false }
+  }, [activeTrade?.id])
 
   if (!connected && !rescoreData && !priceData) {
     return (
@@ -264,6 +307,11 @@ export default function Intraday({ activeSymbol = 'NQ' }) {
             cascade={cascade}
             dpHistory={dpHistory}
             levelNarratives={levelNarratives}
+            activeSymbol={activeSymbol}
+            activeTrade={activeTrade}
+            setActiveTrade={setActiveTrade}
+            pendingTrade={pendingTrade}
+            onPendingTradeConsumed={onPendingTradeConsumed}
             selectedLevel={selectedLevel}
           />
         </div>

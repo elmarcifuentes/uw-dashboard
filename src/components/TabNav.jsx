@@ -1,7 +1,6 @@
 const TABS = [
   { id: 'Overview',      label: 'Overview'     },
   { id: 'Scout',         label: '🔍 Scout',    scout: true },
-  { id: 'Trade',         label: '📈 Trade',    trade: true },
   { id: 'Pre-Session',   label: 'Pre-Session'  },
   { id: 'Intraday',      label: 'Intraday',    live: true },
   { id: 'Post-Session',  label: 'Post-Session' },
