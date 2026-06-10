@@ -1922,36 +1922,85 @@ const POLYGON_INTERVAL_MAP = {
 }
 const POLYGON_DAYS_BACK = { '1m': 7, '5m': 60, '15m': 60, '1h': 365, '1d': 730 }
 
+// Polygon futures API uses a different endpoint + resolution param (not multiplier/timespan)
+const POLYGON_FUTURES_RESOLUTION = {
+  '1m':  '1min',
+  '5m':  '5min',
+  '15m': '15min',
+  '1h':  '1hour',
+  '1d':  '1session',
+}
+
+// Returns [frontMonth, nextMonth] contract tickers for NQ (e.g. ['NQM6','NQU6'])
+// CME quarterly schedule: Mar=H, Jun=M, Sep=U, Dec=Z — single-digit year required
+function getNqFuturesCandidates() {
+  const now = new Date()
+  const m   = now.getMonth() + 1            // 1–12
+  const yr  = now.getFullYear() % 10        // e.g. 2026 → 6
+  const nyr = (now.getFullYear() + 1) % 10
+  const Q   = [
+    { from: 1,  thru: 3,  code: 'H' },
+    { from: 4,  thru: 6,  code: 'M' },
+    { from: 7,  thru: 9,  code: 'U' },
+    { from: 10, thru: 12, code: 'Z' },
+  ]
+  const ci = Q.findIndex(q => m >= q.from && m <= q.thru)
+  const ni = (ci + 1) % 4
+  return [
+    `NQ${Q[ci].code}${yr}`,
+    `NQ${Q[ni].code}${ci === 3 ? nyr : yr}`,
+  ]
+}
+
 async function fetchOHLC(ticker, bars = 250, interval = '1d') {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
-
-  // Polygon ticker candidates: NQ futures need special format
-  const isNQ = ticker === 'NQ=F' || ticker === '/NQ' || ticker === 'NQ'
-  const polygonCandidates = isNQ ? ['NQ1!', '/NQ'] : [ticker]
+  const isNQ        = ticker === 'NQ=F' || ticker === '/NQ' || ticker === 'NQ'
 
   if (POLYGON_KEY) {
-    const pg       = POLYGON_INTERVAL_MAP[interval] || POLYGON_INTERVAL_MAP['1d']
     const daysBack = POLYGON_DAYS_BACK[interval] || 730
     const to       = new Date().toISOString().split('T')[0]
     const from     = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-    for (const pticker of polygonCandidates) {
+    if (isNQ) {
+      // NQ futures: dedicated futures endpoint, resolution param, full field names, descending by default
+      const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
+      for (const fticker of getNqFuturesCandidates()) {
+        try {
+          const url  = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&from=${from}&to=${to}&limit=50000&apiKey=${POLYGON_KEY}`
+          const res  = await fetch(url)
+          const data = await res.json()
+          const count = data.results?.length ?? 0
+          if (count >= bars) {
+            // API returns descending — reverse to chronological then take last `bars`
+            const results = data.results.slice().reverse().slice(-bars)
+            console.log(`[labs] NQ: source=polygon-futures (${fticker}) bars=${count}`)
+            return { closes: results.map(r => r.close), highs: results.map(r => r.high), lows: results.map(r => r.low), source: `polygon-futures (${fticker})` }
+          }
+          console.warn(`[labs] Polygon futures ${fticker}: ${count} bars (need ${bars})`)
+        } catch (err) {
+          console.warn(`[labs] Polygon futures ${fticker} failed:`, err.message)
+        }
+      }
+      console.warn(`[labs] NQ: all Polygon futures candidates failed — falling back to Yahoo`)
+    } else {
+      // Standard equity/ETF via stocks API
+      const pg = POLYGON_INTERVAL_MAP[interval] || POLYGON_INTERVAL_MAP['1d']
       try {
-        const url  = `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(pticker)}/range/${pg.multiplier}/${pg.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
+        const url  = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/${pg.multiplier}/${pg.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
         const res  = await fetch(url)
         const data = await res.json()
         const count = data.results?.length ?? 0
         if (count >= bars) {
           const results = data.results.slice(-bars)
-          console.log(`[labs] ${ticker}: source=polygon (${pticker}) bars=${count}`)
-          return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: `polygon (${pticker})` }
+          console.log(`[labs] ${ticker}: source=polygon bars=${count}`)
+          return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: `polygon (${ticker})` }
         }
-        console.warn(`[labs] Polygon ${pticker}: ${count} bars (need ${bars}) — ${data.status || data.error || 'insufficient'}`)
+        console.warn(`[labs] Polygon ${ticker}: ${count} bars (need ${bars})`)
       } catch (err) {
-        console.warn(`[labs] Polygon ${pticker} failed:`, err.message)
+        console.warn(`[labs] Polygon ${ticker} failed:`, err.message)
       }
+      console.warn(`[labs] ${ticker}: Polygon failed — falling back to Yahoo`)
     }
-    console.warn(`[labs] ${ticker}: all Polygon candidates failed — falling back to Yahoo`)
   }
 
   const yTicker  = isNQ ? 'NQ=F' : ticker
