@@ -72,23 +72,25 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
     setLoading(false)
   }
 
-  const handleIntervalChange = async (interval) => {
+  const handleSettingsChange = async (newSettings) => {
     setLoading(true)
     try {
       const res  = await fetch(`${API_URL}/labs/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interval })
+        body: JSON.stringify(newSettings)
       })
       const data = await res.json()
       if (data.levels)   setAutoLevels(data.levels)
       if (data.settings) setSettings(data.settings)
     } catch (e) {
-      console.warn('[labs] interval change failed:', e.message)
+      console.warn('[labs] settings change failed:', e.message)
     } finally {
       setLoading(false)
     }
   }
+
+  const handleIntervalChange = (interval) => handleSettingsChange({ ...settings, interval })
 
   const levels = autoLevels?.[activeSource]
 
@@ -138,6 +140,38 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
             ))}
           </div>
           <span className="text-xs text-text-muted">· preview only</span>
+        </div>
+
+        <div className="w-px h-4 bg-bg-elevated" />
+
+        {/* Length */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-tertiary">Length</span>
+          <input
+            type="number"
+            value={settings.length}
+            onChange={e => setSettings(prev => ({ ...prev, length: parseInt(e.target.value) || 200 }))}
+            onBlur={e => handleSettingsChange({ ...settings, length: parseInt(e.target.value) || settings.length })}
+            min="50"
+            max="500"
+            step="10"
+            className="bg-bg-elevated text-text-primary font-price text-xs rounded px-2 py-1.5 border border-border-default focus:border-accent-ai focus:outline-none w-20 text-center"
+          />
+        </div>
+
+        {/* Factor */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-tertiary">Factor</span>
+          <input
+            type="number"
+            value={settings.mult}
+            onChange={e => setSettings(prev => ({ ...prev, mult: parseFloat(e.target.value) || 6.0 }))}
+            onBlur={e => handleSettingsChange({ ...settings, mult: parseFloat(e.target.value) || settings.mult })}
+            min="1.0"
+            max="15.0"
+            step="0.5"
+            className="bg-bg-elevated text-text-primary font-price text-xs rounded px-2 py-1.5 border border-border-default focus:border-accent-ai focus:outline-none w-20 text-center"
+          />
         </div>
 
         <div className="w-px h-4 bg-bg-elevated" />
