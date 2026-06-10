@@ -153,7 +153,7 @@ function LevelPreviewTable({ qqq, nq, ratio }) {
   )
 }
 
-export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sessionRatioLockedAt, ratioIsLocked }) {
+export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday }) {
   const [levels, setLevels]         = useState(emptyLevels())
   const [savedDate, setSavedDate]   = useState(null)
   const [isToday, setIsToday]       = useState(false)
@@ -635,21 +635,23 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
 
           {levelSourceMode === 'auto_nq' && (
             <div className="border border-emerald-900/40 bg-emerald-950/10 rounded-lg p-3 ml-2 space-y-3">
-              <div className={`text-xs px-2 py-1.5 rounded flex items-center gap-2 ${
-                ratioIsLocked
-                  ? 'bg-state-holdSoft text-state-hold'
-                  : 'bg-bg-card2 text-text-muted'
-              }`}>
-                {ratioIsLocked ? (
-                  <>
-                    <span>🔒</span>
-                    <span className="font-bold">{sessionRatio?.toFixed(4)}</span>
-                    <span>locked {sessionRatioLockedAt} ET</span>
-                  </>
-                ) : (
-                  <span>Live ratio — locks automatically at 9:30 AM ET</span>
-                )}
-              </div>
+              {!sessionRatio ? (
+                <div className="text-xs px-2 py-1.5 rounded bg-bg-card2 text-text-muted">
+                  Live ratio — locks automatically at 9:30 AM ET
+                </div>
+              ) : ratioIsFromToday ? (
+                <div className="text-xs px-2 py-1.5 rounded bg-state-holdSoft text-state-hold flex items-center gap-2">
+                  <span>🔒</span>
+                  <span className="font-bold">{sessionRatio?.toFixed(4)}</span>
+                  <span>locked {sessionRatioLockedAt} ET</span>
+                </div>
+              ) : (
+                <div className="text-xs px-2 py-1.5 rounded bg-bg-card2 text-text-tertiary flex items-center gap-2">
+                  <span>🔒</span>
+                  <span className="font-bold">{sessionRatio?.toFixed(4)}</span>
+                  <span>yesterday · updates at 9:30 AM ET</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-text-tertiary shrink-0">Manual override</span>
                 <input
@@ -758,13 +760,17 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                 <span className="text-xs font-mono text-text-primary font-bold">
                   {(ratioIsLocked ? sessionRatio : ratio)?.toFixed(4)}
                 </span>
-                {ratioIsLocked ? (
+                {!sessionRatio ? (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-bg-card2 text-text-muted">
+                    Live · locks 9:30 ET
+                  </span>
+                ) : ratioIsFromToday ? (
                   <span className="text-xs px-1.5 py-0.5 rounded font-bold bg-state-holdSoft text-state-hold">
-                    🔒 {sessionRatioLockedAt}
+                    🔒 {sessionRatioLockedAt} ET
                   </span>
                 ) : (
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-bg-card2 text-text-muted">
-                    Live (locks 9:30 ET)
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-bg-card2 text-text-tertiary">
+                    🔒 {sessionRatio?.toFixed(4)} · yesterday · updates 9:30 ET
                   </span>
                 )}
               </div>

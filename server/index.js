@@ -1218,6 +1218,7 @@ app.get('/status', (req, res) => {
     sessionRatio,
     sessionRatioLockedAt,
     ratioIsLocked: !!sessionRatio,
+    ratioIsFromToday: sessionRatioDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
   })
 })
 
@@ -2182,14 +2183,12 @@ try {
   if (saved?.value) {
     const data  = JSON.parse(saved.value)
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
-    if (data.date === today) {
-      sessionRatio         = data.ratio
-      sessionRatioLockedAt = data.lockedAt
-      sessionRatioDate     = data.date
-      console.log('[ratio] restored:', sessionRatio, 'locked at', sessionRatioLockedAt)
-    } else {
-      console.log('[ratio] stale — will lock at next 9:30 AM')
-    }
+    // Always restore — 9:30 AM cron will replace with fresh value automatically
+    sessionRatio         = data.ratio
+    sessionRatioLockedAt = data.lockedAt
+    sessionRatioDate     = data.date
+    const isToday = data.date === today
+    console.log('[ratio] restored:', sessionRatio, isToday ? '(today)' : '(yesterday)')
   }
 } catch (e) {}
 

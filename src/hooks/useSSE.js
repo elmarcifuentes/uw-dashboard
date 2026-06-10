@@ -29,6 +29,7 @@ export function useSSE(url) {
   const [sessionRatio, setSessionRatio]       = useState(null)
   const [sessionRatioLockedAt, setSessionRatioLockedAt] = useState(null)
   const [ratioIsLocked, setRatioIsLocked]     = useState(false)
+  const [ratioIsFromToday, setRatioIsFromToday] = useState(false)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
   const priceHistoryRef = useRef([])
@@ -104,6 +105,7 @@ export function useSSE(url) {
               setRatioIsLocked(true)
               setSessionRatio(data.sessionRatio)
               setSessionRatioLockedAt(data.sessionRatioLockedAt)
+              setRatioIsFromToday(data.ratioIsFromToday ?? false)
             }
           })
           .catch(() => {})
@@ -246,6 +248,7 @@ export function useSSE(url) {
           setRatioIsLocked(true)
           setSessionRatio(data.ratio)
           setSessionRatioLockedAt(data.lockedAt)
+          setRatioIsFromToday(true)
           return
         }
       }
@@ -294,5 +297,6 @@ export function useSSE(url) {
     sessionRatio,
     sessionRatioLockedAt,
     ratioIsLocked,
+    ratioIsFromToday,
   }
 }
