@@ -19,6 +19,21 @@ const CLASS_BORDER = {
   continuation:    'border-signal-continuation/30',
 }
 
+const TIER1_BORDER_COLOR = {
+  sell_resistance: '#ff6b6b',
+  buy_support:     '#2fd47a',
+  continuation:    '#5ba7ff',
+  no_edge:         '#7b8ba8',
+}
+
+function getLevelTier(level) {
+  if (level.classification === 'no_edge') return 3
+  const conf = (level.confidence || '').toLowerCase()
+  if (level.full_stack || conf === 'high') return 1
+  if (conf === 'medium' || (level.score || 0) >= 60) return 2
+  return 3
+}
+
 export default function LevelCard({
   level, allLevels, currentPrice, nqRatio,
   dpHistory, levelNarrative, levelTouches,
@@ -36,12 +51,18 @@ export default function LevelCard({
   const proximity = getLevelProximity(currentPrice, level.price)
   const styles    = getProximityStyles(proximity, level.classification, level)
 
+  const tier = getLevelTier(level)
+  const tier1BorderColor = TIER1_BORDER_COLOR[level.classification] || '#7b8ba8'
+
   return (
     <div
       onClick={() => onSelect?.(level.id)}
-      className={`border rounded-lg overflow-hidden bg-bg-card transition-all duration-300 ${
+      className={`border rounded-lg overflow-hidden transition-all duration-300 ${
+        tier === 1 ? 'bg-bg-elevated shadow-elevated' : 'bg-bg-card'
+      } ${tier === 3 ? 'opacity-60 hover:opacity-100' : ''} ${
         onSelect ? 'cursor-pointer' : ''
       } ${styles.border || borderColor} ${styles.glow || ''} ${styles.pulse ? 'animate-pulse' : ''}`}
+      style={tier === 1 ? { borderLeftWidth: '4px', borderLeftColor: tier1BorderColor } : undefined}
     >
       {/* LAYER 1 — SCAN */}
       <div className="px-4 py-3 flex items-center justify-between gap-3">
@@ -84,25 +105,44 @@ export default function LevelCard({
           <div className={`text-xs mb-1.5 ${styles.labelColor}`}>{styles.label}</div>
         )}
 
-        <div className="flex items-center gap-2">
-          <span style={{ minWidth: '20px', flexShrink: 0 }} className="text-xs text-text-muted">DP</span>
-          <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-bg-elevated rounded relative overflow-hidden">
-            <div className="absolute inset-y-0 left-1/2 w-px bg-text-disabled z-10" />
-            {(() => {
-              const dp  = level.dark_pool || 0
-              const pct = ((dp + 1) / 2) * 100
-              return pct >= 50 ? (
-                <div className="absolute inset-y-0 left-1/2 bg-signal-support" style={{ width: `${(pct - 50) * 2}%` }} />
-              ) : (
-                <div className="absolute inset-y-0 right-1/2 bg-signal-resistance" style={{ width: `${(50 - pct) * 2}%` }} />
-              )
-            })()}
+        {tier !== 3 && (
+          <div className="flex items-center gap-2">
+            <span style={{ minWidth: '20px', flexShrink: 0 }} className="text-xs text-text-muted">DP</span>
+            <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-bg-elevated rounded relative overflow-hidden">
+              <div className="absolute inset-y-0 left-1/2 w-px bg-text-disabled z-10" />
+              {(() => {
+                const dp  = level.dark_pool || 0
+                const pct = ((dp + 1) / 2) * 100
+                return pct >= 50 ? (
+                  <div className="absolute inset-y-0 left-1/2 bg-signal-support" style={{ width: `${(pct - 50) * 2}%` }} />
+                ) : (
+                  <div className="absolute inset-y-0 right-1/2 bg-signal-resistance" style={{ width: `${(50 - pct) * 2}%` }} />
+                )
+              })()}
+            </div>
+            <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
+                  className="text-xs font-price text-text-secondary">
+              {level.dark_pool?.toFixed(3)}
+            </span>
           </div>
-          <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
-                className="text-xs font-price text-text-secondary">
-            {level.dark_pool?.toFixed(3)}
-          </span>
-        </div>
+        )}
+
+        {tier === 1 && level.score != null && (
+          <div className="flex items-center gap-2 mt-1.5">
+            <span style={{ minWidth: '20px', flexShrink: 0 }} className="text-xs text-text-muted">SC</span>
+            <div style={{ flex: 1, minWidth: 0 }} className="h-1.5 bg-bg-base rounded overflow-hidden">
+              <div className={`h-full rounded ${
+                level.classification === 'sell_resistance' ? 'bg-signal-resistance'
+                  : level.classification === 'buy_support' ? 'bg-signal-support'
+                  : 'bg-signal-neutral'
+              }`} style={{ width: `${Math.min(level.score || 0, 100)}%` }} />
+            </div>
+            <span style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
+                  className="text-xs font-price text-text-secondary">
+              {level.score}/100
+            </span>
+          </div>
+        )}
 
         {(level.full_stack || (level.net_gex || 0) < 0) && (
           <div className="flex gap-1.5 mt-1.5">

@@ -106,12 +106,12 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
           return (
           <div key={i} className="flex items-center gap-2">
             <span className={`w-3 h-3 rounded-full shrink-0 ${
-              met ? 'bg-state-stop ring-2 ring-state-stop/60' : 'bg-text-disabled'
+              met ? 'bg-state-cascadeWatch ring-2 ring-state-cascadeWatch/60' : 'bg-text-disabled'
             }`} />
-            <span className={`text-xs ${met ? 'text-state-stop/80 font-medium' : 'text-text-tertiary'}`}>
+            <span className={`text-xs ${met ? 'text-state-cascadeWatch font-medium' : 'text-text-tertiary'}`}>
               {label}
             </span>
-            <span className={`text-xs ml-auto ${met ? 'text-state-stop font-bold' : 'text-text-muted'}`}>
+            <span className={`text-xs ml-auto ${met ? 'text-state-cascadeWatch font-bold' : 'text-text-muted'}`}>
               {met ? '✓ MET' : '✗'}
             </span>
           </div>

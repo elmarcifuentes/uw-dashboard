@@ -66,9 +66,9 @@ export default function EconomicCalendar({ apiUrl }) {
   const hasMediumImpact = events.some(e => e._impact === 'medium')
   const headerColor = hasHighImpact ? 'text-red-400' : hasMediumImpact ? 'text-amber-400' : 'text-text-secondary'
   const containerCls = hasHighImpact
-    ? 'bg-red-950 border-red-500'
+    ? 'bg-bg-card border-state-cascadeWatch/30'
     : hasMediumImpact
-    ? 'bg-amber-950 border-amber-700'
+    ? 'bg-bg-card border-state-exit/30'
     : 'bg-bg-elevated border-border-default'
 
   if (events.length === 0) {
@@ -100,7 +100,7 @@ export default function EconomicCalendar({ apiUrl }) {
             <div key={i} className="flex items-center gap-2 flex-wrap">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
               <span className={`text-xs font-mono w-20 shrink-0 ${colors.text}`}>{etTime}</span>
-              <span className="text-xs text-gray-200 flex-1">{event.event}</span>
+              <span className="text-xs text-text-secondary flex-1">{event.event}</span>
               {event.forecast != null && (
                 <span className="text-xs text-text-tertiary shrink-0">
                   est: {formatEstimate(event.forecast) ?? event.forecast}

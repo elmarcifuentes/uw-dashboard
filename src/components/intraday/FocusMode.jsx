@@ -184,67 +184,61 @@ export default function FocusMode({
       </div>
 
       {/* Row 4 — Price between levels */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-        <div className="max-w-2xl mx-auto w-full flex flex-col gap-3">
+      <div className="flex-1 min-h-0 flex flex-col justify-center gap-3 px-4 py-4 overflow-hidden max-w-2xl mx-auto w-full">
 
-          {resistance ? (
-            <div className="border border-signal-resistance/30 bg-signal-resistanceSoft rounded-lg px-4 py-3 shadow-card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-micro text-signal-resistance font-bold uppercase tracking-wider">
-                    {resistance.id} — Resistance
-                  </span>
-                  <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtPrice(resistance.price)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-micro text-text-tertiary uppercase">above by</div>
-                  <div className="text-lg2 font-price font-bold text-signal-resistance">
-                    +{fmtAbsDist(resistance.price - (currentPrice || 0))}
-                  </div>
+        {resistance ? (
+          <div className="border border-signal-resistance/30 bg-signal-resistanceSoft rounded-lg px-4 py-3 shadow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-micro text-signal-resistance font-bold uppercase tracking-wider">
+                  {resistance.id} — Resistance
+                </span>
+                <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtPrice(resistance.price)}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-micro text-text-tertiary uppercase">above by</div>
+                <div className="text-lg2 font-price font-bold text-signal-resistance">
+                  +{fmtAbsDist(resistance.price - (currentPrice || 0))}
                 </div>
               </div>
-              <DpBar value={resistance.dark_pool} />
             </div>
-          ) : (
-            <div className="border border-border-subtle rounded-lg px-4 py-3 text-center">
-              <span className="text-xs text-text-muted">No resistance classified above</span>
-            </div>
-          )}
-
-          <div className="border-2 border-accent-price/50 bg-accent-price/5 rounded-lg px-4 py-4 text-center shadow-elevated">
-            <div className="text-micro text-accent-price uppercase tracking-wider mb-1">▶ Current Price</div>
-            <div className="text-hero font-price tabular-nums text-text-primary">{displayPrice}</div>
-            {nearest && (
-              <div className="text-md2 text-text-muted mt-2">
-                {fmtAbsDist((currentPrice || 0) - nearest.price)} from {nearest.id}
-              </div>
-            )}
+            <DpBar value={resistance.dark_pool} />
           </div>
+        ) : (
+          <div className="border border-border-subtle rounded-lg px-4 py-3 text-center">
+            <span className="text-xs text-text-muted">No resistance classified above</span>
+          </div>
+        )}
 
-          {support ? (
-            <div className="border border-signal-support/30 bg-signal-supportSoft rounded-lg px-4 py-3 shadow-card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-micro text-signal-support font-bold uppercase tracking-wider">
-                    {support.id} — Support
-                  </span>
-                  <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtPrice(support.price)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-micro text-text-tertiary uppercase">below by</div>
-                  <div className="text-lg2 font-price font-bold text-signal-support">
-                    -{fmtAbsDist((currentPrice || 0) - support.price)}
-                  </div>
+        <div className="border-2 border-accent-price/50 bg-accent-price/5 rounded-lg px-4 py-4 text-center shadow-elevated">
+          <div className="text-micro text-accent-price uppercase tracking-wider mb-1">▶ Current Price</div>
+          <div className="text-hero font-price tabular-nums text-text-primary">{displayPrice}</div>
+        </div>
+
+        {support ? (
+          <div className="border border-signal-support/30 bg-signal-supportSoft rounded-lg px-4 py-3 shadow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-micro text-signal-support font-bold uppercase tracking-wider">
+                  {support.id} — Support
+                </span>
+                <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtPrice(support.price)}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-micro text-text-tertiary uppercase">below by</div>
+                <div className="text-lg2 font-price font-bold text-signal-support">
+                  -{fmtAbsDist((currentPrice || 0) - support.price)}
                 </div>
               </div>
-              <DpBar value={support.dark_pool} />
             </div>
-          ) : (
-            <div className="border border-border-subtle rounded-lg px-4 py-3 text-center">
-              <span className="text-xs text-text-muted">No support classified below</span>
-            </div>
-          )}
-        </div>
+            <DpBar value={support.dark_pool} />
+          </div>
+        ) : (
+          <div className="border border-border-subtle rounded-lg px-4 py-3 text-center">
+            <span className="text-xs text-text-muted">No support classified below</span>
+          </div>
+        )}
+
       </div>
 
       {/* Row 5 — Trade details (only when active trade) */}
