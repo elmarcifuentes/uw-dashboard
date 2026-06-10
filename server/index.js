@@ -1281,7 +1281,7 @@ app.post('/narrative-mode', async (req, res) => {
   }
 })
 
-app.post('/settings/symbol', async (req, res) => {
+app.post('/settings/symbol', (req, res) => {
   const { symbol } = req.body
   if (!['NQ', 'QQQ'].includes(symbol)) {
     return res.status(400).json({ error: 'Invalid symbol — use NQ|QQQ' })
@@ -1292,14 +1292,57 @@ app.post('/settings/symbol', async (req, res) => {
     VALUES ('active_symbol', ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(symbol)
-  // Invalidate all narrative caches so next rescore regenerates with new symbol context
+  // Invalidate all narrative caches so regeneration uses new symbol context
   lastNarrativeHash        = null
   lastAssistantReadHash    = null
   lastLevelNarrativeHashes = {}
   lastSessionBriefHash     = null
-  console.log('[settings] active symbol set:', symbol)
+  console.log('[settings] symbol:', symbol, '— cache cleared, triggering narrative regeneration')
   sseEmitter.emit('event', { type: 'symbol_change', symbol, timestamp: new Date().toISOString() })
   res.json({ success: true, symbol })
+
+  // Regenerate all narratives in background so SSE pushes updated content immediately
+  if (!latest) return
+  setTimeout(() => {
+    generateNarrativeForMode(latest, dpHistory)
+      .then(narrative => {
+        if (narrative?.length > 0) {
+          lastNarrative = narrative
+          sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
+          console.log('[settings] narrative_update emitted for symbol:', symbol)
+        }
+      })
+      .catch(err => console.warn('[settings] narrative regen failed:', err.message))
+    generateSessionBrief(latest)
+      .then(briefs => {
+        if (briefs?.session) {
+          lastSessionBrief  = briefs.session
+          lastTacticalBrief = briefs.tactical
+          sseEmitter.emit('event', { type: 'session_brief_update', session: briefs.session, tactical: briefs.tactical, timestamp: new Date().toISOString() })
+          console.log('[settings] session_brief_update emitted for symbol:', symbol)
+        }
+      })
+      .catch(err => console.warn('[settings] session brief regen failed:', err.message))
+    generateAssistantRead(latest)
+      .then(read => {
+        if (read) {
+          lastAssistantRead     = read
+          lastAssistantReadHash = null // keep invalidated so next rescore refreshes too
+          sseEmitter.emit('event', { type: 'assistant_read_update', assistantRead: read, timestamp: new Date().toISOString() })
+          console.log('[settings] assistant_read_update emitted for symbol:', symbol)
+        }
+      })
+      .catch(err => console.warn('[settings] assistant read regen failed:', err.message))
+    generateLevelNarratives(latest)
+      .then(levelNarratives => {
+        if (Object.keys(levelNarratives).length > 0) {
+          lastLevelNarratives = levelNarratives
+          sseEmitter.emit('event', { type: 'level_narratives_update', narratives: levelNarratives, timestamp: new Date().toISOString() })
+          console.log('[settings] level_narratives_update emitted for symbol:', symbol)
+        }
+      })
+      .catch(err => console.warn('[settings] level narrative regen failed:', err.message))
+  }, 300)
 })
 
 app.get('/budget', (req, res) => {
