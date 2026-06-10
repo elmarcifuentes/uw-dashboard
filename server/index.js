@@ -2079,13 +2079,14 @@ function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0, startAv
   }
   if (!avg || isNaN(avg)) return null
   return {
-    R2:  parseFloat((avg + atr * 2).toFixed(2)),
-    R1:  parseFloat((avg + atr).toFixed(2)),
-    MID: parseFloat(avg.toFixed(2)),
-    S1:  parseFloat((avg - atr).toFixed(2)),
-    S2:  parseFloat((avg - atr * 2).toFixed(2)),
-    atr: parseFloat(atr.toFixed(4)),
-    avg: parseFloat(avg.toFixed(4)),
+    R2:      parseFloat((avg + atr * 2).toFixed(2)),
+    R1:      parseFloat((avg + atr).toFixed(2)),
+    MID:     parseFloat(avg.toFixed(2)),
+    S1:      parseFloat((avg - atr).toFixed(2)),
+    S2:      parseFloat((avg - atr * 2).toFixed(2)),
+    atr:     parseFloat(atr.toFixed(4)),
+    holdAtr: parseFloat((atr / 2).toFixed(4)),
+    avg:     parseFloat(avg.toFixed(4)),
   }
 }
 
@@ -2112,14 +2113,16 @@ async function calcWeeklyAvg(ticker, length, mult) {
 
 function deriveNQfromQQQ(qqqResult, ratio) {
   const r = ratio || 41.14
+  const atr = Math.round(qqqResult.atr * r * 4) / 4
   return {
-    R2:  Math.round(qqqResult.R2  * r * 4) / 4,
-    R1:  Math.round(qqqResult.R1  * r * 4) / 4,
-    MID: Math.round(qqqResult.MID * r * 4) / 4,
-    S1:  Math.round(qqqResult.S1  * r * 4) / 4,
-    S2:  Math.round(qqqResult.S2  * r * 4) / 4,
-    atr: Math.round(qqqResult.atr * r * 4) / 4,
-    avg: Math.round(qqqResult.avg * r * 4) / 4,
+    R2:      Math.round(qqqResult.R2  * r * 4) / 4,
+    R1:      Math.round(qqqResult.R1  * r * 4) / 4,
+    MID:     Math.round(qqqResult.MID * r * 4) / 4,
+    S1:      Math.round(qqqResult.S1  * r * 4) / 4,
+    S2:      Math.round(qqqResult.S2  * r * 4) / 4,
+    atr,
+    holdAtr: parseFloat((atr / 2).toFixed(4)),
+    avg:     Math.round(qqqResult.avg * r * 4) / 4,
     source: 'derived_from_qqq', derivedRatio: r,
   }
 }
@@ -2146,7 +2149,7 @@ function saveLevels(qqqResult, nqResult, interval) {
 
 async function calculateLabsLevels(interval = labsSettings.interval) {
   const INIT_BARS  = 1000
-  const LEVEL_BARS = labsSettings.length + 50
+  const LEVEL_BARS = 250   // fixed: ATR always from last ~3 days of 5m bars
   const { length, mult, avgMode = 'daily' } = labsSettings
   console.log(`[labs] calculating: mode=${avgMode} interval=${interval}`)
 
@@ -2166,13 +2169,14 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
 
       const atr5mQQQ = calcATR(qqqData.highs, qqqData.lows, qqqData.closes, length) * mult
       const qqqResult = {
-        R2:  parseFloat((weeklyAvgQQQ + atr5mQQQ * 2).toFixed(2)),
-        R1:  parseFloat((weeklyAvgQQQ + atr5mQQQ).toFixed(2)),
-        MID: parseFloat(weeklyAvgQQQ.toFixed(2)),
-        S1:  parseFloat((weeklyAvgQQQ - atr5mQQQ).toFixed(2)),
-        S2:  parseFloat((weeklyAvgQQQ - atr5mQQQ * 2).toFixed(2)),
-        avg: parseFloat(weeklyAvgQQQ.toFixed(4)),
-        atr: parseFloat(atr5mQQQ.toFixed(4)),
+        R2:      parseFloat((weeklyAvgQQQ + atr5mQQQ * 2).toFixed(2)),
+        R1:      parseFloat((weeklyAvgQQQ + atr5mQQQ).toFixed(2)),
+        MID:     parseFloat(weeklyAvgQQQ.toFixed(2)),
+        S1:      parseFloat((weeklyAvgQQQ - atr5mQQQ).toFixed(2)),
+        S2:      parseFloat((weeklyAvgQQQ - atr5mQQQ * 2).toFixed(2)),
+        avg:     parseFloat(weeklyAvgQQQ.toFixed(4)),
+        atr:     parseFloat(atr5mQQQ.toFixed(4)),
+        holdAtr: parseFloat((atr5mQQQ / 2).toFixed(4)),
         mode: 'weekly',
       }
       console.log(`[labs] weekly QQQ: avg=${weeklyAvgQQQ.toFixed(3)} atr=${atr5mQQQ.toFixed(3)} MID=${qqqResult.MID}`)
@@ -2181,13 +2185,14 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
       if (weeklyAvgNQ_raw && nqData) {
         const atr5mNQ = calcATR(nqData.highs, nqData.lows, nqData.closes, length) * mult
         nqResult = {
-          R2:  parseFloat((weeklyAvgNQ_raw + atr5mNQ * 2).toFixed(2)),
-          R1:  parseFloat((weeklyAvgNQ_raw + atr5mNQ).toFixed(2)),
-          MID: parseFloat(weeklyAvgNQ_raw.toFixed(2)),
-          S1:  parseFloat((weeklyAvgNQ_raw - atr5mNQ).toFixed(2)),
-          S2:  parseFloat((weeklyAvgNQ_raw - atr5mNQ * 2).toFixed(2)),
-          avg: parseFloat(weeklyAvgNQ_raw.toFixed(4)),
-          atr: parseFloat(atr5mNQ.toFixed(4)),
+          R2:      parseFloat((weeklyAvgNQ_raw + atr5mNQ * 2).toFixed(2)),
+          R1:      parseFloat((weeklyAvgNQ_raw + atr5mNQ).toFixed(2)),
+          MID:     parseFloat(weeklyAvgNQ_raw.toFixed(2)),
+          S1:      parseFloat((weeklyAvgNQ_raw - atr5mNQ).toFixed(2)),
+          S2:      parseFloat((weeklyAvgNQ_raw - atr5mNQ * 2).toFixed(2)),
+          avg:     parseFloat(weeklyAvgNQ_raw.toFixed(4)),
+          atr:     parseFloat(atr5mNQ.toFixed(4)),
+          holdAtr: parseFloat((atr5mNQ / 2).toFixed(4)),
           mode: 'weekly',
         }
         console.log(`[labs] weekly NQ: avg=${weeklyAvgNQ_raw.toFixed(1)} atr=${atr5mNQ.toFixed(1)} MID=${nqResult.MID}`)
@@ -2214,11 +2219,12 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
     } catch (e) {}
 
     if (!savedAvgQQQ) {
-      console.log(`[labs] initializing avg from ${INIT_BARS} bars...`)
+      console.log(`[labs] initializing avg from ${INIT_BARS} bars (avg only, ATR discarded)...`)
       const [qqqInit, nqInit] = await Promise.all([
         fetchOHLC('QQQ',  INIT_BARS, interval),
         fetchOHLC('NQ=F', INIT_BARS, interval).catch(() => null),
       ])
+      // Extract avg only — ATR from 1000 bars is NOT used for final levels
       const qqqInitR = predictiveRanges(qqqInit.closes, qqqInit.highs, qqqInit.lows, length, mult, null)
       savedAvgQQQ = qqqInitR?.avg ?? qqqInit.closes[qqqInit.closes.length - 1]
       if (nqInit) {
@@ -2228,6 +2234,7 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
       console.log(`[labs] converged avg: QQQ=${savedAvgQQQ?.toFixed(3)} NQ=${savedAvgNQ?.toFixed(1)}`)
     }
 
+    // Final level calculation — LEVEL_BARS only (ATR from recent bars = correct ✅)
     const [qqqData, nqData] = await Promise.all([
       fetchOHLC('QQQ',  LEVEL_BARS, interval),
       fetchOHLC('NQ=F', LEVEL_BARS, interval).catch(() => null),
@@ -2235,6 +2242,8 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
 
     const qqqResult = predictiveRanges(qqqData.closes, qqqData.highs, qqqData.lows, length, mult, savedAvgQQQ)
     if (!qqqResult) { console.warn('[labs] QQQ predictiveRanges returned null'); return null }
+    if (qqqResult.atr > 10) console.warn(`[labs] WARNING: QQQ ATR=${qqqResult.atr.toFixed(2)} seems too large — check bar data`)
+    console.log(`[labs] ATR check: QQQ=${qqqResult.atr?.toFixed(3)}`)
     console.log(`[labs] QQQ: R1=${qqqResult.R1} MID=${qqqResult.MID} S1=${qqqResult.S1}`)
 
     const nqResult_raw = nqData
