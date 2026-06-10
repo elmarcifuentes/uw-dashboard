@@ -202,6 +202,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
           levels={result?.levels}
           nqRatio={nqRatio}
           onExit={() => setFocusMode(false)}
+          activeSymbol={activeSymbol}
         />
       )}
 
@@ -272,7 +273,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
         {/* Left column */}
         <div className="col-span-12 md:col-span-8 space-y-3">
           <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
-          <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} tacticalBrief={tacticalBrief} />
+          <NarrativeBlock narrative={narrative} result={result} lastUpdate={lastUpdate} compact={compact} narrativeMode={narrativeMode} tacticalBrief={tacticalBrief} activeSymbol={activeSymbol} />
 
           {/* Sub-tab navigation — flat underline style */}
           <div className="border-b border-gray-800">

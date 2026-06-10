@@ -13,9 +13,21 @@ export default function ActiveTradePanel({ trade, currentPrice, pnl, evaluation,
   const progressPct = evaluation?.progressPct || 0
 
   return (
-    <div className={`border rounded-lg p-4 ${
+    <div className={`border rounded-lg p-4 relative overflow-hidden ${
       pnl?.isProfit ? 'border-green-900/50 bg-green-950/10' : 'border-red-900/50 bg-red-950/10'
     }`}>
+      {/* Directional gradient overlay */}
+      <div className={`absolute inset-0 pointer-events-none ${
+        isShort
+          ? 'bg-gradient-to-b from-red-950/20 via-transparent to-transparent'
+          : 'bg-gradient-to-t from-green-950/20 via-transparent to-transparent'
+      }`} />
+      {/* Large faded directional arrow */}
+      <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-7xl font-black pointer-events-none select-none opacity-[0.04] ${
+        isShort ? 'text-red-400' : 'text-green-400'
+      }`}>
+        {isShort ? '↓' : '↑'}
+      </div>
       {/* Direction badge + P&L */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">

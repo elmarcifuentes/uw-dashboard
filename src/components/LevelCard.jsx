@@ -3,6 +3,7 @@ import { getLevelProximity, getProximityStyles } from '../utils/proximity'
 import DpSparkline from './DpSparkline'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import { calculateTradeSetup } from '../utils/tradeSetup'
+import { formatNarrative } from '../utils/formatNarrative'
 
 const CLASS_COLOR = {
   sell_resistance: 'text-red-400',
@@ -199,7 +200,7 @@ export default function LevelCard({
             <div className="border-t border-gray-800 pt-2">
               <div className="text-xs text-purple-600 mb-1">🤖 Claude Analysis</div>
               <p className="text-xs text-gray-300 leading-relaxed italic border-l-2 border-purple-900 pl-2">
-                {stripMarkdown(levelNarrative)}
+                {formatNarrative(stripMarkdown(levelNarrative), activeSymbol)}
               </p>
             </div>
           )}

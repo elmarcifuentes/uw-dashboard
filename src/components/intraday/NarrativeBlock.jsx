@@ -1,6 +1,7 @@
 import { useState, memo } from 'react'
+import { formatNarrative } from '../../utils/formatNarrative'
 
-export default memo(function NarrativeBlock({ narrative, result, lastUpdate, compact, narrativeMode, tacticalBrief }) {
+export default memo(function NarrativeBlock({ narrative, result, lastUpdate, compact, narrativeMode, tacticalBrief, activeSymbol = 'NQ' }) {
   const [expanded, setExpanded] = useState(true)
   const isClaudeMode = narrativeMode === 'claude'
 
@@ -65,7 +66,7 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
       {expanded && (
         <div className="px-3 pb-3">
           {isClaudeMode && tacticalBrief ? (
-            <p className="text-xs text-gray-200 leading-relaxed">{tacticalBrief}</p>
+            <p className="text-xs text-gray-200 leading-relaxed">{formatNarrative(tacticalBrief, activeSymbol)}</p>
           ) : (
             <div className="flex flex-col gap-1.5">
               {displayLines.map((line, i) => {
@@ -79,7 +80,7 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
                   (i === 0 ? 'text-gray-200' : 'text-gray-300')
                 return (
                   <p key={i} className={`text-xs leading-relaxed ${i > 0 ? 'mt-1' : ''} ${textColor}`}>
-                    {line}
+                    {formatNarrative(line, activeSymbol)}
                   </p>
                 )
               })}

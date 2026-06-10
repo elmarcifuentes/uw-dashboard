@@ -291,6 +291,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
         assistantRead={assistantRead}
         currentPrice={data?.current_price}
         nqRatio={nqRatio}
+        activeSymbol={activeSymbol}
       />
 
       {/* Session Brief — full-width above hero */}
@@ -328,6 +329,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
         cascade={cascade}
         currentPrice={data?.current_price}
         nqRatio={nqRatio}
+        activeSymbol={activeSymbol}
       />
 
       {/* Row 1 — Three hero cards */}

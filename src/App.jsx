@@ -64,7 +64,7 @@ function AppInner() {
 
       <TabNav active={activeTab} onChange={setActiveTab} connected={connected} unlocked={unlocked} />
 
-      {showStrip && <AssistantStrip assistantRead={assistantRead} />}
+      {showStrip && <AssistantStrip assistantRead={assistantRead} activeSymbol={activeSymbol} />}
 
       <main className="max-w-screen-xl mx-auto px-4">
         <RestartBanner restarted={restarted} hasData={hasData} onDismiss={dismiss} />

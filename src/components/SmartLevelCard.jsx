@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import DpSparkline from './DpSparkline'
 import { stripMarkdown } from '../utils/stripMarkdown'
+import { formatNarrative } from '../utils/formatNarrative'
 
 const CLS_COLOR  = { sell_resistance: 'text-red-400',   buy_support: 'text-green-400',  no_edge: 'text-gray-400',  continuation: 'text-blue-400'  }
 const CLS_BORDER = { sell_resistance: 'border-red-900',  buy_support: 'border-green-900', no_edge: 'border-gray-800', continuation: 'border-blue-900' }
@@ -209,7 +210,7 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
           </button>
           {expanded && (
             <p className="text-xs text-gray-300 mt-2 leading-relaxed italic border-l-2 border-purple-900 pl-2">
-              {stripMarkdown(narrative)}
+              {formatNarrative(stripMarkdown(narrative), activeSymbol)}
             </p>
           )}
         </div>

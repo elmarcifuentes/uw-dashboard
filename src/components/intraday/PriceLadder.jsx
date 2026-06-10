@@ -27,25 +27,33 @@ function getBaseBorderCls(cls) {
   return { buy_support: 'border border-green-900', sell_resistance: 'border border-red-900', no_edge: 'border border-gray-700', continuation: 'border border-purple-900' }[cls] || 'border border-gray-700'
 }
 
-function StructureBreakBar({ sb, currentPrice }) {
+function StructureBreakBar({ sb, currentPrice, nqRatio, activeSymbol = 'NQ' }) {
   if (!sb) return null
   const toR2 = sb.distance_to_r2
   const toS2 = sb.distance_to_s2
   const active   = sb.active ?? false
   const imminent = !active && ((toR2 != null && toR2 <= 0.50) || (toS2 != null && toS2 <= 0.50))
+  const isNQ = activeSymbol === 'NQ'
+
+  const fmtDist = (d) => {
+    if (d == null) return '—'
+    return isNQ && nqRatio
+      ? `${(Math.round(d * nqRatio * 4) / 4).toFixed(2)} NQ`
+      : `$${d.toFixed(2)}`
+  }
 
   let cls  = 'bg-gray-800 border-gray-700 text-gray-400'
-  let text = `R2 $${toR2?.toFixed(2) ?? '—'} away  |  S2 $${toS2?.toFixed(2) ?? '—'} away`
+  let text = `R2 ${fmtDist(toR2)} away  |  S2 ${fmtDist(toS2)} away`
 
   if (imminent) {
     cls  = 'bg-amber-900/50 border-amber-600 text-amber-300'
     text = toR2 != null && toR2 <= 0.50
-      ? `⚠ R2 $${toR2.toFixed(2)} — BREAK IMMINENT`
-      : `⚠ S2 $${toS2.toFixed(2)} — BREAK IMMINENT`
+      ? `⚠ R2 ${fmtDist(toR2)} — BREAK IMMINENT`
+      : `⚠ S2 ${fmtDist(toS2)} — BREAK IMMINENT`
   }
   if (active) {
     const dir = sb.direction === 'upside' ? '▲' : '▼'
-    const ext = sb.r3 ? ` — ${sb.direction === 'upside' ? 'R3' : 'S3'}: $${sb.r3}` : ''
+    const ext = sb.r3 ? ` — ${sb.direction === 'upside' ? 'R3' : 'S3'}: ${isNQ && nqRatio ? `NQ ${(Math.round(sb.r3 * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `$${sb.r3}`}` : ''
     cls  = 'bg-red-900/50 border-red-600 text-red-300'
     text = `⚠ STRUCTURE BREAK ${dir} ${sb.direction?.toUpperCase() ?? ''}${ext}`
   }
@@ -55,7 +63,7 @@ function StructureBreakBar({ sb, currentPrice }) {
       {text}
       {active && sb.r3 && currentPrice != null && (
         <span className="text-red-300 text-xs ml-2">
-          · ${Math.abs(Number(currentPrice) - sb.r3).toFixed(2)} to S3
+          · {fmtDist(Math.abs(Number(currentPrice) - sb.r3))} to S3
         </span>
       )}
     </div>
@@ -157,7 +165,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         </div>
       )}
 
-      <StructureBreakBar sb={result.structure_break} currentPrice={cp} />
+      <StructureBreakBar sb={result.structure_break} currentPrice={cp} nqRatio={nqRatio} activeSymbol={activeSymbol} />
 
       {/* Price above all levels */}
       {cp != null && !isNaN(cp) && sorted.length > 0 && cp > sorted[0].price && (
@@ -376,24 +384,37 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gray-600 w-12">Entry</span>
-                          <span className="text-white font-mono">${setup.entry.qqq?.toFixed(2)}</span>
-                          {setup.entry.nq && <span className="text-gray-500 font-mono">NQ {setup.entry.nq.toLocaleString()}</span>}
+                          <span className="text-white font-mono">
+                            {activeSymbol === 'NQ'
+                              ? (setup.entry.nq ? `NQ ${setup.entry.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
+                              : `$${setup.entry.qqq?.toFixed(2)}`}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gray-600 w-12">Target</span>
-                          <span className="text-green-400 font-mono">${setup.target.qqq?.toFixed(2)}</span>
-                          {setup.target.nq && <span className="text-green-600 font-mono">NQ {setup.target.nq.toLocaleString()}</span>}
+                          <span className="text-green-400 font-mono">
+                            {activeSymbol === 'NQ'
+                              ? (setup.target.nq ? `NQ ${setup.target.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
+                              : `$${setup.target.qqq?.toFixed(2)}`}
+                          </span>
                           <span className="text-gray-600">← {setup.target.level}</span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gray-600 w-12">Stop</span>
-                          <span className="text-red-400 font-mono">${setup.stop.qqq?.toFixed(2)}</span>
-                          {setup.stop.nq && <span className="text-red-600 font-mono">NQ {setup.stop.nq.toLocaleString()}</span>}
+                          <span className="text-red-400 font-mono">
+                            {activeSymbol === 'NQ'
+                              ? (setup.stop.nq ? `NQ ${setup.stop.nq.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—')
+                              : `$${setup.stop.qqq?.toFixed(2)}`}
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-700/50 text-xs">
-                        <div className="text-gray-600">Move <span className="text-gray-400 font-mono">${setup.move.qqq}{setup.move.nq ? ` / ${setup.move.nq} NQ` : ''}</span></div>
-                        <div className="text-gray-600">Risk <span className="text-gray-400 font-mono">${setup.risk.qqq}{setup.risk.nq ? ` / ${setup.risk.nq} NQ` : ''}</span></div>
+                        <div className="text-gray-600">Move <span className="text-gray-400 font-mono">
+                          {activeSymbol === 'NQ' ? (setup.move.nq ? `${setup.move.nq} NQ` : '—') : `$${setup.move.qqq}`}
+                        </span></div>
+                        <div className="text-gray-600">Risk <span className="text-gray-400 font-mono">
+                          {activeSymbol === 'NQ' ? (setup.risk.nq ? `${setup.risk.nq} NQ` : '—') : `$${setup.risk.qqq}`}
+                        </span></div>
                         <div className={`font-mono font-bold ${rrColor}`}>{setup.rr}:1</div>
                       </div>
                       <div className={`text-xs mt-1 ${rrColor}`}>

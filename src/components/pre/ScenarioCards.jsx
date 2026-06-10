@@ -1,5 +1,5 @@
 export default function ScenarioCards({
-  assistantRead, levels, cascade, currentPrice, nqRatio
+  assistantRead, levels, cascade, currentPrice, nqRatio, activeSymbol = 'NQ'
 }) {
   if (!assistantRead) return null
 
@@ -11,18 +11,21 @@ export default function ScenarioCards({
     l.classification === 'buy_support'
   ).sort((a, b) => b.price - a.price)
 
-  const nq = (p) => nqRatio
-    ? ` (NQ ${Math.round(p * nqRatio).toLocaleString()})`
-    : ''
+  const fmtLvl = (l) => {
+    if (!l) return ''
+    return activeSymbol === 'NQ' && nqRatio
+      ? `NQ ${(Math.round(l.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      : `$${l.price?.toFixed(2)}`
+  }
 
   const bullishTarget = sellLevels?.[0]
-    ? `Break and hold above ${sellLevels[0].id} $${sellLevels[0].price?.toFixed(2)}${nq(sellLevels[0].price)} opens path to next resistance.`
+    ? `Break and hold above ${sellLevels[0].id} ${fmtLvl(sellLevels[0])} opens path to next resistance.`
     : assistantRead.next
 
   const bearishTrigger = cascade?.conditions?.[0]
     ? 'Cascade threshold met — MID dark pool past -0.700. S1 and S2 conditions determine floor.'
     : buyLevels?.[0]
-    ? `Failure at ${buyLevels[0].id} $${buyLevels[0].price?.toFixed(2)}${nq(buyLevels[0].price)} opens downside. Watch for structural void.`
+    ? `Failure at ${buyLevels[0].id} ${fmtLvl(buyLevels[0])} opens downside. Watch for structural void.`
     : assistantRead.risk
 
   const noTrade = assistantRead.invalidation
@@ -36,7 +39,7 @@ export default function ScenarioCards({
       icon: '↑',
       content: bullishTarget,
       sub: buyLevels?.length > 0
-        ? `Support: ${buyLevels.map(l => `${l.id} $${l.price?.toFixed(2)}`).join(', ')}`
+        ? `Support: ${buyLevels.map(l => `${l.id} ${fmtLvl(l)}`).join(', ')}`
         : 'No classified support active',
     },
     {
@@ -47,7 +50,7 @@ export default function ScenarioCards({
       icon: '↓',
       content: bearishTrigger,
       sub: sellLevels?.length > 0
-        ? `Resistance: ${sellLevels.map(l => `${l.id} $${l.price?.toFixed(2)}`).join(', ')}`
+        ? `Resistance: ${sellLevels.map(l => `${l.id} ${fmtLvl(l)}`).join(', ')}`
         : 'No classified resistance active',
     },
     {

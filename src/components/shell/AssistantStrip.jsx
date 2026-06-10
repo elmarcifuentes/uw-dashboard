@@ -1,3 +1,5 @@
+import { formatNarrative } from '../../utils/formatNarrative'
+
 const FIELDS = [
   { key: 'now',          label: 'NOW',      color: 'text-white',     border: 'border-gray-700',      labelColor: 'text-gray-500'  },
   { key: 'next',         label: 'NEXT',     color: 'text-blue-200',  border: 'border-blue-900/50',   labelColor: 'text-blue-500'  },
@@ -5,7 +7,7 @@ const FIELDS = [
   { key: 'invalidation', label: 'IF WRONG', color: 'text-gray-400',  border: 'border-gray-800',      labelColor: 'text-gray-600'  },
 ]
 
-export default function AssistantStrip({ assistantRead }) {
+export default function AssistantStrip({ assistantRead, activeSymbol = 'NQ' }) {
   return (
     <div className="border-b border-gray-800 bg-[#0d1424]">
       <div className="max-w-screen-xl mx-auto px-3 sm:px-4 py-2">
@@ -16,7 +18,9 @@ export default function AssistantStrip({ assistantRead }) {
             {FIELDS.map(f => (
               <div key={f.key} className={`border rounded-lg px-2.5 py-2 ${f.border} bg-[#111827]/50 min-h-[64px]`}>
                 <div className={`text-xs font-bold tracking-wider mb-1 ${f.labelColor}`}>{f.label}</div>
-                <p className={`text-xs leading-relaxed line-clamp-3 ${f.color}`}>{assistantRead[f.key] || '—'}</p>
+                <p className={`text-xs leading-relaxed line-clamp-3 ${f.color}`}>
+                  {formatNarrative(assistantRead[f.key], activeSymbol) || '—'}
+                </p>
               </div>
             ))}
           </div>

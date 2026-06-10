@@ -1,5 +1,5 @@
 export default function ThesisBar({
-  sentiment, levels, cascade, assistantRead, currentPrice, nqRatio
+  sentiment, levels, cascade, assistantRead, currentPrice, nqRatio, activeSymbol = 'NQ'
 }) {
   const dominant = levels
     ?.filter(l => l.classification !== 'no_edge')
@@ -58,7 +58,9 @@ export default function ThesisBar({
                 {dominant.id}
               </span>
               <span className="text-xs text-white font-mono">
-                ${dominant.price?.toFixed(2)}{nq(dominant.price)}
+                {activeSymbol === 'NQ'
+                  ? `NQ ${nqRatio ? (Math.round(dominant.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}`
+                  : `$${dominant.price?.toFixed(2)}`}
               </span>
               {dominant.full_stack && (
                 <span className="text-xs text-yellow-400 font-bold">★</span>

@@ -17,7 +17,7 @@ export default function FocusMode({
   connected, currentPrice, nqPrice,
   priceVelocity, sentiment,
   assistantRead, cascade, levels,
-  nqRatio, onExit
+  nqRatio, onExit, activeSymbol = 'NQ'
 }) {
   const mid   = levels?.find(l => l.id === 'MID')
   const midDp = mid?.dark_pool || 0
@@ -38,6 +38,19 @@ export default function FocusMode({
   }, null)
 
   const nq = p => nqRatio ? Math.round(p * nqRatio).toLocaleString() : null
+  const isNQ = activeSymbol === 'NQ'
+  const fmtPrice = (p) => {
+    if (p == null) return '—'
+    return isNQ
+      ? `NQ ${(Math.round(p * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      : `$${p.toFixed(2)}`
+  }
+  const fmtDist = (d) => {
+    if (d == null) return '—'
+    return isNQ
+      ? `${(Math.round(Math.abs(d) * nqRatio * 4) / 4).toFixed(2)} NQ`
+      : `$${Math.abs(d).toFixed(2)}`
+  }
 
   return (
     <div className="fixed inset-0 bg-[#0a0f1e] z-50 flex flex-col overflow-hidden">
@@ -50,10 +63,14 @@ export default function FocusMode({
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-white font-mono tabular-nums">
-            ${currentPrice?.toFixed(2)}
+            {isNQ
+              ? `NQ ${nqPrice?.toLocaleString('en-US', { minimumFractionDigits: 2 }) ?? '—'}`
+              : `$${currentPrice?.toFixed(2)}`}
           </span>
           <VelocityIndicator velocity={priceVelocity} />
-          <span className="text-sm text-gray-500 font-mono">/ NQ {nqPrice?.toLocaleString()}</span>
+          {isNQ
+            ? <span className="text-sm text-gray-500 font-mono">QQQ ${currentPrice?.toFixed(2)}</span>
+            : <span className="text-sm text-gray-500 font-mono">NQ {nqPrice?.toLocaleString()}</span>}
         </div>
         {sentiment?.state && (
           <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold ${
@@ -144,16 +161,13 @@ export default function FocusMode({
                   {resistance.id} — Resistance
                 </span>
                 <div className="text-lg font-bold text-white font-mono mt-0.5">
-                  ${resistance.price?.toFixed(2)}
-                  {nq(resistance.price) && (
-                    <span className="text-sm text-gray-500 ml-2">NQ {nq(resistance.price)}</span>
-                  )}
+                  {fmtPrice(resistance.price)}
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-xs text-gray-500">above</div>
                 <div className="text-lg font-mono font-bold text-red-400">
-                  +${(resistance.price - currentPrice)?.toFixed(2)}
+                  +{fmtDist(resistance.price - currentPrice)}
                 </div>
               </div>
             </div>
@@ -167,14 +181,18 @@ export default function FocusMode({
         <div className="border-2 border-yellow-400/50 bg-yellow-400/5 rounded-lg px-4 py-4 mb-3 text-center">
           <div className="text-xs text-yellow-500 uppercase tracking-wider mb-1">▶ Current Price</div>
           <div className="text-3xl sm:text-4xl font-bold text-white font-mono tabular-nums">
-            ${currentPrice?.toFixed(2)}
+            {isNQ
+              ? `NQ ${nqPrice?.toLocaleString('en-US', { minimumFractionDigits: 2 }) ?? '—'}`
+              : `$${currentPrice?.toFixed(2)}`}
           </div>
           <div className="text-lg text-yellow-500/70 font-mono mt-1">
-            NQ {nqPrice?.toLocaleString()}
+            {isNQ
+              ? `QQQ $${currentPrice?.toFixed(2)}`
+              : `NQ ${nqPrice?.toLocaleString()}`}
           </div>
           {nearest && (
             <div className="text-xs text-gray-600 mt-2">
-              {Math.abs(currentPrice - nearest.price).toFixed(2)} from {nearest.id}
+              {fmtDist(currentPrice - nearest.price)} from {nearest.id}
             </div>
           )}
         </div>
@@ -187,16 +205,13 @@ export default function FocusMode({
                   {support.id} — Support
                 </span>
                 <div className="text-lg font-bold text-white font-mono mt-0.5">
-                  ${support.price?.toFixed(2)}
-                  {nq(support.price) && (
-                    <span className="text-sm text-gray-500 ml-2">NQ {nq(support.price)}</span>
-                  )}
+                  {fmtPrice(support.price)}
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-xs text-gray-500">below</div>
                 <div className="text-lg font-mono font-bold text-green-400">
-                  -${(currentPrice - support.price)?.toFixed(2)}
+                  -{fmtDist(currentPrice - support.price)}
                 </div>
               </div>
             </div>
