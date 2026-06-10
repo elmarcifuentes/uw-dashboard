@@ -5,6 +5,7 @@ const TABS = [
   { id: 'Intraday',      label: 'Intraday',     live: true },
   { id: 'Post-Session',  label: 'Post-Session'  },
   { id: 'News',          label: 'News'          },
+  { id: 'Catalyst',      label: '⚡ Catalyst',  catalyst: true },
   { id: 'Settings',      label: 'Settings',     locked: true },
   { id: 'Guide',         label: 'Guide'         },
 ]

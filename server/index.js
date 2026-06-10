@@ -2507,6 +2507,148 @@ app.get('/trade/history', (req, res) => {
   res.json({ trades: rows })
 })
 
+// ─── CATALYST DATA ────────────────────────────────────────────────────────────
+
+let catalystCache = null
+
+function scoreCatalystBias(flowData, pcData, gexData, tideData, latestResult) {
+  let upVotes = 0
+  let downVotes = 0
+  const factors = []
+
+  // Factor 1: Put/Call ratio
+  const pc = parseFloat(pcData?.data?.putCallRatio || pcData?.data?.ratio || 0)
+  if (pc > 1.2) {
+    downVotes += 2
+    factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'DOWN', weight: 'HIGH', note: `${pc.toFixed(2)} > 1.2 — bearish positioning` })
+  } else if (pc < 0.8 && pc > 0) {
+    upVotes += 2
+    factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'UP', weight: 'HIGH', note: `${pc.toFixed(2)} < 0.8 — bullish positioning` })
+  } else if (pc > 0) {
+    factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'NEUTRAL', weight: 'MED', note: `${pc.toFixed(2)} — neutral` })
+  }
+
+  // Factor 2: GEX environment
+  const todayGex = gexData?.data?.find(g =>
+    g.expiry === new Date().toISOString().split('T')[0] || g.date === new Date().toISOString().split('T')[0]
+  ) || gexData?.data?.[0]
+  const netGex = parseFloat(todayGex?.net_gex || 0)
+  if (netGex < -50000) {
+    factors.push({ name: '0DTE GEX', value: `${(netGex / 1000).toFixed(0)}k`, vote: 'EXPANSION', weight: 'HIGH', note: 'Negative GEX — move accelerates through levels' })
+  } else if (netGex > 100000) {
+    factors.push({ name: '0DTE GEX', value: `+${(netGex / 1000).toFixed(0)}k`, vote: 'PINNING', weight: 'MED', note: 'Positive GEX — price may pin, smaller move' })
+  } else {
+    factors.push({ name: '0DTE GEX', value: `${(netGex / 1000).toFixed(0)}k`, vote: 'NEUTRAL', weight: 'LOW', note: 'Neutral GEX environment' })
+  }
+
+  // Factor 3: ETF tide
+  const tide = latestResult?.etf_tide || tideData?.data?.direction
+  if (tide === 'bullish') {
+    upVotes += 1
+    factors.push({ name: 'ETF Tide', value: 'BULLISH', vote: 'UP', weight: 'MED', note: 'Institutions buying calls' })
+  } else if (tide === 'bearish') {
+    downVotes += 1
+    factors.push({ name: 'ETF Tide', value: 'BEARISH', vote: 'DOWN', weight: 'MED', note: 'Institutions buying puts' })
+  }
+
+  // Factor 4: MID dark pool
+  const midLevel = latestResult?.levels?.find(l => l.id === 'MID')
+  const midDp = midLevel?.dark_pool || 0
+  if (midDp <= -0.500) {
+    downVotes += 2
+    factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'DOWN', weight: 'HIGH', note: `${midDp.toFixed(3)} — strong institutional selling at MID` })
+  } else if (midDp >= 0.500) {
+    upVotes += 2
+    factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'UP', weight: 'HIGH', note: `${midDp.toFixed(3)} — strong institutional buying at MID` })
+  } else {
+    factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'NEUTRAL', weight: 'LOW', note: `${midDp.toFixed(3)} — no strong signal` })
+  }
+
+  // Factor 5: Recent options flow
+  const flows = flowData?.data || []
+  let callFlow = 0
+  let putFlow = 0
+  flows.slice(0, 20).forEach(f => {
+    const premium = parseFloat(f.total_premium || f.premium || 0)
+    if (f.put_call === 'CALL' || f.type === 'call') callFlow += premium
+    else if (f.put_call === 'PUT' || f.type === 'put') putFlow += premium
+  })
+  if (putFlow > callFlow * 1.5) {
+    downVotes += 2
+    factors.push({ name: 'Options Flow', value: `Puts $${(putFlow / 1000).toFixed(0)}k`, vote: 'DOWN', weight: 'HIGH', note: `Put flow ${((putFlow / Math.max(callFlow, 1)) * 100).toFixed(0)}% above calls` })
+  } else if (callFlow > putFlow * 1.5) {
+    upVotes += 2
+    factors.push({ name: 'Options Flow', value: `Calls $${(callFlow / 1000).toFixed(0)}k`, vote: 'UP', weight: 'HIGH', note: `Call flow ${((callFlow / Math.max(putFlow, 1)) * 100).toFixed(0)}% above puts` })
+  } else {
+    factors.push({ name: 'Options Flow', value: 'Mixed', vote: 'NEUTRAL', weight: 'MED', note: 'No dominant directional flow' })
+  }
+
+  const total = upVotes + downVotes
+  const confidence = total === 0 ? 5 : Math.round(Math.max(upVotes, downVotes) / total * 10)
+  const direction = upVotes > downVotes ? 'UP' : downVotes > upVotes ? 'DOWN' : 'NEUTRAL'
+  const gexNote = netGex < -50000 ? 'expansion' : 'pinning'
+
+  return {
+    direction, confidence, upVotes, downVotes, factors, gexNote,
+    summary: direction === 'UP'
+      ? `Bullish bias — ${confidence}/10 confidence`
+      : direction === 'DOWN'
+      ? `Bearish bias — ${confidence}/10 confidence`
+      : 'No clear directional bias',
+  }
+}
+
+async function fetchCatalystData() {
+  console.log('[catalyst] fetching data...')
+  const UW_BASE = process.env.UW_API_BASE || 'https://api.unusualwhales.com'
+  const UW_KEY  = process.env.UW_API_KEY
+  const headers = { Authorization: `Bearer ${UW_KEY}` }
+
+  const safeFetch = async (url) => {
+    try {
+      const r = await fetch(url, { headers })
+      return r.ok ? await r.json() : null
+    } catch { return null }
+  }
+
+  const [flowData, pcData, gexData, tideData] = await Promise.all([
+    safeFetch(`${UW_BASE}/api/alerts/options-flow?ticker=QQQ&limit=50`),
+    safeFetch(`${UW_BASE}/api/stock/QQQ/put-call-ratio`),
+    safeFetch(`${UW_BASE}/api/stock/QQQ/greek-exposure/expiry`),
+    safeFetch(`${UW_BASE}/api/market/tide`),
+  ])
+
+  const score = scoreCatalystBias(flowData, pcData, gexData, tideData, latest)
+
+  catalystCache = {
+    fetchedAt:    new Date().toISOString(),
+    flow:         flowData?.data || [],
+    putCallRatio: pcData?.data || null,
+    gex:          gexData?.data || [],
+    tide:         tideData?.data || null,
+    score,
+    levels:       latest?.levels || [],
+    currentPrice: latest?.current_price,
+    nqRatio:      latest?.nq_ratio || 41.14,
+  }
+
+  console.log('[catalyst] fetched:', `bias=${score.direction}`, `confidence=${score.confidence}/10`)
+  return catalystCache
+}
+
+app.get('/catalyst/data', (req, res) => {
+  res.json({ cached: catalystCache, timestamp: new Date().toISOString() })
+})
+
+app.post('/catalyst/fetch', async (req, res) => {
+  try {
+    const data = await fetchCatalystData()
+    res.json({ success: true, data })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.listen(PORT, () => {
   console.log(`[server] UW Dashboard API listening on port ${PORT}`)
 })

@@ -12,6 +12,7 @@ import SettingsTab from './components/settings/SettingsTab'
 import LockModal from './components/LockModal'
 import RestartBanner from './components/RestartBanner'
 import ScoutTab from './components/scout/ScoutTab'
+import CatalystTab from './components/catalyst/CatalystTab'
 import { useServerHealth } from './hooks/useServerHealth'
 import { useSSE } from './hooks/useSSE'
 import { useSymbol } from './hooks/useSymbol'
@@ -75,6 +76,21 @@ function AppInner() {
           {activeTab === 'Intraday'     && <Intraday activeSymbol={activeSymbol} activeTrade={activeTrade} setActiveTrades={setActiveTrades} pendingTrade={pendingTrade} onPendingTradeConsumed={() => setPendingTrade(null)} />}
           {activeTab === 'Post-Session' && <PostSession activeSymbol={activeSymbol} nqRatio={nqRatio} />}
           {activeTab === 'News'         && <NewsTab />}
+          {activeTab === 'Catalyst'     && (
+            <CatalystTab
+              levels={result?.levels}
+              currentPrice={currentPrice}
+              nqRatio={nqRatio}
+              activeSymbol={activeSymbol}
+              cascade={result?.cascade}
+              activeTrades={activeTrades}
+              setActiveTrades={setActiveTrades}
+              onEnterTrade={(trade) => {
+                setPendingTrade(trade)
+                setActiveTab('Intraday')
+              }}
+            />
+          )}
           {activeTab === 'Settings'     && <SettingsTab systemPaused={systemPaused} pausedAt={pausedAt} activeSymbol={activeSymbol} />}
           {activeTab === 'Guide'        && <GuideTab />}
         </div>
