@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
+import { formatNarrative } from '../utils/formatNarrative'
 import LevelCard from './LevelCard'
 import EarningsWarning from './EarningsWarning'
 import EconomicCalendar from './EconomicCalendar'
@@ -312,11 +313,11 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
           </div>
           {briefOpen ? (
             <p className="text-xs text-gray-300 leading-relaxed border-l-2 border-purple-900 pl-3">
-              {sessionBrief}
+              {formatNarrative(sessionBrief, activeSymbol)}
             </p>
           ) : (
             <p className="text-xs text-gray-600 italic line-clamp-1">
-              {sessionBrief.slice(0, 120)}...
+              {formatNarrative(sessionBrief, activeSymbol).slice(0, 120)}...
             </p>
           )}
         </div>

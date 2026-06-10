@@ -1,4 +1,6 @@
-export default function SessionBrief({ brief, mode }) {
+import { formatNarrative } from '../utils/formatNarrative'
+
+export default function SessionBrief({ brief, mode, activeSymbol = 'NQ' }) {
   if (!brief || mode !== 'claude') return null
 
   return (
@@ -10,7 +12,9 @@ export default function SessionBrief({ brief, mode }) {
         <span className="text-xs text-purple-400 uppercase tracking-wide">Session Brief</span>
         <span className="text-xs text-gray-600">Claude Haiku</span>
       </div>
-      <p className="text-xs text-gray-300 leading-relaxed">{brief}</p>
+      <p className="text-xs text-gray-300 leading-relaxed">
+        {formatNarrative(brief, activeSymbol)}
+      </p>
     </div>
   )
 }
