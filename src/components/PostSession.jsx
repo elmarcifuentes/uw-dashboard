@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import SessionScoreboard from './post/SessionScoreboard'
+import ThreeColLayout from './layout/ThreeColLayout'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -180,8 +181,8 @@ export default function PostSession({ activeSymbol = 'QQQ', nqRatio = null }) {
   return (
     <div className="space-y-4">
 
-      {/* Session selector + export */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Session selector + export — full width */}
+      <div className="flex items-center gap-3 flex-wrap pt-3">
         <label className="text-xs text-text-tertiary uppercase tracking-wider">Session</label>
         <select
           value={selectedDate || ''}
@@ -206,205 +207,214 @@ export default function PostSession({ activeSymbol = 'QQQ', nqRatio = null }) {
       {storyLoading && <div className="text-text-tertiary text-sm text-center py-8">Loading…</div>}
 
       {story && !storyLoading && (
-        <>
-          <SessionScoreboard session={story} />
-
-          {/* Summary boxes */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Price range */}
-            <div className="bg-bg-card2/60 rounded border border-border-default p-3">
-              <div className="text-xs text-text-tertiary mb-1">Price Range</div>
-              <div className="font-mono text-sm">
-                <span className="text-text-primary">{fmtSessionPrice(story.session.session_low, activeSymbol, nqRatio)}</span>
-                <span className="text-text-tertiary mx-1">—</span>
-                <span className="text-text-primary">{fmtSessionPrice(story.session.session_high, activeSymbol, nqRatio)}</span>
+        <ThreeColLayout
+          whereWidth="lg:w-[35%]"
+          whyWidth="lg:w-[35%]"
+          whatWidth="lg:w-[30%]"
+          where={
+            <>
+              {/* Price range */}
+              <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+                <div className="text-xs text-text-tertiary mb-1">Price Range</div>
+                <div className="font-mono text-sm">
+                  <span className="text-text-primary">{fmtSessionPrice(story.session.session_low, activeSymbol, nqRatio)}</span>
+                  <span className="text-text-tertiary mx-1">—</span>
+                  <span className="text-text-primary">{fmtSessionPrice(story.session.session_high, activeSymbol, nqRatio)}</span>
+                </div>
+                <div className="text-xs mt-1 font-mono">
+                  <span className="text-text-tertiary">Open </span>
+                  <span className="text-text-primary">{fmtSessionPrice(story.session.open_price, activeSymbol, nqRatio)}</span>
+                  <span className="text-text-tertiary mx-1">→ Close </span>
+                  <span className="text-text-primary">{fmtSessionPrice(story.session.close_price, activeSymbol, nqRatio)}</span>
+                </div>
               </div>
-              <div className="text-xs mt-1 font-mono">
-                <span className="text-text-tertiary">Open </span>
-                <span className="text-text-primary">{fmtSessionPrice(story.session.open_price, activeSymbol, nqRatio)}</span>
-                <span className="text-text-tertiary mx-1">→ Close </span>
-                <span className="text-text-primary">{fmtSessionPrice(story.session.close_price, activeSymbol, nqRatio)}</span>
-              </div>
-            </div>
 
-            {/* Enhancement 1 — Signal Accuracy with cascade context */}
-            <div className="bg-bg-card2/60 rounded border border-border-default p-3">
-              <div className="text-xs text-text-tertiary mb-1">Signal Accuracy</div>
-              {story.accuracy.total_classified === 0 ? (
-                <>
-                  <div className="text-2xl font-bold text-text-tertiary">—</div>
-                  <div className="text-xs text-text-tertiary mt-1">
-                    {story.session.cascade_fired
-                      ? 'Cascade session — levels classified as no_edge'
-                      : 'No actionable classifications this session'}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className={`text-2xl font-bold ${
-                    story.accuracy.accuracy_pct == null ? 'text-text-tertiary' :
-                    story.accuracy.accuracy_pct >= 70  ? 'text-green-400' :
-                    story.accuracy.accuracy_pct >= 50  ? 'text-amber-400' : 'text-red-400'
-                  }`}>
-                    {story.accuracy.accuracy_pct != null ? `${story.accuracy.accuracy_pct}%` : '—'}
-                  </div>
-                  <div className="text-text-tertiary text-xs">
-                    {story.accuracy.correct}✓ &nbsp;{story.accuracy.incorrect}✗ &nbsp;{story.accuracy.noise}~
-                    &nbsp;of {story.accuracy.total_classified}
-                  </div>
-                </>
-              )}
-            </div>
+              {/* Level outcomes */}
+              <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+                <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Level Outcomes</div>
 
-            {/* Enhancement 2 — Session Events with cascade detail */}
-            <div className="bg-bg-card2/60 rounded border border-border-default p-3">
-              <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Session Events</div>
-
-              {story.session.cascade_fired ? (
-                <div className="mb-2">
-                  <div className="text-red-400 text-sm font-bold mb-1">⚠ Cascade Fired</div>
-                  {(story.cascade_events || []).map((ce, i) => (
-                    <div key={i} className="text-xs text-text-secondary font-mono pl-2 space-y-0.5">
-                      <div>Fired:    <span className="text-text-primary">{fmtSessionPrice(ce.price_at_fire, activeSymbol, nqRatio)}</span></div>
-                      <div>Resolved: <span className="text-text-primary">{fmtSessionPrice(ce.price_at_resolve, activeSymbol, nqRatio)}</span></div>
-                      <div>Drawdown: <span className="text-amber-400">{ce.drawdown != null ? `$${ce.drawdown}` : '—'}</span></div>
-                      <div className="flex gap-3 mt-0.5">
-                        <span className={ce.reached_s1 ? 'text-red-400' : 'text-text-muted'}>S1 {ce.reached_s1 ? '✓' : '✗'}</span>
-                        <span className={ce.reached_s2 ? 'text-red-400' : 'text-text-muted'}>S2 {ce.reached_s2 ? '✓' : '✗'}</span>
+                {/* Mobile level list */}
+                <div className="block sm:hidden space-y-2">
+                  {story.level_outcomes.map(level => (
+                    <div key={level.level} className="bg-bg-elevated/50 rounded border border-border-default/50 p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-text-primary font-mono font-bold">{level.level}</span>
+                        <span className={`text-xs font-bold ${
+                          level.outcome === 'correct' ? 'text-green-400' :
+                          level.outcome === 'incorrect' ? 'text-red-400' :
+                          level.outcome === 'noise' ? 'text-amber-400' : 'text-text-tertiary'
+                        }`}>{level.outcome?.toUpperCase() || 'PENDING'}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div className="text-text-tertiary">Classification <span className="text-text-secondary font-mono">
+                          {level.classification === 'buy_support' ? 'BUY SUP' : level.classification === 'sell_resistance' ? 'SELL RES' : 'NO EDGE'}
+                        </span></div>
+                        <div className="text-text-tertiary">Score <span className="text-text-secondary font-mono">{level.score}</span></div>
+                        <div className="text-text-tertiary">DP <span className="text-text-secondary font-mono">{level.dark_pool?.toFixed(3) ?? '—'}</span></div>
+                        <div className="text-text-tertiary">Move <span className={`font-mono ${level.price_move == null ? 'text-text-muted' : level.price_move >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {level.price_move != null ? `${level.price_move >= 0 ? '+' : ''}${level.price_move.toFixed(2)}` : '—'}
+                        </span></div>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="text-green-400 text-sm mb-1">✓ No cascade</div>
-              )}
 
-              {story.session.structure_break_fired && (
-                <div className="text-amber-400 text-sm font-bold mb-1">⚠ Structure Break</div>
-              )}
-              {story.session_notes?.expansion_gex_fired && (
-                <div className="text-red-400 text-xs font-bold mb-1">⚠ Expansion GEX fired</div>
-              )}
-              <div className="text-text-tertiary text-xs mt-2">
-                Magnet streak: <span className="text-text-primary">{story.session.magnet_streak ?? '—'}</span>
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-text-tertiary border-b border-border-default">
+                        <th className="text-left py-1.5 pr-2">Level</th>
+                        <th className="text-left py-1.5 pr-2">Class</th>
+                        <th className="text-left py-1.5 pr-2">Conf</th>
+                        <th className="text-right py-1.5 pr-2">Score</th>
+                        <th className="text-right py-1.5 pr-2">DP</th>
+                        <th className="text-left py-1.5 pr-2">Flags</th>
+                        <th className="text-left py-1.5 pr-2">ETF</th>
+                        <th className="text-right py-1.5 pr-2">Move</th>
+                        <th className="text-left py-1.5 pr-2">Outcome</th>
+                        <th className="text-left py-1.5">Override</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {story.level_outcomes.map(level => (
+                        <tr key={level.level} className="border-b border-border-subtle/60 hover:bg-bg-elevated/30">
+                          <td className="py-1.5 pr-2 font-mono font-bold text-text-primary">{level.level}</td>
+                          <td className="py-1.5 pr-2 text-text-secondary">
+                            {level.classification === 'buy_support' ? 'BUY SUP' :
+                             level.classification === 'sell_resistance' ? 'SELL RES' : 'NO EDGE'}
+                          </td>
+                          <td className={`py-1.5 pr-2 ${CONF_COLOR[level.confidence] || 'text-text-tertiary'}`}>
+                            {level.confidence?.toUpperCase() || '—'}
+                          </td>
+                          <td className="py-1.5 pr-2 text-right font-mono text-text-secondary">{level.score}</td>
+                          <td className="py-1.5 pr-2 text-right font-mono text-text-secondary">{level.dark_pool?.toFixed(3) ?? '—'}</td>
+                          <td className="py-1.5 pr-2">
+                            {level.full_stack && <span className="text-yellow-400">★</span>}
+                          </td>
+                          <td className="py-1.5 pr-2">
+                            <span className={
+                              level.etf_direction === 'bullish' ? 'text-green-400' :
+                              level.etf_direction === 'bearish' ? 'text-red-400' : 'text-text-tertiary'
+                            }>
+                              {level.etf_direction === 'bullish' ? '↑' :
+                               level.etf_direction === 'bearish' ? '↓' : '—'}
+                            </span>
+                          </td>
+                          <td className={`py-1.5 pr-2 text-right font-mono tabular-nums ${
+                            level.price_move == null ? 'text-text-muted' :
+                            level.price_move >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {level.price_move != null ? `${level.price_move >= 0 ? '+' : ''}${level.price_move.toFixed(2)}` : '—'}
+                          </td>
+                          <td className={`py-1.5 pr-2 font-bold ${OUTCOME_COLOR[level.outcome] || 'text-text-muted'}`}>
+                            {level.outcome?.toUpperCase() || 'PENDING'}
+                          </td>
+                          <td className="py-1.5">
+                            <select
+                              defaultValue=""
+                              onChange={e => e.target.value && updateOutcome(level.level, e.target.value)}
+                              className="bg-bg-elevated border border-border-strong text-text-secondary text-xs rounded px-1 py-0.5"
+                            >
+                              <option value="">—</option>
+                              <option value="correct">✓ Correct</option>
+                              <option value="incorrect">✗ Incorrect</option>
+                              <option value="noise">~ Noise</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          }
+          why={
+            <>
+              {/* Signal accuracy */}
+              <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+                <div className="text-xs text-text-tertiary mb-1">Signal Accuracy</div>
+                {story.accuracy.total_classified === 0 ? (
+                  <>
+                    <div className="text-2xl font-bold text-text-tertiary">—</div>
+                    <div className="text-xs text-text-tertiary mt-1">
+                      {story.session.cascade_fired
+                        ? 'Cascade session — levels classified as no_edge'
+                        : 'No actionable classifications this session'}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={`text-2xl font-bold ${
+                      story.accuracy.accuracy_pct == null ? 'text-text-tertiary' :
+                      story.accuracy.accuracy_pct >= 70  ? 'text-green-400' :
+                      story.accuracy.accuracy_pct >= 50  ? 'text-amber-400' : 'text-red-400'
+                    }`}>
+                      {story.accuracy.accuracy_pct != null ? `${story.accuracy.accuracy_pct}%` : '—'}
+                    </div>
+                    <div className="text-text-tertiary text-xs">
+                      {story.accuracy.correct}✓ &nbsp;{story.accuracy.incorrect}✗ &nbsp;{story.accuracy.noise}~
+                      &nbsp;of {story.accuracy.total_classified}
+                    </div>
+                  </>
+                )}
+              </div>
 
-          {/* Enhancement 3 — Level outcomes with Flags + ETF columns */}
-          <div className="bg-bg-card2/60 rounded border border-border-default p-3">
-            <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Level Outcomes</div>
-
-            {/* Mobile level list */}
-            <div className="block sm:hidden space-y-2">
-              {story.level_outcomes.map(level => (
-                <div key={level.level} className="bg-bg-elevated/50 rounded border border-border-default/50 p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-text-primary font-mono font-bold">{level.level}</span>
-                    <span className={`text-xs font-bold ${
-                      level.outcome === 'correct' ? 'text-green-400' :
-                      level.outcome === 'incorrect' ? 'text-red-400' :
-                      level.outcome === 'noise' ? 'text-amber-400' : 'text-text-tertiary'
-                    }`}>{level.outcome?.toUpperCase() || 'PENDING'}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div className="text-text-tertiary">Classification <span className="text-text-secondary font-mono">
-                      {level.classification === 'buy_support' ? 'BUY SUP' : level.classification === 'sell_resistance' ? 'SELL RES' : 'NO EDGE'}
-                    </span></div>
-                    <div className="text-text-tertiary">Score <span className="text-text-secondary font-mono">{level.score}</span></div>
-                    <div className="text-text-tertiary">DP <span className="text-text-secondary font-mono">{level.dark_pool?.toFixed(3) ?? '—'}</span></div>
-                    <div className="text-text-tertiary">Move <span className={`font-mono ${level.price_move == null ? 'text-text-muted' : level.price_move >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {level.price_move != null ? `${level.price_move >= 0 ? '+' : ''}${level.price_move.toFixed(2)}` : '—'}
-                    </span></div>
+              {/* High confidence */}
+              {story.accuracy.high_confidence_calls > 0 && (
+                <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+                  <div className="text-xs text-text-tertiary mb-1 uppercase tracking-wider">High Confidence Accuracy</div>
+                  <div className="text-2xl font-bold text-green-400">{story.accuracy.high_confidence_accuracy_pct}%</div>
+                  <div className="text-xs text-text-tertiary">
+                    {story.accuracy.high_confidence_correct} correct of {story.accuracy.high_confidence_calls} high confidence calls
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
 
-            <div className="hidden sm:block">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-text-tertiary border-b border-border-default">
-                  <th className="text-left py-1.5 pr-2">Level</th>
-                  <th className="text-left py-1.5 pr-2">Classification</th>
-                  <th className="text-left py-1.5 pr-2">Conf</th>
-                  <th className="text-right py-1.5 pr-2">Score</th>
-                  <th className="text-right py-1.5 pr-2">DP</th>
-                  <th className="text-left py-1.5 pr-2">Flags</th>
-                  <th className="text-left py-1.5 pr-2">ETF</th>
-                  <th className="text-right py-1.5 pr-2">Move</th>
-                  <th className="text-left py-1.5 pr-2">Outcome</th>
-                  <th className="text-left py-1.5">Override</th>
-                </tr>
-              </thead>
-              <tbody>
-                {story.level_outcomes.map(level => (
-                  <tr key={level.level} className="border-b border-border-subtle/60 hover:bg-bg-elevated/30">
-                    <td className="py-1.5 pr-2 font-mono font-bold text-text-primary">{level.level}</td>
-                    <td className="py-1.5 pr-2 text-text-secondary">
-                      {level.classification === 'buy_support' ? 'BUY SUP' :
-                       level.classification === 'sell_resistance' ? 'SELL RES' : 'NO EDGE'}
-                    </td>
-                    <td className={`py-1.5 pr-2 ${CONF_COLOR[level.confidence] || 'text-text-tertiary'}`}>
-                      {level.confidence?.toUpperCase() || '—'}
-                    </td>
-                    <td className="py-1.5 pr-2 text-right font-mono text-text-secondary">{level.score}</td>
-                    <td className="py-1.5 pr-2 text-right font-mono text-text-secondary">{level.dark_pool?.toFixed(3) ?? '—'}</td>
-                    <td className="py-1.5 pr-2">
-                      {level.full_stack && <span className="text-yellow-400">★</span>}
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <span className={
-                        level.etf_direction === 'bullish' ? 'text-green-400' :
-                        level.etf_direction === 'bearish' ? 'text-red-400' : 'text-text-tertiary'
-                      }>
-                        {level.etf_direction === 'bullish' ? '↑' :
-                         level.etf_direction === 'bearish' ? '↓' : '—'}
-                      </span>
-                    </td>
-                    <td className={`py-1.5 pr-2 text-right font-mono tabular-nums ${
-                      level.price_move == null ? 'text-text-muted' :
-                      level.price_move >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {level.price_move != null ? `${level.price_move >= 0 ? '+' : ''}${level.price_move.toFixed(2)}` : '—'}
-                    </td>
-                    <td className={`py-1.5 pr-2 font-bold ${OUTCOME_COLOR[level.outcome] || 'text-text-muted'}`}>
-                      {level.outcome?.toUpperCase() || 'PENDING'}
-                    </td>
-                    <td className="py-1.5">
-                      <select
-                        defaultValue=""
-                        onChange={e => e.target.value && updateOutcome(level.level, e.target.value)}
-                        className="bg-bg-elevated border border-border-strong text-text-secondary text-xs rounded px-1 py-0.5"
-                      >
-                        <option value="">—</option>
-                        <option value="correct">✓ Correct</option>
-                        <option value="incorrect">✗ Incorrect</option>
-                        <option value="noise">~ Noise</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </div>
+              {/* Session events */}
+              <div className="bg-bg-card2/60 rounded border border-border-default p-3">
+                <div className="text-xs text-text-tertiary mb-2 uppercase tracking-wider">Session Events</div>
 
-          {/* High confidence */}
-          {story.accuracy.high_confidence_calls > 0 && (
-            <div className="bg-bg-card2/60 rounded border border-border-default p-3">
-              <div className="text-xs text-text-tertiary mb-1 uppercase tracking-wider">High Confidence Accuracy</div>
-              <div className="text-2xl font-bold text-green-400">{story.accuracy.high_confidence_accuracy_pct}%</div>
-              <div className="text-xs text-text-tertiary">
-                {story.accuracy.high_confidence_correct} correct of {story.accuracy.high_confidence_calls} high confidence calls
+                {story.session.cascade_fired ? (
+                  <div className="mb-2">
+                    <div className="text-red-400 text-sm font-bold mb-1">⚠ Cascade Fired</div>
+                    {(story.cascade_events || []).map((ce, i) => (
+                      <div key={i} className="text-xs text-text-secondary font-mono pl-2 space-y-0.5">
+                        <div>Fired:    <span className="text-text-primary">{fmtSessionPrice(ce.price_at_fire, activeSymbol, nqRatio)}</span></div>
+                        <div>Resolved: <span className="text-text-primary">{fmtSessionPrice(ce.price_at_resolve, activeSymbol, nqRatio)}</span></div>
+                        <div>Drawdown: <span className="text-amber-400">{ce.drawdown != null ? `$${ce.drawdown}` : '—'}</span></div>
+                        <div className="flex gap-3 mt-0.5">
+                          <span className={ce.reached_s1 ? 'text-red-400' : 'text-text-muted'}>S1 {ce.reached_s1 ? '✓' : '✗'}</span>
+                          <span className={ce.reached_s2 ? 'text-red-400' : 'text-text-muted'}>S2 {ce.reached_s2 ? '✓' : '✗'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-green-400 text-sm mb-1">✓ No cascade</div>
+                )}
+
+                {story.session.structure_break_fired && (
+                  <div className="text-amber-400 text-sm font-bold mb-1">⚠ Structure Break</div>
+                )}
+                {story.session_notes?.expansion_gex_fired && (
+                  <div className="text-red-400 text-xs font-bold mb-1">⚠ Expansion GEX fired</div>
+                )}
+                <div className="text-text-tertiary text-xs mt-2">
+                  Magnet streak: <span className="text-text-primary">{story.session.magnet_streak ?? '—'}</span>
+                </div>
               </div>
-            </div>
-          )}
 
-          {story.timeline?.length > 0 && (
-            <SessionTimeline events={story.timeline} activeSymbol={activeSymbol} nqRatio={nqRatio} />
-          )}
-        </>
+              {/* Timeline */}
+              {story.timeline?.length > 0 && (
+                <SessionTimeline events={story.timeline} activeSymbol={activeSymbol} nqRatio={nqRatio} />
+              )}
+            </>
+          }
+          what={
+            <SessionScoreboard session={story} />
+          }
+        />
       )}
     </div>
   )
