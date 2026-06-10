@@ -1999,22 +1999,24 @@ async function fetchFromPolygon(ticker, bars, interval) {
 async function fetchFromPolygonFutures(bars, interval) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
-  const daysBack   = POLYGON_DAYS_BACK[interval] || 730
-  const to         = new Date().toISOString().split('T')[0]
-  const from       = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
   for (const fticker of getNqFuturesCandidates()) {
     try {
-      const url   = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&from=${from}&to=${to}&limit=50000&apiKey=${POLYGON_KEY}`
+      // Request exactly bars+50 so we have headroom after filtering nulls; sort desc (newest first)
+      const fetchLimit = bars + 50
+      const url   = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&limit=${fetchLimit}&sort=desc&apiKey=${POLYGON_KEY}`
       const res   = await fetch(url)
       const data  = await res.json()
-      const count = data.results?.length ?? 0
-      if (count >= bars) {
-        const results = data.results.slice().reverse().slice(-bars)
-        console.log(`[labs] NQ: source=polygon-futures (${fticker}) bars=${count}`)
+      const total = data.results?.length ?? 0
+      if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars`); continue }
+      // desc → asc, then take last `bars`
+      const all     = data.results.slice().reverse()
+      const results = all.slice(-bars)
+      console.log(`[labs] Polygon futures ${fticker}: requested=${fetchLimit} total=${total} used=${results.length}`)
+      if (results.length >= Math.min(bars, 10)) {
         return { closes: results.map(r => r.close), highs: results.map(r => r.high), lows: results.map(r => r.low), source: `polygon-futures (${fticker})` }
       }
-      console.warn(`[labs] Polygon futures ${fticker}: ${count} bars (need ${bars})`)
+      console.warn(`[labs] Polygon futures ${fticker}: only ${results.length} usable bars (need ${bars})`)
     } catch (err) {
       console.warn(`[labs] Polygon futures ${fticker} failed:`, err.message)
     }
@@ -2026,43 +2028,62 @@ async function fetchOHLC(ticker, bars = 250, interval = '1d') {
   const isQQQ = ticker === 'QQQ'
   const isNQ  = ticker === 'NQ=F' || ticker === '/NQ' || ticker === 'NQ'
 
+  let result
   if (isQQQ) {
     if (labsDataSources.qqq === 'polygon') {
-      try { return await fetchFromPolygon('QQQ', bars, interval) }
+      try { result = await fetchFromPolygon('QQQ', bars, interval) }
       catch (err) { console.warn('[labs] Polygon QQQ failed:', err.message, '— falling back to Yahoo') }
     }
-    return await fetchFromYahoo('QQQ', bars, interval)
-  }
-
-  if (isNQ) {
+    if (!result) result = await fetchFromYahoo('QQQ', bars, interval)
+  } else if (isNQ) {
     if (labsDataSources.nq === 'polygon') {
-      try { return await fetchFromPolygonFutures(bars, interval) }
+      try { result = await fetchFromPolygonFutures(bars, interval) }
       catch (err) { console.warn('[labs] Polygon NQ failed:', err.message, '— falling back to Yahoo') }
     }
-    return await fetchFromYahoo('NQ=F', bars, interval)
+    if (!result) result = await fetchFromYahoo('NQ=F', bars, interval)
+  } else {
+    result = await fetchFromYahoo(ticker, bars, interval)
   }
 
-  return await fetchFromYahoo(ticker, bars, interval)
+  // Hard cap — never pass more bars than requested to calcATR
+  if (result?.closes?.length > bars) {
+    console.warn(`[labs] fetchOHLC ${ticker}: got ${result.closes.length} bars, slicing to ${bars}`)
+    result = {
+      closes: result.closes.slice(-bars),
+      highs:  result.highs.slice(-bars),
+      lows:   result.lows.slice(-bars),
+      source: result.source,
+    }
+  }
+
+  console.log(`[labs] fetchOHLC ${ticker}: source=${result?.source} bars=${result?.closes?.length}`)
+  return result
 }
 
 // Raw Wilder-smoothed ATR (no mult applied)
 function calcATR(highs, lows, closes, length) {
-  const n   = closes.length
-  if (n < 2) return 0
-  const len = Math.min(length, n - 1)
-  let atr = 0, count = 0
-  for (let i = 1; i <= len; i++) {
-    if (!closes[i] || !highs[i] || !lows[i]) continue
-    atr += Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i-1]), Math.abs(lows[i] - closes[i-1]))
-    count++
+  if (!highs?.length || highs.length < 2) return 0
+  // Build TR series (index 1..n-1)
+  const trValues = []
+  for (let i = 1; i < highs.length; i++) {
+    if (!closes[i] || !highs[i] || !lows[i] || !closes[i-1]) continue
+    trValues.push(Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i-1]),
+      Math.abs(lows[i]  - closes[i-1])
+    ))
   }
-  if (!count) return 0
-  atr = atr / count
-  for (let i = len + 1; i < n; i++) {
-    if (!closes[i] || !highs[i] || !lows[i]) continue
-    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i-1]), Math.abs(lows[i] - closes[i-1]))
-    atr = (atr * (len - 1) + tr) / len
+  if (trValues.length < length) {
+    return trValues.reduce((a, b) => a + b, 0) / trValues.length
   }
+  // Seed: simple average of first `length` TR values
+  let atr = trValues.slice(0, length).reduce((a, b) => a + b, 0) / length
+  // Wilder smoothing over remaining bars
+  for (let i = length; i < trValues.length; i++) {
+    atr = (atr * (length - 1) + trValues[i]) / length
+  }
+  const tr10avg = trValues.slice(0, 10).reduce((a, b) => a + b, 0) / Math.min(10, trValues.length)
+  console.log(`[labs] calcATR: bars=${highs.length} length=${length} tr[0]=${trValues[0]?.toFixed(3)} tr_avg10=${tr10avg.toFixed(3)} atr=${atr.toFixed(3)}`)
   return atr
 }
 
