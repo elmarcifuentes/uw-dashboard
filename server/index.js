@@ -2237,12 +2237,7 @@ function setupLabsCron(cron, interval) {
     calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
   }, { timezone: 'America/New_York' }))
 
-  labsCronTasks.push(cron.schedule('0 9 * * 1-5', () => {
-    console.log('[labs] pre-market recalc')
-    calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
-  }, { timezone: 'America/New_York' }))
-
-  console.log(`[labs] crons set: intra=${intraSchedule} + 9:00am + 4:35pm ET`)
+  console.log(`[labs] crons set: intra=${intraSchedule} + 4:35pm ET`)
 }
 
 // Schedule via dynamic import (ESM-compatible, graceful if node-cron not installed)
