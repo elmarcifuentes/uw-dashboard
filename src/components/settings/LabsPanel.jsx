@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Info } from 'lucide-react'
 import HeatmapView from '../labs/HeatmapView'
 import LevelComparison from '../labs/LevelComparison'
 import TradeSetupCard from '../labs/TradeSetupCard'
@@ -201,6 +202,45 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
             })} ET
           </span>
         )}
+
+        {/* Info tooltip */}
+        <div className="relative group ml-auto">
+          <Info
+            size={13}
+            className="text-text-disabled hover:text-text-tertiary cursor-help transition-colors"
+          />
+          <div className="absolute right-0 bottom-full mb-2 w-72 z-50 bg-bg-elevated border border-border-default rounded-lg p-3 shadow-elevated invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-none">
+            <div className="text-micro font-bold text-text-tertiary uppercase tracking-wider mb-2">Current Settings</div>
+            <div className="font-price text-xs text-text-primary mb-3">
+              ATR({settings.length}) × {settings.mult} · 250 bars · {settings.interval}
+              {autoLevels?.lastCalculated && (
+                <span className="text-text-muted ml-1">
+                  · {new Date(autoLevels.lastCalculated).toLocaleTimeString('en-US', {
+                    timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit'
+                  })} ET
+                </span>
+              )}
+            </div>
+            <div className="border-t border-border-subtle mb-2" />
+            <div className="space-y-1.5">
+              <div>
+                <span className="text-micro font-bold text-text-secondary">Length</span>
+                <span className="text-micro text-text-muted ml-1">(default 200)</span>
+                <p className="text-micro text-text-muted mt-0.5">ATR period. Shorter = more responsive to recent volatility. Longer = smoother, more stable levels.</p>
+              </div>
+              <div>
+                <span className="text-micro font-bold text-text-secondary">Factor</span>
+                <span className="text-micro text-text-muted ml-1">(default 6.0)</span>
+                <p className="text-micro text-text-muted mt-0.5">Band multiplier. Lower = tighter levels for quiet markets. Higher = wider levels for volatile markets (CPI, Fed weeks).</p>
+              </div>
+              <div>
+                <span className="text-micro font-bold text-text-secondary">Timeframe</span>
+                <p className="text-micro text-text-muted mt-0.5">Bar size for calculation. 5m matches intraday session structure. Preview only — active levels always use 5m.</p>
+              </div>
+            </div>
+            <div className="absolute right-3 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-border-default" />
+          </div>
+        </div>
       </div>
 
       {loading ? (
