@@ -32,7 +32,7 @@ function AppInner() {
   const { activeSymbol, changeSymbol } = useSymbol()
   const [pendingTrade, setPendingTrade] = useState(null)
 
-  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt, activeTrades, setActiveTrades } = useSSE(`${API_URL}/stream`)
+  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt, activeTrades, setActiveTrades, sessionRatio, sessionRatioLockedAt, ratioIsLocked } = useSSE(`${API_URL}/stream`)
   const activeTrade = activeTrades?.[activeSymbol] || null
 
   const result        = useMemo(() => rescoreData?.result ?? null, [rescoreData])
@@ -91,7 +91,7 @@ function AppInner() {
               }}
             />
           )}
-          {activeTab === 'Settings'     && <SettingsTab systemPaused={systemPaused} pausedAt={pausedAt} activeSymbol={activeSymbol} />}
+          {activeTab === 'Settings'     && <SettingsTab systemPaused={systemPaused} pausedAt={pausedAt} activeSymbol={activeSymbol} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} ratioIsLocked={ratioIsLocked} />}
           {activeTab === 'Guide'        && <GuideTab />}
         </div>
       </main>

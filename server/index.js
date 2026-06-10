@@ -114,6 +114,11 @@ try {
   }
 } catch {}
 
+// Session ratio lock — locked at 9:30 AM ET, persists all session
+let sessionRatio         = null
+let sessionRatioLockedAt = null
+let sessionRatioDate     = null
+
 // Auto-score toggle — default ON
 let autoScoreEnabled = true
 try {
@@ -1210,6 +1215,9 @@ app.get('/status', (req, res) => {
     nqOffsets,
     autoScoreEnabled,
     activeSymbolPref,
+    sessionRatio,
+    sessionRatioLockedAt,
+    ratioIsLocked: !!sessionRatio,
   })
 })
 
@@ -2169,18 +2177,39 @@ try {
     console.log('[labs] data sources restored:', labsDataSources)
   }
 } catch (e) {}
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'session_ratio'`).get()
+  if (saved?.value) {
+    const data  = JSON.parse(saved.value)
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+    if (data.date === today) {
+      sessionRatio         = data.ratio
+      sessionRatioLockedAt = data.lockedAt
+      sessionRatioDate     = data.date
+      console.log('[ratio] restored:', sessionRatio, 'locked at', sessionRatioLockedAt)
+    } else {
+      console.log('[ratio] stale — will lock at next 9:30 AM')
+    }
+  }
+} catch (e) {}
 
 const nqRound = v => Math.round(v * 4) / 4
 
-// Apply auto levels to daily_levels + trigger rescore when mode is auto/auto_qqq
+// Returns session-locked ratio if available, otherwise falls back to live
+function getActiveRatio() {
+  return sessionRatio || nqOffsets.ratio || latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
+}
+
+// Apply auto levels to daily_levels + trigger rescore when mode is auto/auto_qqq/auto_nq
 async function applyAutoLevelsIfEnabled() {
   if (systemPaused) return
   if (levelSourceMode === 'manual') return
-  if (!labsAutoLevels?.qqq) return
+  if (levelSourceMode === 'auto_nq' && !labsAutoLevels?.nq)  return
+  if (levelSourceMode !== 'auto_nq' && !labsAutoLevels?.qqq) return
 
   const qqq   = labsAutoLevels.qqq
   const nq    = labsAutoLevels.nq
-  const ratio = nqOffsets.ratio || latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
+  const ratio = getActiveRatio()
 
   let levelData
   if (levelSourceMode === 'auto') {
@@ -2198,6 +2227,14 @@ async function applyAutoLevelsIfEnabled() {
       mid_qqq: qqq.MID, mid_nq: nqRound(qqq.MID * ratio) + (nqOffsets.MID || 0),
       s1_qqq:  qqq.S1,  s1_nq:  nqRound(qqq.S1  * ratio) + (nqOffsets.S1  || 0),
       s2_qqq:  qqq.S2,  s2_nq:  nqRound(qqq.S2  * ratio) + (nqOffsets.S2  || 0),
+    }
+  } else if (levelSourceMode === 'auto_nq') {
+    levelData = {
+      r2_nq:  nq.R2,  r2_qqq:  parseFloat((nq.R2  / ratio).toFixed(2)),
+      r1_nq:  nq.R1,  r1_qqq:  parseFloat((nq.R1  / ratio).toFixed(2)),
+      mid_nq: nq.MID, mid_qqq: parseFloat((nq.MID / ratio).toFixed(2)),
+      s1_nq:  nq.S1,  s1_qqq:  parseFloat((nq.S1  / ratio).toFixed(2)),
+      s2_nq:  nq.S2,  s2_qqq:  parseFloat((nq.S2  / ratio).toFixed(2)),
     }
   } else { return }
 
@@ -2317,6 +2354,31 @@ function setupLabsCron(cron, interval) {
 import('node-cron').then(({ default: cron }) => {
   labsCron = cron
   setupLabsCron(cron, labsSettings.activeInterval)
+
+  // Lock NQ/QQQ ratio at 9:30 AM ET for consistent session level conversion
+  cron.schedule('30 9 * * 1-5', () => {
+    const liveRatio = latest?.nq_ratio
+    if (!liveRatio) { console.warn('[ratio] no live ratio at 9:30 — skipping lock'); return }
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+    const now   = new Date().toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    })
+    sessionRatio         = parseFloat(liveRatio.toFixed(4))
+    sessionRatioLockedAt = now
+    sessionRatioDate     = today
+    db.prepare(`
+      INSERT INTO settings (key, value, updated_at)
+      VALUES ('session_ratio', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+    `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date: today }))
+    console.log('[ratio] LOCKED at 9:30 AM:', sessionRatio)
+    sseEmitter.emit('event', {
+      type: 'ratio_locked', ratio: sessionRatio, lockedAt: sessionRatioLockedAt,
+      timestamp: new Date().toISOString()
+    })
+    if (levelSourceMode !== 'manual') applyAutoLevelsIfEnabled()
+  }, { timezone: 'America/New_York' })
+
 }).catch(e => {
   console.log('[labs] node-cron not available:', e.message)
 })
@@ -2470,7 +2532,7 @@ app.post('/scoring/auto-score', (req, res) => {
 
 app.post('/levels/source-mode', async (req, res) => {
   const { mode } = req.body
-  const valid = ['auto', 'auto_qqq', 'manual']
+  const valid = ['auto', 'auto_qqq', 'auto_nq', 'manual']
   if (!valid.includes(mode)) return res.status(400).json({ error: 'Invalid mode' })
 
   levelSourceMode = mode
@@ -2485,6 +2547,30 @@ app.post('/levels/source-mode', async (req, res) => {
 
   sseEmitter.emit('event', { type: 'level_source_mode_changed', mode, timestamp: new Date().toISOString() })
   res.json({ success: true, mode })
+})
+
+app.post('/ratio/lock', (req, res) => {
+  const { ratio } = req.body
+  if (!ratio || isNaN(parseFloat(ratio))) return res.status(400).json({ error: 'Invalid ratio' })
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  const now   = new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit'
+  })
+  sessionRatio         = parseFloat(parseFloat(ratio).toFixed(4))
+  sessionRatioLockedAt = `${now} (manual)`
+  sessionRatioDate     = today
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('session_ratio', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date: today }))
+  console.log('[ratio] MANUALLY locked:', sessionRatio)
+  sseEmitter.emit('event', {
+    type: 'ratio_locked', ratio: sessionRatio, lockedAt: sessionRatioLockedAt,
+    timestamp: new Date().toISOString()
+  })
+  if (levelSourceMode !== 'manual') applyAutoLevelsIfEnabled()
+  res.json({ success: true, ratio: sessionRatio, lockedAt: sessionRatioLockedAt })
 })
 
 app.post('/levels/nq-offsets', async (req, res) => {

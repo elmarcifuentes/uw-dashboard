@@ -26,6 +26,9 @@ export function useSSE(url) {
   const [systemPaused, setSystemPaused]       = useState(false)
   const [pausedAt, setPausedAt]               = useState(null)
   const [activeTrades, setActiveTrades]       = useState({})
+  const [sessionRatio, setSessionRatio]       = useState(null)
+  const [sessionRatioLockedAt, setSessionRatioLockedAt] = useState(null)
+  const [ratioIsLocked, setRatioIsLocked]     = useState(false)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
   const priceHistoryRef = useRef([])
@@ -92,6 +95,17 @@ export function useSSE(url) {
         fetch(`${apiBase}/level-touches`)
           .then(r => r.json())
           .then(data => { if (data?.touches) setLevelTouches(data.touches) })
+          .catch(() => {})
+        // Restore ratio lock state
+        fetch(`${apiBase}/status`)
+          .then(r => r.json())
+          .then(data => {
+            if (data?.ratioIsLocked) {
+              setRatioIsLocked(true)
+              setSessionRatio(data.sessionRatio)
+              setSessionRatioLockedAt(data.sessionRatioLockedAt)
+            }
+          })
           .catch(() => {})
         // Restore active trades (per-symbol)
         fetch(`${apiBase}/trade/active`)
@@ -228,6 +242,12 @@ export function useSSE(url) {
           setActiveTrades(prev => ({ ...prev, [data.symbol]: null }))
           return
         }
+        if (data.type === 'ratio_locked') {
+          setRatioIsLocked(true)
+          setSessionRatio(data.ratio)
+          setSessionRatioLockedAt(data.lockedAt)
+          return
+        }
       }
 
       es.onerror = () => {
@@ -271,5 +291,8 @@ export function useSSE(url) {
     pausedAt,
     activeTrades,
     setActiveTrades,
+    sessionRatio,
+    sessionRatioLockedAt,
+    ratioIsLocked,
   }
 }

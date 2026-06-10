@@ -153,7 +153,7 @@ function LevelPreviewTable({ qqq, nq, ratio }) {
   )
 }
 
-export default function SystemPanel({ systemPaused, pausedAt }) {
+export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sessionRatioLockedAt, ratioIsLocked }) {
   const [levels, setLevels]         = useState(emptyLevels())
   const [savedDate, setSavedDate]   = useState(null)
   const [isToday, setIsToday]       = useState(false)
@@ -613,7 +613,67 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
             </div>
           )}
 
-          {/* Mode 3 — Full Manual */}
+          {/* Mode 3 — Auto NQ native + derived QQQ */}
+          <button
+            onClick={() => handleModeChange('auto_nq')}
+            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+              levelSourceMode === 'auto_nq'
+                ? 'border-emerald-600 bg-emerald-950/20'
+                : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className={`text-xs font-bold ${levelSourceMode === 'auto_nq' ? 'text-emerald-400' : 'text-text-secondary'}`}>
+                  🤖 Auto NQ · Derived QQQ
+                </div>
+                <div className="text-xs text-text-muted mt-0.5">NQ native levels · QQQ = NQ ÷ ratio for UW scoring · ratio locks at 9:30</div>
+              </div>
+              {levelSourceMode === 'auto_nq' && <span className="text-emerald-500 text-xs shrink-0 ml-2">● active</span>}
+            </div>
+          </button>
+
+          {levelSourceMode === 'auto_nq' && (
+            <div className="border border-emerald-900/40 bg-emerald-950/10 rounded-lg p-3 ml-2 space-y-3">
+              <div className={`text-xs px-2 py-1.5 rounded flex items-center gap-2 ${
+                ratioIsLocked
+                  ? 'bg-state-holdSoft text-state-hold'
+                  : 'bg-bg-card2 text-text-muted'
+              }`}>
+                {ratioIsLocked ? (
+                  <>
+                    <span>🔒</span>
+                    <span className="font-bold">{sessionRatio?.toFixed(4)}</span>
+                    <span>locked {sessionRatioLockedAt} ET</span>
+                  </>
+                ) : (
+                  <span>Live ratio — locks automatically at 9:30 AM ET</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-text-tertiary shrink-0">Manual override</span>
+                <input
+                  type="number"
+                  placeholder={sessionRatio || ratio?.toFixed(3) || '41.14'}
+                  step="0.001"
+                  className="bg-bg-elevated text-text-primary font-mono text-xs rounded px-2 py-1 border border-border-strong focus:border-emerald-500 focus:outline-none w-28"
+                  onBlur={e => {
+                    if (!e.target.value) return
+                    fetch(`${API_URL}/ratio/lock`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ratio: parseFloat(e.target.value) })
+                    }).catch(() => {})
+                    e.target.value = ''
+                  }}
+                />
+                <span className="text-xs text-text-disabled">locks immediately</span>
+              </div>
+              <AutoScoreToggle enabled={autoScoreEnabled} onToggle={handleAutoScoreToggle} />
+            </div>
+          )}
+
+          {/* Mode 4 — Full Manual */}
           <button
             onClick={() => handleModeChange('manual')}
             className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
@@ -692,9 +752,22 @@ export default function SystemPanel({ systemPaused, pausedAt }) {
       {(ratio || isToday || history.length > 0) && (
         <Section title="Saved Levels">
           {ratio && (
-            <div className="bg-bg-elevated rounded px-3 py-2 flex items-center justify-between mb-3">
+            <div className="bg-bg-elevated rounded px-3 py-2 flex items-center justify-between mb-3 gap-2 flex-wrap">
               <span className="text-xs text-text-secondary">NQ/QQQ Ratio</span>
-              <span className="text-xs font-mono text-text-primary font-bold">{ratio.toFixed(4)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-text-primary font-bold">
+                  {(ratioIsLocked ? sessionRatio : ratio)?.toFixed(4)}
+                </span>
+                {ratioIsLocked ? (
+                  <span className="text-xs px-1.5 py-0.5 rounded font-bold bg-state-holdSoft text-state-hold">
+                    🔒 {sessionRatioLockedAt}
+                  </span>
+                ) : (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-bg-card2 text-text-muted">
+                    Live (locks 9:30 ET)
+                  </span>
+                )}
+              </div>
             </div>
           )}
           {isToday && (
