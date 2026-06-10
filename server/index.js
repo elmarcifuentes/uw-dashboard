@@ -1903,8 +1903,9 @@ app.get('/narrative', (req, res) => {
 
 // ─── LABS: Auto Level Detection ─────────────────────────────────────────────
 
-let labsAutoLevels = { qqq: null, nq: null, lastCalculated: null }
-let labsSettings   = { interval: '5m', activeInterval: '5m', length: 200, mult: 6.0 }
+let labsAutoLevels  = { qqq: null, nq: null, lastCalculated: null }
+let labsSettings    = { interval: '5m', activeInterval: '5m', length: 200, mult: 6.0 }
+let labsDataSources = { qqq: 'yahoo', nq: 'polygon' }
 
 const YAHOO_INTERVAL_MAP = {
   '1m':  { interval: '1m',  range: '7d'  },
@@ -1952,71 +1953,86 @@ function getNqFuturesCandidates() {
   ]
 }
 
-async function fetchOHLC(ticker, bars = 250, interval = '1d') {
-  const POLYGON_KEY = process.env.POLYGON_API_KEY
-  const isNQ        = ticker === 'NQ=F' || ticker === '/NQ' || ticker === 'NQ'
-
-  if (POLYGON_KEY) {
-    const daysBack = POLYGON_DAYS_BACK[interval] || 730
-    const to       = new Date().toISOString().split('T')[0]
-    const from     = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-
-    if (isNQ) {
-      // NQ futures: dedicated futures endpoint, resolution param, full field names, descending by default
-      const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
-      for (const fticker of getNqFuturesCandidates()) {
-        try {
-          const url  = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&from=${from}&to=${to}&limit=50000&apiKey=${POLYGON_KEY}`
-          const res  = await fetch(url)
-          const data = await res.json()
-          const count = data.results?.length ?? 0
-          if (count >= bars) {
-            // API returns descending — reverse to chronological then take last `bars`
-            const results = data.results.slice().reverse().slice(-bars)
-            console.log(`[labs] NQ: source=polygon-futures (${fticker}) bars=${count}`)
-            return { closes: results.map(r => r.close), highs: results.map(r => r.high), lows: results.map(r => r.low), source: `polygon-futures (${fticker})` }
-          }
-          console.warn(`[labs] Polygon futures ${fticker}: ${count} bars (need ${bars})`)
-        } catch (err) {
-          console.warn(`[labs] Polygon futures ${fticker} failed:`, err.message)
-        }
-      }
-      console.warn(`[labs] NQ: all Polygon futures candidates failed — falling back to Yahoo`)
-    } else {
-      // Standard equity/ETF via stocks API
-      const pg = POLYGON_INTERVAL_MAP[interval] || POLYGON_INTERVAL_MAP['1d']
-      try {
-        const url  = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/${pg.multiplier}/${pg.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
-        const res  = await fetch(url)
-        const data = await res.json()
-        const count = data.results?.length ?? 0
-        if (count >= bars) {
-          const results = data.results.slice(-bars)
-          console.log(`[labs] ${ticker}: source=polygon bars=${count}`)
-          return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: `polygon (${ticker})` }
-        }
-        console.warn(`[labs] Polygon ${ticker}: ${count} bars (need ${bars})`)
-      } catch (err) {
-        console.warn(`[labs] Polygon ${ticker} failed:`, err.message)
-      }
-      console.warn(`[labs] ${ticker}: Polygon failed — falling back to Yahoo`)
-    }
-  }
-
-  const yTicker  = isNQ ? 'NQ=F' : ticker
-  const yConfig  = YAHOO_INTERVAL_MAP[interval] || YAHOO_INTERVAL_MAP['1d']
-  const url      = `https://query1.finance.yahoo.com/v8/finance/chart/${yTicker}?interval=${yConfig.interval}&range=${yConfig.range}`
-  const res      = await fetch(url)
-  const data     = await res.json()
-  const result   = data.chart.result[0]
-  const quotes   = result.indicators.quote[0]
-  const valid    = []
+async function fetchFromYahoo(ticker, bars, interval) {
+  const yConfig = YAHOO_INTERVAL_MAP[interval] || YAHOO_INTERVAL_MAP['1d']
+  const url     = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${yConfig.interval}&range=${yConfig.range}`
+  const res     = await fetch(url)
+  const data    = await res.json()
+  const result  = data.chart.result[0]
+  const quotes  = result.indicators.quote[0]
+  const valid   = []
   for (let i = 0; i < quotes.close.length; i++) {
     if (quotes.close[i] && quotes.high[i] && quotes.low[i])
       valid.push({ c: quotes.close[i], h: quotes.high[i], l: quotes.low[i] })
   }
   const last = valid.slice(-bars)
   return { closes: last.map(v => v.c), highs: last.map(v => v.h), lows: last.map(v => v.l), source: 'yahoo' }
+}
+
+async function fetchFromPolygon(ticker, bars, interval) {
+  const POLYGON_KEY = process.env.POLYGON_API_KEY
+  if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
+  const daysBack = POLYGON_DAYS_BACK[interval] || 730
+  const to       = new Date().toISOString().split('T')[0]
+  const from     = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const pg       = POLYGON_INTERVAL_MAP[interval] || POLYGON_INTERVAL_MAP['1d']
+  const url      = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/${pg.multiplier}/${pg.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
+  const res      = await fetch(url)
+  const data     = await res.json()
+  const count    = data.results?.length ?? 0
+  if (count < bars) throw new Error(`only ${count} bars (need ${bars})`)
+  const results  = data.results.slice(-bars)
+  console.log(`[labs] ${ticker}: source=polygon bars=${count}`)
+  return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: `polygon (${ticker})` }
+}
+
+async function fetchFromPolygonFutures(bars, interval) {
+  const POLYGON_KEY = process.env.POLYGON_API_KEY
+  if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
+  const daysBack   = POLYGON_DAYS_BACK[interval] || 730
+  const to         = new Date().toISOString().split('T')[0]
+  const from       = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
+  for (const fticker of getNqFuturesCandidates()) {
+    try {
+      const url   = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&from=${from}&to=${to}&limit=50000&apiKey=${POLYGON_KEY}`
+      const res   = await fetch(url)
+      const data  = await res.json()
+      const count = data.results?.length ?? 0
+      if (count >= bars) {
+        const results = data.results.slice().reverse().slice(-bars)
+        console.log(`[labs] NQ: source=polygon-futures (${fticker}) bars=${count}`)
+        return { closes: results.map(r => r.close), highs: results.map(r => r.high), lows: results.map(r => r.low), source: `polygon-futures (${fticker})` }
+      }
+      console.warn(`[labs] Polygon futures ${fticker}: ${count} bars (need ${bars})`)
+    } catch (err) {
+      console.warn(`[labs] Polygon futures ${fticker} failed:`, err.message)
+    }
+  }
+  throw new Error('all NQ futures candidates returned insufficient bars')
+}
+
+async function fetchOHLC(ticker, bars = 250, interval = '1d') {
+  const isQQQ = ticker === 'QQQ'
+  const isNQ  = ticker === 'NQ=F' || ticker === '/NQ' || ticker === 'NQ'
+
+  if (isQQQ) {
+    if (labsDataSources.qqq === 'polygon') {
+      try { return await fetchFromPolygon('QQQ', bars, interval) }
+      catch (err) { console.warn('[labs] Polygon QQQ failed:', err.message, '— falling back to Yahoo') }
+    }
+    return await fetchFromYahoo('QQQ', bars, interval)
+  }
+
+  if (isNQ) {
+    if (labsDataSources.nq === 'polygon') {
+      try { return await fetchFromPolygonFutures(bars, interval) }
+      catch (err) { console.warn('[labs] Polygon NQ failed:', err.message, '— falling back to Yahoo') }
+    }
+    return await fetchFromYahoo('NQ=F', bars, interval)
+  }
+
+  return await fetchFromYahoo(ticker, bars, interval)
 }
 
 function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0) {
@@ -2143,6 +2159,13 @@ try {
   if (saved?.value) {
     labsAutoLevels = JSON.parse(saved.value)
     console.log('[labs] levels restored from DB')
+  }
+} catch (e) {}
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'labs_data_sources'`).get()
+  if (saved?.value) {
+    labsDataSources = { ...labsDataSources, ...JSON.parse(saved.value) }
+    console.log('[labs] data sources restored:', labsDataSources)
   }
 } catch (e) {}
 
@@ -2300,7 +2323,22 @@ import('node-cron').then(({ default: cron }) => {
 // ─── LABS ENDPOINTS ──────────────────────────────────────────────────────────
 
 app.get('/labs/auto-levels', (req, res) => {
-  res.json({ ...labsAutoLevels, timestamp: new Date().toISOString() })
+  res.json({ ...labsAutoLevels, dataSources: labsDataSources, timestamp: new Date().toISOString() })
+})
+
+app.post('/labs/data-sources', async (req, res) => {
+  const { qqq, nq } = req.body
+  const valid = ['yahoo', 'polygon']
+  if (qqq && valid.includes(qqq)) labsDataSources.qqq = qqq
+  if (nq  && valid.includes(nq))  labsDataSources.nq  = nq
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('labs_data_sources', ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(JSON.stringify(labsDataSources))
+  console.log('[labs] data sources:', labsDataSources)
+  calculateLabsLevels(labsSettings.interval).catch(() => {})
+  res.json({ success: true, dataSources: labsDataSources })
 })
 
 app.get('/labs/scoring-latest', (req, res) => {

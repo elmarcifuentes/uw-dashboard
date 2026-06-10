@@ -21,7 +21,8 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
   const [currentPrice, setCurrentPrice]   = useState(null)
   const [nqRatio, setNqRatio]             = useState(41.14)
   const [scoredLevels, setScoredLevels]   = useState(null)
-  const [settings, setSettings] = useState({ interval: '5m', length: 200, mult: 6.0 })
+  const [settings, setSettings]     = useState({ interval: '5m', length: 200, mult: 6.0 })
+  const [dataSources, setDataSources] = useState({ qqq: 'yahoo', nq: 'polygon' })
 
   useEffect(() => {
     fetch(`${API_URL}/labs/auto-levels`)
@@ -30,6 +31,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
         setAutoLevels(data)
         if (data.settings)      setSettings(data.settings)
         else if (data.interval) setSettings(prev => ({ ...prev, interval: data.interval }))
+        if (data.dataSources)   setDataSources(data.dataSources)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -92,6 +94,25 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
   }
 
   const handleIntervalChange = (interval) => handleSettingsChange({ ...settings, interval })
+
+  const handleSourceChange = async (ticker, source) => {
+    const newSources = { ...dataSources, [ticker]: source }
+    setDataSources(newSources)
+    setLoading(true)
+    try {
+      const res  = await fetch(`${API_URL}/labs/data-sources`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSources),
+      })
+      const data = await res.json()
+      if (data.dataSources) setDataSources(data.dataSources)
+    } catch (e) {
+      console.warn('[labs] source change failed:', e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const levels = autoLevels?.[activeSource]
 
@@ -175,6 +196,48 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
           />
         </div>
 
+        {/* QQQ source */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-tertiary">QQQ</span>
+          <div className="flex gap-1">
+            {['yahoo', 'polygon'].map(src => (
+              <button
+                key={src}
+                onClick={() => handleSourceChange('qqq', src)}
+                disabled={loading}
+                className={`px-2.5 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-40 ${
+                  dataSources.qqq === src
+                    ? 'bg-indigo-700 text-text-primary'
+                    : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {src === 'yahoo' ? 'Yahoo' : 'Polygon'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* NQ source */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-tertiary">NQ</span>
+          <div className="flex gap-1">
+            {['yahoo', 'polygon'].map(src => (
+              <button
+                key={src}
+                onClick={() => handleSourceChange('nq', src)}
+                disabled={loading}
+                className={`px-2.5 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-40 ${
+                  dataSources.nq === src
+                    ? 'bg-indigo-700 text-text-primary'
+                    : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {src === 'yahoo' ? 'Yahoo' : 'Polygon'}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="w-px h-4 bg-bg-elevated" />
 
         <div className="flex gap-1">
@@ -236,6 +299,10 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
               <div>
                 <span className="text-micro font-bold text-text-secondary">Timeframe</span>
                 <p className="text-micro text-text-muted mt-0.5">Bar size for calculation. 5m matches intraday session structure. Preview only — active levels always use 5m.</p>
+              </div>
+              <div>
+                <span className="text-micro font-bold text-text-secondary">Data Sources</span>
+                <p className="text-micro text-text-muted mt-0.5">Yahoo — free, reliable, slight delay. Polygon — paid, accurate, native futures. Default: QQQ→Yahoo, NQ→Polygon. Falls back to Yahoo if Polygon fails.</p>
               </div>
             </div>
             <div className="absolute right-3 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-border-default" />
