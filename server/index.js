@@ -2036,6 +2036,7 @@ async function fetchOHLC(ticker, bars = 250, interval = '1d') {
 }
 
 function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0) {
+  console.log(`[labs] predictiveRanges: length=${length} mult=${mult}`)
   const valid = closes.reduce((acc, c, i) => {
     if (c && highs[i] && lows[i]) acc.push({ c, h: highs[i], l: lows[i] })
     return acc
@@ -2091,7 +2092,7 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
   console.log(`[labs] calculating levels (${interval})...`)
   const { length, mult } = labsSettings
   try {
-    const qqq       = await fetchOHLC('QQQ', 250, interval)
+    const qqq       = await fetchOHLC('QQQ', length + 50, interval)
     const qqqLevels = predictiveRanges(qqq.closes, qqq.highs, qqq.lows, length, mult)
     if (qqqLevels) {
       qqqLevels.ticker   = 'QQQ'
@@ -2102,7 +2103,7 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
 
     let nqLevels = null
     try {
-      const nq   = await fetchOHLC('NQ=F', 250, interval)
+      const nq   = await fetchOHLC('NQ=F', length + 50, interval)
       nqLevels   = predictiveRanges(nq.closes, nq.highs, nq.lows, length, mult)
       if (nqLevels) {
         nqLevels.ticker   = 'NQ'
@@ -2151,7 +2152,7 @@ try {
   const savedSettings = db.prepare(`SELECT value FROM settings WHERE key = 'labs_settings'`).get()
   if (savedSettings?.value) {
     labsSettings = { ...labsSettings, ...JSON.parse(savedSettings.value) }
-    console.log('[labs] settings restored:', labsSettings.interval)
+    console.log('[labs] settings restored:', JSON.stringify(labsSettings))
   }
 } catch (e) {}
 try {
