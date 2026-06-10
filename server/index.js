@@ -1176,7 +1176,7 @@ app.get('/history', (req, res) => {
 })
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', last_update: latest?._received_at || null, version: '4c', polygon_key_set: !!process.env.POLYGON_API_KEY })
+  res.json({ status: 'ok', last_update: latest?._received_at || null, version: '4c' })
 })
 
 app.get('/uptime', (req, res) => {

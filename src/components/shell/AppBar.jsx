@@ -36,14 +36,14 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
             onClick={() => setShowInfo(!showInfo)}
             className="text-text-disabled text-xs hover:text-text-tertiary transition-colors"
           >
-            v4b
+            v4c
           </button>
           {showInfo && (
             <div className="absolute top-full mt-2 left-0 bg-bg-card border border-border-subtle rounded-lg p-3 text-xs space-y-1 z-50 shadow-elevated w-48">
               <div className="text-text-secondary font-bold mb-2">TradesAlgo</div>
               <div className="flex justify-between gap-8">
                 <span className="text-text-muted">Build</span>
-                <span className="text-text-secondary">v4b</span>
+                <span className="text-text-secondary">v4c</span>
               </div>
               <div className="flex justify-between gap-8">
                 <span className="text-text-muted">Claude</span>
