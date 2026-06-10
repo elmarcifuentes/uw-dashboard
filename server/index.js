@@ -1024,9 +1024,6 @@ provider.onPriceUpdate((price) => {
     }
   }
 
-  // Throttle: skip if price hasn't moved ≥ $0.05 since last emit
-  const priceMoved = !lastEmittedPrice || Math.abs(price - lastEmittedPrice) >= 0.05
-  if (!priceMoved) return
   lastEmittedPrice = price
   priceHistory.push({ price, ts: Date.now() })
   if (priceHistory.length > 50) priceHistory.shift()
@@ -1071,6 +1068,16 @@ app.get('/stream', (req, res) => {
       type: 'rescore',
       result: latest,
       trigger: 'initial',
+      timestamp: new Date().toISOString(),
+    })}\n\n`)
+  }
+
+  // Send live price immediately so reconnecting clients don't wait for next poll
+  const livePrice = provider.getStatus().lastPrice
+  if (livePrice) {
+    res.write(`data: ${JSON.stringify({
+      type: 'price',
+      price: livePrice,
       timestamp: new Date().toISOString(),
     })}\n\n`)
   }

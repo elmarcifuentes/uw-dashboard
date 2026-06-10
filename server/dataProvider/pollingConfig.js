@@ -1,10 +1,10 @@
 export default {
   intervals: {
-    quiet:       60 * 1000,
-    approaching: 20 * 1000,
-    near:        10 * 1000,
-    close:        5 * 1000,
-    veryClose:    3 * 1000,
+    quiet:       10 * 1000,  // was 60s — reduced to match 10s max
+    approaching:  5 * 1000,  // was 20s
+    near:         5 * 1000,  // was 10s
+    close:        3 * 1000,  // was 5s
+    veryClose:    2 * 1000,  // was 3s
     atLevel:      2 * 1000,
   },
 
