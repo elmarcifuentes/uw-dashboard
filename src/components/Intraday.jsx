@@ -300,11 +300,42 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
 
       <ExpansionGexAlert expansionGex={expansionGex} pinningSessions={pinningSessions} />
 
-      {/* 12-col grid: left 8-col main content, right 4-col rail */}
-      <div className="grid grid-cols-12 gap-3">
+      {/* Three-column flex layout */}
+      <div className="flex flex-col lg:flex-row gap-3 items-start">
 
-        {/* Left column */}
-        <div className="col-span-12 md:col-span-8 space-y-3">
+        {/* WHERE — price ladder + sub-tab nav below */}
+        <div className="w-full lg:w-[40%] space-y-3 shrink-0">
+          <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
+            {subTab === 0 && !focusMode && <>
+              <PriceSparkline history={priceHistory} levels={result?.levels} />
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} expansionGex={expansionGex} />
+            </>}
+            {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
+            {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
+            {subTab === 3 && <RescoreLog history={history} compact={compact} />}
+          </div>
+          {/* Sub-tab navigation — below content */}
+          <div className="border-t border-border-subtle">
+            <div className="flex gap-0">
+              {(compact ? SUB_TABS_COMPACT : SUB_TABS).map((tab, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSubTab(i)}
+                  className={`px-3 py-2 text-xs font-medium transition-colors -mt-px border-t-2 ${
+                    subTab === i
+                      ? 'text-text-primary border-indigo-500'
+                      : 'text-text-tertiary hover:text-text-secondary border-transparent'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* WHY — cascade gauge + narrative */}
+        <div className="w-full lg:w-[22%] space-y-3 shrink-0">
           <CascadeProximityGauge cascade={cascade} midDpHistory={midDpHistory} />
           {activeTrade && !expandNarrative ? (
             <div className="border border-border-subtle bg-bg-card rounded-lg px-3 py-2 flex items-center gap-2">
@@ -331,40 +362,10 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
               )}
             </>
           )}
-
-          {/* Sub-tab navigation — flat underline style */}
-          <div className="border-b border-border-subtle">
-            <div className="flex gap-0">
-              {(compact ? SUB_TABS_COMPACT : SUB_TABS).map((tab, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSubTab(i)}
-                  className={`px-3 py-2 text-xs font-medium transition-colors -mb-px border-b-2 ${
-                    subTab === i
-                      ? 'text-text-primary border-indigo-500'
-                      : 'text-text-tertiary hover:text-text-secondary border-transparent'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Sub-tab content */}
-          <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
-            {subTab === 0 && !focusMode && <>
-              <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} expansionGex={expansionGex} />
-            </>}
-            {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
-            {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
-            {subTab === 3 && <RescoreLog history={history} compact={compact} />}
-          </div>
         </div>
 
-        {/* Right rail — visible on tablet+, 4-col */}
-        <div className="hidden md:block md:col-span-4">
+        {/* WHAT — right rail */}
+        <div className="hidden lg:block lg:flex-1 space-y-3">
           <RightRail
             levels={result?.levels}
             currentPrice={currentPrice}
