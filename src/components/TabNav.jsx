@@ -1,14 +1,12 @@
 const TABS = [
-  { id: 'Overview',      label: 'Overview'     },
-  { id: 'Scout',         label: '🔍 Scout',    scout: true },
-  { id: 'Pre-Session',   label: 'Pre-Session'  },
-  { id: 'Intraday',      label: 'Intraday',    live: true },
-  { id: 'Post-Session',  label: 'Post-Session' },
-  { id: 'News',          label: 'News'         },
-  { id: 'Levels',        label: 'Levels',      locked: true },
-  { id: 'Controls',      label: 'Controls',    locked: true },
-  { id: 'Guide',         label: 'Guide'        },
-  { id: 'Labs',          label: '🧪 Labs',     labs: true },
+  { id: 'Overview',      label: 'Overview'      },
+  { id: 'Scout',         label: '🔍 Scout',     scout: true },
+  { id: 'Pre-Session',   label: 'Pre-Session'   },
+  { id: 'Intraday',      label: 'Intraday',     live: true },
+  { id: 'Post-Session',  label: 'Post-Session'  },
+  { id: 'News',          label: 'News'          },
+  { id: 'Settings',      label: 'Settings',     locked: true },
+  { id: 'Guide',         label: 'Guide'         },
 ]
 
 export default function TabNav({ active, onChange, connected, unlocked }) {

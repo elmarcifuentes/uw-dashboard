@@ -129,12 +129,9 @@ function GuideOverview() {
             { tab: 'News',
               q: 'What is moving markets?',
               desc: 'Full news feed, filtered by relevance and sentiment' },
-            { tab: 'Levels 🔒',
-              q: 'Are today\'s levels set?',
-              desc: 'Level entry form, TradingView webhook banner, session history' },
-            { tab: 'Controls 🔒',
-              q: 'System settings and tools',
-              desc: 'Force rescore, narrative mode, API budget, sound alerts, draw buttons' },
+            { tab: 'Settings 🔒',
+              q: 'System config and labs',
+              desc: 'System: level source mode, daily levels, scoring controls, system pause, sound alerts, API budget. Labs: Predictive Ranges auto-detection tools' },
             { tab: 'Guide',
               q: 'How does this work?',
               desc: 'This reference documentation' },
@@ -155,8 +152,8 @@ function GuideOverview() {
           {[
             { time: 'Pre-Market',
               steps: [
-                'Levels tab → PIN → review TradingView webhook banner → Accept',
-                'OR: enter 5 NQ + 5 QQQ prices manually → Save Levels',
+                'Settings tab → PIN → ⚙ System → review TradingView webhook banner → Accept',
+                'OR: choose Level Source mode → enter 5 NQ + 5 QQQ prices manually → Save Levels',
                 'Optional: /draw in Claude Code to update TradingView chart lines',
               ]},
             { time: 'During Session',
@@ -487,7 +484,7 @@ function GuideAI() {
         ))}
         <p className="text-xs text-gray-600 mt-2">
           All narratives use Claude Haiku via Anthropic API (~$0.25/day). Toggle between Template (free),
-          Claude (AI), or Off in Controls tab. Mode persists across Railway restarts.
+          Claude (AI), or Off in Settings → System → Controls. Mode persists across Railway restarts.
         </p>
       </GuideCard>
     </div>
@@ -557,7 +554,7 @@ function GuideInterface() {
           <Row label="Level touch (≤ $0.15)" value="C5 tone (buy) / Eb4 tone (sell)" sub="Different pitch for buy vs sell levels" />
           <Row label="Cascade fires"          value="Three descending tones"          sub="440 → 370 → 311 Hz" />
         </div>
-        <p className="text-xs text-gray-600 mt-2">Toggle in Controls tab. Off by default.</p>
+        <p className="text-xs text-gray-600 mt-2">Toggle in Settings → System. Off by default.</p>
       </GuideCard>
 
       <GuideCard title="TradingView Integration">
@@ -565,7 +562,7 @@ function GuideInterface() {
           <Row label="Webhook (recommended)" value="TradingView alert → Railway"      sub="Auto-populates Levels tab with pending banner" />
           <Row label="Manual entry"          value="Levels tab → NQ + QQQ prices"    sub="Ratio auto-calculated from entries" />
           <Row label="/draw command"         value="Claude Code + MCP"               sub="Local only — draws lines on TradingView chart" />
-          <Row label="Draw buttons"          value="Dashboard Controls tab"          sub="Requires draw-relay + ngrok running locally" />
+          <Row label="Draw buttons"          value="Settings → System → Controls"     sub="Requires draw-relay + ngrok running locally" />
         </div>
       </GuideCard>
     </div>

@@ -7,12 +7,10 @@ import PreSession from './components/PreSession'
 import Intraday from './components/Intraday'
 import PostSession from './components/PostSession'
 import NewsTab from './components/NewsTab'
-import ControlsTab from './components/ControlsTab'
 import GuideTab from './components/GuideTab'
-import LabsDashboard from './components/labs/LabsDashboard'
+import SettingsTab from './components/settings/SettingsTab'
 import LockModal from './components/LockModal'
 import RestartBanner from './components/RestartBanner'
-import LevelsTab from './components/LevelsTab'
 import ScoutTab from './components/scout/ScoutTab'
 import { useServerHealth } from './hooks/useServerHealth'
 import { useSSE } from './hooks/useSSE'
@@ -77,10 +75,8 @@ function AppInner() {
           {activeTab === 'Intraday'     && <Intraday activeSymbol={activeSymbol} activeTrade={activeTrade} setActiveTrades={setActiveTrades} pendingTrade={pendingTrade} onPendingTradeConsumed={() => setPendingTrade(null)} />}
           {activeTab === 'Post-Session' && <PostSession activeSymbol={activeSymbol} nqRatio={nqRatio} />}
           {activeTab === 'News'         && <NewsTab />}
-          {activeTab === 'Levels'       && <LevelsTab />}
-          {activeTab === 'Controls'     && <ControlsTab systemPaused={systemPaused} pausedAt={pausedAt} />}
+          {activeTab === 'Settings'     && <SettingsTab systemPaused={systemPaused} pausedAt={pausedAt} activeSymbol={activeSymbol} />}
           {activeTab === 'Guide'        && <GuideTab />}
-          {activeTab === 'Labs'         && <LabsDashboard activeSymbol={activeSymbol} />}
         </div>
       </main>
 
