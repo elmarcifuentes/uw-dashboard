@@ -1176,7 +1176,7 @@ app.get('/history', (req, res) => {
 })
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', last_update: latest?._received_at || null, version: '4b' })
+  res.json({ status: 'ok', last_update: latest?._received_at || null, version: '4c' })
 })
 
 app.get('/uptime', (req, res) => {
