@@ -6,6 +6,8 @@ import EvidenceMeter from './EvidenceMeter'
 import SmartLevelCard from './SmartLevelCard'
 import TopNetImpact from './TopNetImpact'
 import SectorETF from './SectorETF'
+import CascadeBanner from './CascadeBanner'
+import ThreeColLayout from './layout/ThreeColLayout'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -26,8 +28,8 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
     dpHistory, levelTouches, priceVelocity,
   } = useSSE(`${API_URL}/stream`)
 
-  const [status, setStatus]   = useState(null)
-  const [budget, setBudget]   = useState(null)
+  const [status, setStatus]       = useState(null)
+  const [budget, setBudget]       = useState(null)
   const [showBrief, setShowBrief] = useState(false)
 
   useEffect(() => {
@@ -41,14 +43,14 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
     return () => clearInterval(t)
   }, [])
 
-  const result       = useMemo(() => rescoreData?.result ?? null, [rescoreData])
+  const result             = useMemo(() => rescoreData?.result ?? null, [rescoreData])
   const effectiveSentiment = sentiment ?? rescoreData?.result?._sentiment ?? null
-  const levels       = result?.levels || []
-  const nqRatio      = result?.nq_ratio ? Number(result.nq_ratio) : null
-  const currentPrice = priceData?.price ?? result?.current_price
-  const nqPrice      = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio * 4) / 4 : null
-  const cascade      = result?.cascade ?? null
-  const sb           = result?.structure_break ?? null
+  const levels             = result?.levels || []
+  const nqRatio            = result?.nq_ratio ? Number(result.nq_ratio) : null
+  const currentPrice       = priceData?.price ?? result?.current_price
+  const nqPrice            = nqRatio && currentPrice ? Math.round(currentPrice * nqRatio * 4) / 4 : null
+  const cascade            = result?.cascade ?? null
+  const sb                 = result?.structure_break ?? null
 
   const etHour      = parseInt(new Date().toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/New_York' }))
   const sessionType = etHour >= 9 && etHour < 16 ? 'LIVE' : etHour >= 4 && etHour < 9 ? 'PRE-MARKET' : 'AFTER-HOURS'
@@ -61,126 +63,146 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
   const focusLevel = levels.length > 0 && currentPrice != null
     ? levels.reduce((n, l) => Math.abs(currentPrice - l.price) < Math.abs(currentPrice - n.price) ? l : n)
     : null
+  const midLevel   = levels.find(l => l.id === 'MID') ?? null
 
   const etfDir   = levels[0]?.etf_direction || 'neutral'
   const streak   = status?.allPinningSessions ?? '—'
   const apiCalls = budget?.callsToday ?? '—'
 
   return (
-    <div className="space-y-4 py-4">
+    <ThreeColLayout
+      where={
+        <>
+          {/* Market state */}
+          <div className="bg-bg-card border border-border-subtle rounded-lg p-4 space-y-3">
+            <div className="text-xs text-text-tertiary uppercase tracking-wider">Market State</div>
+            {effectiveSentiment?.state && (
+              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold w-fit ${
+                effectiveSentiment.color === 'green'
+                  ? 'bg-green-950 text-green-400 border border-green-800'
+                  : effectiveSentiment.color === 'red'
+                  ? 'bg-red-950 text-red-400 border border-red-800'
+                  : 'bg-amber-950 text-amber-400 border border-amber-800'
+              }`}>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${
+                  effectiveSentiment.color === 'green' ? 'bg-green-500'
+                    : effectiveSentiment.color === 'red' ? 'bg-red-500'
+                    : 'bg-amber-500'
+                } ${effectiveSentiment.state === 'HIGH_RISK' && !cascade?.active ? 'animate-pulse' : ''}`} />
+                {effectiveSentiment.state}
+              </div>
+            )}
+            {sessionBrief && (
+              <div className="border-t border-border-subtle pt-2">
+                <button
+                  onClick={() => setShowBrief(!showBrief)}
+                  className="text-xs text-purple-700 hover:text-purple-500 transition-colors"
+                >
+                  {showBrief ? '▲ hide' : '▼ session brief'}
+                </button>
+                {showBrief && (
+                  <p className="text-xs text-text-secondary mt-2 leading-relaxed border-l-2 border-purple-900 pl-2">
+                    {formatNarrative(sessionBrief, activeSymbol)}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
 
-      {/* Hero — 3 columns */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-
-        {/* Market state */}
-        <div className="bg-bg-card border border-border-subtle rounded-lg p-4 flex flex-col gap-3">
-          <div className="text-xs text-text-tertiary uppercase tracking-wider">Market State</div>
-
-          {/* Sentiment badge — most prominent */}
-          {effectiveSentiment?.state && (
-            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold w-fit ${
-              effectiveSentiment.color === 'green'
-                ? 'bg-green-950 text-green-400 border border-green-800'
-                : effectiveSentiment.color === 'red'
-                ? 'bg-red-950 text-red-400 border border-red-800'
-                : 'bg-amber-950 text-amber-400 border border-amber-800'
-            }`}>
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                effectiveSentiment.color === 'green' ? 'bg-green-500'
-                  : effectiveSentiment.color === 'red' ? 'bg-red-500'
-                  : 'bg-amber-500'
-              } ${effectiveSentiment.state === 'HIGH_RISK' && !cascade?.active ? 'animate-pulse' : ''}`} />
-              {effectiveSentiment.state}
+          {/* Price hero */}
+          <div className="bg-bg-card border border-border-subtle rounded-lg p-4 flex flex-col items-center justify-center">
+            <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Live Price</div>
+            <div className="text-4xl font-bold text-text-primary font-mono tabular-nums">
+              {activeSymbol === 'NQ'
+                ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
+                : (currentPrice != null ? '$' + currentPrice.toFixed(2) : '—')}
             </div>
-          )}
+            <div className="flex items-center gap-2 mt-3">
+              <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascade?.active ? 'animate-pulse' : ''}`} />
+              <span className="text-xs text-text-tertiary">{connected ? 'LIVE' : 'DISCONNECTED'}</span>
+              {priceVelocity != null && (() => {
+                const abs = Math.abs(priceVelocity), up = priceVelocity > 0
+                const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : '→'
+                const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : 'text-text-muted'
+                return <span className={`text-xs font-bold ${color}`}>{arrow}</span>
+              })()}
+            </div>
+            {focusLevel && currentPrice != null && (
+              <div className="text-xs text-text-tertiary mt-2">
+                {(() => {
+                  const d = Math.abs(currentPrice - focusLevel.price)
+                  const val = activeSymbol === 'NQ' && nqRatio ? Math.round(d * nqRatio * 4) / 4 : d
+                  return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from ${focusLevel.id}`
+                })()}
+              </div>
+            )}
+            <div className="text-xs text-text-muted mt-1">
+              {sessionType === 'LIVE' ? '● Market open' : sessionType === 'PRE-MARKET' ? '◑ Pre-market' : '○ After hours'}
+            </div>
+            {lastRescoreTime && (
+              <div className="text-xs text-text-disabled mt-0.5">updated {lastRescoreTime}</div>
+            )}
+          </div>
 
-          {/* NOW text */}
-          {assistantRead?.now && (
-            <p className="text-xs text-text-secondary leading-relaxed">
-              {formatNarrative(assistantRead.now, activeSymbol)}
-            </p>
-          )}
+          {/* Strongest levels */}
+          <SmartLevelCard level={bearLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bearLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bearLevel?.id]}  label="Strongest Resistance" activeSymbol={activeSymbol} />
+          <SmartLevelCard level={focusLevel} currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[focusLevel?.id]} dpHistory={dpHistory} touches={levelTouches?.[focusLevel?.id]} label="Current Focus"        activeSymbol={activeSymbol} />
+          <SmartLevelCard level={bullLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bullLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bullLevel?.id]}  label="Strongest Support"   activeSymbol={activeSymbol} />
+        </>
+      }
+      why={
+        <>
+          {/* Signal evidence */}
+          <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
+            <div className="text-micro font-semibold text-text-tertiary uppercase tracking-wider mb-3">
+              Signal Evidence
+            </div>
+            <EvidenceMeter levels={levels} etfDirection={etfDir} />
+          </div>
 
-          {/* Session brief expander */}
-          {sessionBrief && (
-            <div className="border-t border-border-subtle pt-2">
-              <button
-                onClick={() => setShowBrief(!showBrief)}
-                className="text-xs text-purple-700 hover:text-purple-500 transition-colors"
-              >
-                {showBrief ? '▲ hide' : '▼ session brief'}
-              </button>
-              {showBrief && (
-                <p className="text-xs text-text-secondary mt-2 leading-relaxed border-l-2 border-purple-900 pl-2">
-                  {formatNarrative(sessionBrief, activeSymbol)}
-                </p>
+          {/* Cascade status */}
+          <CascadeBanner cascade={cascade} midPrice={midLevel?.price} nqRatio={nqRatio} />
+        </>
+      }
+      what={
+        <>
+          {/* Immediate risk */}
+          <ImmediateRiskCard cascade={cascade} levels={levels} structureBreak={sb} />
+
+          {/* What to watch */}
+          {assistantRead && (
+            <div className="bg-bg-elevated border border-border-default rounded-lg p-4 space-y-2">
+              <div className="text-micro font-semibold text-text-tertiary uppercase tracking-wider">
+                What to Watch
+              </div>
+              <p className="text-sm2 text-text-secondary leading-relaxed">
+                {formatNarrative(assistantRead.now, activeSymbol)}
+              </p>
+              {assistantRead.next && (
+                <div className="border-t border-border-subtle pt-2">
+                  <p className="text-sm2 text-text-muted leading-relaxed">
+                    {formatNarrative(assistantRead.next, activeSymbol)}
+                  </p>
+                </div>
               )}
             </div>
           )}
-        </div>
-
-        {/* Price hero */}
-        <div className="bg-bg-card border border-border-subtle rounded-lg p-4 flex flex-col items-center justify-center">
-          <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Live Price</div>
-          <div className="text-4xl font-bold text-text-primary font-mono tabular-nums">
-            {activeSymbol === 'NQ'
-              ? (nqPrice != null ? '$' + nqPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
-              : (currentPrice != null ? '$' + currentPrice.toFixed(2) : '—')}
+        </>
+      }
+      secondary={
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="Streak"     value={streak}   sub="consecutive sessions" />
+            <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} color={etfDir === 'bullish' ? 'text-green-400' : etfDir === 'bearish' ? 'text-red-400' : 'text-text-secondary'} />
+            <StatCard label="API Budget" value={apiCalls} sub={`/ 14,000 (${typeof apiCalls === 'number' ? ((apiCalls / 14000) * 100).toFixed(1) : '—'}%)`} />
+            <StatCard label="GEX Regime" value={status?.expansionGexActive ? 'EXPANSION' : 'PINNING'} sub={`${status?.allPinningSessions ?? '—'} sessions`} color={status?.expansionGexActive ? 'text-red-400' : 'text-green-400'} />
           </div>
-          <div className="flex items-center gap-2 mt-3">
-            <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'} ${connected && !cascade?.active ? 'animate-pulse' : ''}`} />
-            <span className="text-xs text-text-tertiary">{connected ? 'LIVE' : 'DISCONNECTED'}</span>
-            {priceVelocity != null && (() => {
-              const abs = Math.abs(priceVelocity), up = priceVelocity > 0
-              const arrow = abs > 0.05 ? (up ? '↑↑' : '↓↓') : abs > 0.02 ? (up ? '↑' : '↓') : '→'
-              const color = abs > 0.05 ? (up ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse') : abs > 0.02 ? (up ? 'text-green-500' : 'text-red-500') : 'text-text-muted'
-              return <span className={`text-xs font-bold ${color}`}>{arrow}</span>
-            })()}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <TopNetImpact apiUrl={API_URL} />
+            <SectorETF    apiUrl={API_URL} />
           </div>
-          {focusLevel && currentPrice != null && (
-            <div className="text-xs text-text-tertiary mt-2">
-              {(() => {
-                const d = Math.abs(currentPrice - focusLevel.price)
-                const val = activeSymbol === 'NQ' && nqRatio ? Math.round(d * nqRatio * 4) / 4 : d
-                return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from ${focusLevel.id}`
-              })()}
-            </div>
-          )}
-          <div className="text-xs text-text-muted mt-1">
-            {sessionType === 'LIVE' ? '● Market open' : sessionType === 'PRE-MARKET' ? '◑ Pre-market' : '○ After hours'}
-          </div>
-          {lastRescoreTime && (
-            <div className="text-xs text-text-disabled mt-0.5">updated {lastRescoreTime}</div>
-          )}
-        </div>
-
-        {/* Immediate risk */}
-        <ImmediateRiskCard cascade={cascade} levels={levels} structureBreak={sb} />
-      </div>
-
-      {/* Strongest levels */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <SmartLevelCard level={bearLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bearLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bearLevel?.id]}  label="Strongest Resistance" activeSymbol={activeSymbol} />
-        <SmartLevelCard level={focusLevel} currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[focusLevel?.id]} dpHistory={dpHistory} touches={levelTouches?.[focusLevel?.id]} label="Current Focus" activeSymbol={activeSymbol} />
-        <SmartLevelCard level={bullLevel}  currentPrice={currentPrice} nqRatio={nqRatio} narrative={levelNarratives?.[bullLevel?.id]}  dpHistory={dpHistory} touches={levelTouches?.[bullLevel?.id]}  label="Strongest Support" activeSymbol={activeSymbol} />
-      </div>
-
-      {/* Evidence meter */}
-      <EvidenceMeter levels={levels} etfDirection={etfDir} />
-
-      {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Streak"     value={streak}          sub="consecutive sessions" color="text-text-primary" />
-        <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} color={etfDir === 'bullish' ? 'text-green-400' : etfDir === 'bearish' ? 'text-red-400' : 'text-text-secondary'} />
-        <StatCard label="API Budget" value={apiCalls}        sub={`/ 14,000 (${typeof apiCalls === 'number' ? ((apiCalls / 14000) * 100).toFixed(1) : '—'}%)`} color="text-text-primary" />
-        <StatCard label="GEX Regime" value={status?.expansionGexActive ? 'EXPANSION' : 'PINNING'} sub={`${status?.allPinningSessions ?? '—'} sessions`} color={status?.expansionGexActive ? 'text-red-400' : 'text-green-400'} />
-      </div>
-
-      {/* Lower row — Top Movers + Sector Flow */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <TopNetImpact apiUrl={API_URL} />
-        <SectorETF apiUrl={API_URL} />
-      </div>
-    </div>
+        </>
+      }
+    />
   )
 }
