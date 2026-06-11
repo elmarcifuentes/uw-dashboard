@@ -2174,17 +2174,22 @@ async function fetchFromPolygonFutures(bars, interval, opts = {}) {
   const candidates = [activeNQContract, ...getNqFuturesCandidates().filter(t => t !== activeNQContract)]
   for (const fticker of candidates) {
     try {
-      const url = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&from=${fromStr}&to=${toStr}&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
+      // sort=desc + limit ensures Polygon returns from the NEWEST end. With sort=asc the
+      // 50k response cap returns the OLDEST bars from contract inception — at 1m that
+      // truncates before the present, so slice(-N) selected months-stale bars.
+      const limit = Math.min(bars + 50, 50000)
+      const url = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&from=${fromStr}&to=${toStr}&sort=desc&limit=${limit}&apiKey=${POLYGON_KEY}`
       console.log(`[labs] Polygon URL: ${url.replace(POLYGON_KEY, 'REDACTED')}`)
       const res  = await fetch(url)
       const data = await res.json()
       const total = data.results?.length ?? 0
       if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars in range ${fromStr}→${toStr}`); continue }
-      // Sort already asc; take last `bars`. Keep ALL bars including overnight gaps —
-      // TradingView's PR ratchets on gap bars, so flattening them desyncs the recurrence.
-      const usedBars    = data.results.slice(-bars)
+      // Deterministically select the NEWEST `bars` by timestamp regardless of API order,
+      // then sort ascending for the recurrence. Keeps gap bars (TradingView ratchets on them).
+      const usedBars = [...data.results]
+        .sort((a, b) => toMs(a.window_start ?? a.t) - toMs(b.window_start ?? b.t))
+        .slice(-bars)
       console.log(`[labs] fetch mode=${fetchMode} bars=${usedBars.length} (total=${total}, ${fticker})`)
-      if (total > bars * 3) console.log(`[labs] Polygon returned ${total} bars — using last ${bars} (date range param ignored by Polygon futures API)`)
       const firstBar = usedBars[0]
       const lastBar  = usedBars[usedBars.length - 1]
       const firstTs  = new Date(toMs(firstBar.window_start ?? firstBar.t)).toISOString()
@@ -2395,6 +2400,29 @@ function saveNQLevels(nqResult, interval) {
 // 5m → labs_pr_avg_5m, 1m → labs_pr_avg_1m (any other tf gets its own isolated key).
 const prAvgKey = (interval) => 'labs_pr_avg_' + (interval || '5m')
 
+// Approx NQ futures (ETH/Globex) open state in ET. Used only to decide whether a stale
+// feed is suspicious — when the market is closed, old last-bars are legitimate.
+function isFuturesMarketOpen() {
+  const { hour, day } = getETNow()   // day: 0=Sun … 6=Sat
+  if (day === 6) return false                 // Saturday — closed
+  if (day === 0) return hour >= 18            // Sunday — opens 18:00 ET
+  if (day === 5) return hour < 17             // Friday — closes 17:00 ET
+  if (hour === 17) return false               // Mon–Thu daily maintenance break 17:00–18:00 ET
+  return true
+}
+
+// Hard recency guard: during market hours the newest CLOSED bar must be fresh, else the
+// feed is stale and we must NOT consume it (returns false → caller aborts without writing).
+function barsAreFresh(lastBarTs, interval) {
+  if (!isFuturesMarketOpen()) return true     // legitimate gaps when closed
+  const ageMin = (Date.now() - lastBarTs) / 60000
+  if (ageMin > 30) {
+    console.warn(`[labs] [${interval}] STALE BARS: last=${new Date(lastBarTs).toISOString()} (${ageMin.toFixed(0)}min old) — aborting, state NOT written`)
+    return false
+  }
+  return true
+}
+
 async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) {
   const INIT_BARS  = 1000
   const LEVEL_BARS = 250
@@ -2441,7 +2469,11 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
       console.log(`[labs] [${interval}] cold-start init from ${INIT_BARS} bars (closed bars only, RMA warmup)...`)
       const init = await fetchOHLC('NQ=F', INIT_BARS, interval)
       if (!init?.times) { console.warn('[labs] init fetch missing timestamps — cannot run recurrence'); return null }
-      const s = initRecurrence(dropForming(init.closes), dropForming(init.highs), dropForming(init.lows), dropForming(init.times), length, mult)
+      const closes = dropForming(init.closes), highs = dropForming(init.highs), lows = dropForming(init.lows), times = dropForming(init.times)
+      const lastFedTs = times[times.length - 1]
+      console.log(`[labs] [${interval}] cold-start bars fed: first=${new Date(times[0]).toISOString()} last=${new Date(lastFedTs).toISOString()} n=${times.length}`)
+      if (!barsAreFresh(lastFedTs, interval)) return null   // stale feed → abort, do not write state
+      const s = initRecurrence(closes, highs, lows, times, length, mult)
       if (!s) { console.warn('[labs] initRecurrence returned null'); return null }
       console.log(`[labs] [${interval}] init complete: avg=${s.avg.toFixed(1)} halfWidth=${s.halfWidth.toFixed(1)} rawATR=${s.atrState.toFixed(1)} ratchets=${s.ratchets} bars=${s.barsProcessed}`)
       return { state: s, source: init.source }
@@ -2477,8 +2509,11 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
       const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval, { sinceTs: state.lastBarTs })
       if (!nqData?.times) { console.warn('[labs] recent fetch missing timestamps — skipping advance'); return null }
       source = nqData.source
+      const aCloses = dropForming(nqData.closes), aHighs = dropForming(nqData.highs), aLows = dropForming(nqData.lows), aTimes = dropForming(nqData.times)
+      const lastFedTs = aTimes[aTimes.length - 1]
+      if (!barsAreFresh(lastFedTs, interval)) return null   // stale feed → abort, keep prior state untouched
       const prevAvg = state.avg
-      const adv = advanceRecurrence(state, dropForming(nqData.closes), dropForming(nqData.highs), dropForming(nqData.lows), dropForming(nqData.times), length, mult)
+      const adv = advanceRecurrence(state, aCloses, aHighs, aLows, aTimes, length, mult)
       if (adv.needsReinit) {
         // Saved bar predates the window — only safe recovery is a re-init
         console.log(`[labs] [${interval}] recalc mode=cold-start reason=gap-too-large`)
@@ -2809,19 +2844,36 @@ app.post('/labs/settings', async (req, res) => {
   const validIntervals = ['1m', '5m', '15m', '1h', '1d']
   if (interval && !validIntervals.includes(interval))
     return res.status(400).json({ error: 'Invalid interval' })
-  const prevInterval = labsSettings.interval
+
+  // Detect a real length/mult change BEFORE mutating — the recurrence depends on these,
+  // so any change invalidates ALL persisted state and requires a cold-start.
+  const newLength = length != null ? parseInt(length)   : labsSettings.length
+  const newMult   = mult   != null ? parseFloat(mult)   : labsSettings.mult
+  const paramsChanged = newLength !== labsSettings.length || newMult !== labsSettings.mult
+
   if (interval) labsSettings.interval = interval  // preview only — does NOT affect active cron
-  if (length)   labsSettings.length   = parseInt(length)
-  if (mult)     labsSettings.mult     = parseFloat(mult)
+  labsSettings.length = newLength
+  labsSettings.mult   = newMult
   if (avgMode && ['daily', 'weekly'].includes(avgMode)) labsSettings.avgMode = avgMode
   db.prepare(`
     INSERT INTO settings (key, value, updated_at)
     VALUES ('labs_settings', ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(JSON.stringify(labsSettings))
-  console.log('[labs] settings updated (preview):', labsSettings)
-  await calculateLabsLevels(interval || labsSettings.interval)
-  // No auto-apply here — preview interval change does not push to active levels
+
+  if (paramsChanged) {
+    // All stored recurrence state was built under the old params — wipe every timeframe
+    // and cold-start the active one now (the inactive tf cold-starts on next switch).
+    db.prepare(`DELETE FROM settings WHERE key LIKE 'labs_pr_avg%'`).run()
+    const tf = labsSettings.activeInterval
+    console.log(`[labs] params changed length=${newLength} mult=${newMult} → state reset, cold-start ${tf}`)
+    const result = await calculateLabsLevels(tf, { reason: 'params' })
+    handleLabsUpdate(result)
+  } else {
+    console.log('[labs] settings updated (no param change):', JSON.stringify(labsSettings))
+    await calculateLabsLevels(interval || labsSettings.activeInterval)
+    // No auto-apply here — interval preview change does not push to active levels
+  }
   res.json({ success: true, settings: labsSettings, levels: labsAutoLevels })
 })
 

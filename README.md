@@ -248,7 +248,9 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | Advance fetches request `from = lastBarTs − 1h` (cold-start keeps 10-day window) to cap Polygon transfer; log `[labs] fetch mode={advance\|cold-start} bars={n}`. |
+| _next_ | **Length/Factor changes now take effect** — `/labs/settings` detects a length/mult change, wipes all `labs_pr_avg%` state, and cold-starts the active timeframe with new params (`[labs] params changed … → state reset, cold-start`). Interval-only change resets nothing. |
+| _next_ | **Fixed stale-bar fetch** — Polygon futures now queried `sort=desc` (newest end) + deterministic newest-by-timestamp selection; `sort=asc&limit=50000` was returning oldest-from-inception, truncating before present at 1m (levels stuck ~25,000). Added a hard recency guard: during market hours, if newest closed bar >30 min old → `[labs] STALE BARS` and state is NOT written. Cold-start logs the first/last bar fed. |
+| `6aa3599` | Advance fetches request `from = lastBarTs − 1h` (cold-start keeps 10-day window) to cap Polygon transfer; log `[labs] fetch mode={advance\|cold-start} bars={n}`. |
 | `7af233c` | Predictive Ranges timeframe toggle (5m default / 1m). Recurrence state persisted per timeframe (`labs_pr_avg_5m` / `labs_pr_avg_1m`, legacy key migrated to `_5m`); the two never mix. Scheduler advances the active timeframe on its own bar close (every minute for 1m). `/labs/active-interval` is the authoritative toggle (loads/cold-starts target tf, restores prior tf untouched); `/labs/reset-avg` resets only the active tf; contract rollover clears both. Logs tagged `[labs] [5m]`/`[1m]`. |
 | `fddf6da` | `/labs/recalculate` made identical to the scheduled 5m cycle — advances persisted state over newly-closed bars only, never cold-starts (no new bar → no-op). Cold-start gated to no-state / reset / rollover / gap-too-large, each logged `recalc mode=cold-start reason=…`; advance logs `recalc mode=advance barsAdvanced=N`. |
 | `e18b1a9` | Faithful LuxAlgo PR port: persisted recurrence state `{avg, halfWidth, atrState, lastBarTs}`, advance over closed bars only (no sliding-window re-run), drop forming bar, ETH bars, removed `filterOutlierBars` from PR path. Fixes intraday band drift. |
@@ -266,7 +268,7 @@ Every 60s, checks ET time:
 
 ## Known Issues
 
-- **Polygon `from` ignored** — the futures aggs endpoint ignores the `from` param and returns ~26k bars regardless. Advance fetches now request `from = lastBarTs − 1h` (cold-start keeps 10 days) so transfer is capped *if* Polygon ever honors it; today it's still ~26k sliced to 250. Watch `[labs] fetch mode=advance bars=N` for actual counts.
+- **Polygon `from` ignored** — the futures aggs endpoint ignores the `from` param. Fetches now use `sort=desc` + limit to take bars from the **newest** end (was `sort=asc&limit=50000`, which returned oldest-from-inception and went stale at 1m). Recency guard aborts on stale feed during market hours. Watch `[labs] fetch mode={advance|cold-start} bars=N` and the `cold-start bars fed: first=… last=…` line for actual counts/timestamps.
 - **Polygon contract list** — `/futures/v1/contracts?product_code=NQ` returns stale 2018 contracts despite `active=true`; workaround is direct ticker fetch for expiry, product_code query only for rollover
 - **ATR** — `rawAtr` should be 40–100 pts for NQ 5m; if `[labs] raw ATR too large` appears in Railway logs, check `filterOutlierBars` threshold
 
