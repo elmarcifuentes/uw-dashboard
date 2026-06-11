@@ -2767,9 +2767,25 @@ app.post('/scoring/auto-score', (req, res) => {
   res.json({ success: true, autoScoreEnabled })
 })
 
+app.post('/levels/manual-nq', (req, res) => {
+  const { R2_nq, R1_nq, MID_nq, S1_nq, S2_nq, R2_qqq, R1_qqq, MID_qqq, S1_qqq, S2_qqq, ratio, source } = req.body
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  db.prepare(`
+    INSERT INTO daily_levels (date, R2_qqq, R1_qqq, MID_qqq, S1_qqq, S2_qqq, R2_nq, R1_nq, MID_nq, S1_nq, S2_nq, nq_ratio, source, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+    ON CONFLICT(date) DO UPDATE SET
+      R2_qqq=excluded.R2_qqq, R1_qqq=excluded.R1_qqq, MID_qqq=excluded.MID_qqq, S1_qqq=excluded.S1_qqq, S2_qqq=excluded.S2_qqq,
+      R2_nq=excluded.R2_nq,   R1_nq=excluded.R1_nq,   MID_nq=excluded.MID_nq,   S1_nq=excluded.S1_nq,   S2_nq=excluded.S2_nq,
+      nq_ratio=excluded.nq_ratio, source=excluded.source, updated_at=datetime('now')
+  `).run(today, R2_qqq, R1_qqq, MID_qqq, S1_qqq, S2_qqq, R2_nq, R1_nq, MID_nq, S1_nq, S2_nq, ratio, source || 'manual_nq')
+  console.log('[levels] manual NQ saved:', `MID_nq=${MID_nq}`, `MID_qqq=${MID_qqq}`, `ratio=${ratio}`)
+  runAutoRescore('manual_nq_save')
+  res.json({ success: true })
+})
+
 app.post('/levels/source-mode', async (req, res) => {
   const { mode } = req.body
-  const valid = ['auto_nq', 'manual']
+  const valid = ['auto_nq', 'manual', 'manual_nq']
   if (!valid.includes(mode)) return res.status(400).json({ error: 'Invalid mode' })
 
   levelSourceMode = mode

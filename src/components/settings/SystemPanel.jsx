@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { PenLine } from 'lucide-react'
 import Controls from '../intraday/Controls'
 import AlertBadge from '../AlertBadge'
 
@@ -176,6 +177,9 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
   const [nqPreview, setNqPreview]               = useState(null)
   const [ratioInput, setRatioInput]             = useState('')
   const [ratioPreview, setRatioPreview]         = useState(null)
+  const [manualNQLevels, setManualNQLevels]     = useState({ R2: '', R1: '', MID: '', S1: '', S2: '' })
+  const [manualNQRatioInput, setManualNQRatioInput] = useState('')
+  const [manualNQSaving, setManualNQSaving]     = useState(false)
 
   const calcRatioPreview = (value) => {
     const r = parseFloat(value)
@@ -187,6 +191,28 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
       ratio: r,
       levels:  { R2: (nq.R2/r).toFixed(2), R1: (nq.R1/r).toFixed(2), MID: (nq.MID/r).toFixed(2), S1: (nq.S1/r).toFixed(2), S2: (nq.S2/r).toFixed(2) },
       current: { R2: (nq.R2/cur).toFixed(2), R1: (nq.R1/cur).toFixed(2), MID: (nq.MID/cur).toFixed(2), S1: (nq.S1/cur).toFixed(2), S2: (nq.S2/cur).toFixed(2) },
+    }
+  }
+
+  const handleSaveManualNQ = async () => {
+    const ratio = parseFloat(manualNQRatioInput) || sessionRatio || 41.14
+    const payload = {
+      R2_nq:  parseFloat(manualNQLevels.R2),  R2_qqq:  parseFloat((manualNQLevels.R2  / ratio).toFixed(2)),
+      R1_nq:  parseFloat(manualNQLevels.R1),  R1_qqq:  parseFloat((manualNQLevels.R1  / ratio).toFixed(2)),
+      MID_nq: parseFloat(manualNQLevels.MID), MID_qqq: parseFloat((manualNQLevels.MID / ratio).toFixed(2)),
+      S1_nq:  parseFloat(manualNQLevels.S1),  S1_qqq:  parseFloat((manualNQLevels.S1  / ratio).toFixed(2)),
+      S2_nq:  parseFloat(manualNQLevels.S2),  S2_qqq:  parseFloat((manualNQLevels.S2  / ratio).toFixed(2)),
+      ratio, source: 'manual_nq',
+    }
+    setManualNQSaving(true)
+    try {
+      await fetch(`${API_URL}/levels/manual-nq`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      await handleModeChange('manual')
+    } finally {
+      setManualNQSaving(false)
     }
   }
 
@@ -221,7 +247,7 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
 
     fetch(`${API_URL}/labs/auto-levels`)
       .then(r => r.json())
-      .then(data => { if (data?.qqq) setPreviewLevels(data) })
+      .then(data => { if (data?.nq) setPreviewLevels(data) })
       .catch(() => {})
 
     fetch(`${API_URL}/levels/history`)
@@ -484,8 +510,8 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
 
         <div className="space-y-2">
 
-          {/* Mode buttons — 2-column grid */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Mode buttons — 3-column grid */}
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => handleModeChange('auto_nq')}
               className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
@@ -494,13 +520,26 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                   : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
               }`}
             >
-              <div>
-                <div className={`text-xs font-bold ${levelSourceMode === 'auto_nq' ? 'text-emerald-400' : 'text-text-secondary'}`}>
-                  🤖 Auto NQ
-                </div>
-                <div className="text-xs text-text-muted mt-0.5">NQ native · QQQ derived · ratio locks 9:30</div>
-                {levelSourceMode === 'auto_nq' && <span className="text-emerald-500 text-xs">● active</span>}
+              <div className={`text-xs font-bold ${levelSourceMode === 'auto_nq' ? 'text-emerald-400' : 'text-text-secondary'}`}>
+                🤖 Auto NQ
               </div>
+              <div className="text-xs text-text-muted mt-0.5">NQ native · QQQ derived · ratio locks 9:30</div>
+              {levelSourceMode === 'auto_nq' && <span className="text-emerald-500 text-xs">● active</span>}
+            </button>
+
+            <button
+              onClick={() => handleModeChange('manual_nq')}
+              className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                levelSourceMode === 'manual_nq'
+                  ? 'border-sky-600 bg-sky-950/20'
+                  : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
+              }`}
+            >
+              <div className={`text-xs font-bold flex items-center gap-1 ${levelSourceMode === 'manual_nq' ? 'text-sky-400' : 'text-text-secondary'}`}>
+                <PenLine size={11} /> Manual NQ
+              </div>
+              <div className="text-xs text-text-muted mt-0.5">Enter NQ · QQQ auto-calculated</div>
+              {levelSourceMode === 'manual_nq' && <span className="text-sky-400 text-xs">● active</span>}
             </button>
 
             <button
@@ -511,13 +550,11 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                   : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
               }`}
             >
-              <div>
-                <div className={`text-xs font-bold ${levelSourceMode === 'manual' ? 'text-text-secondary' : 'text-text-tertiary'}`}>
-                  ✏️ Manual
-                </div>
-                <div className="text-xs text-text-muted mt-0.5">Levels only change when you save</div>
-                {levelSourceMode === 'manual' && <span className="text-text-secondary text-xs">● active</span>}
+              <div className={`text-xs font-bold ${levelSourceMode === 'manual' ? 'text-text-secondary' : 'text-text-tertiary'}`}>
+                ✏️ Manual
               </div>
+              <div className="text-xs text-text-muted mt-0.5">Levels only change when you save</div>
+              {levelSourceMode === 'manual' && <span className="text-text-secondary text-xs">● active</span>}
             </button>
           </div>
 
@@ -623,6 +660,70 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Manual NQ expanded panel */}
+          {levelSourceMode === 'manual_nq' && (
+            <div className="border border-sky-900/40 bg-sky-950/10 rounded-lg p-3 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-text-muted">Ratio:</span>
+                <span className="text-xs font-mono font-bold text-text-primary">
+                  {sessionRatio?.toFixed(4) || '41.1420'}
+                </span>
+                {sessionRatioLockedAt && (
+                  <span className="text-xs text-state-hold">🔒 {sessionRatioLockedAt}</span>
+                )}
+                <input
+                  type="number"
+                  placeholder="override ratio"
+                  step="0.001"
+                  value={manualNQRatioInput}
+                  onChange={e => setManualNQRatioInput(e.target.value)}
+                  className="bg-bg-elevated font-mono text-xs text-text-primary rounded px-2 py-1 border border-border-default focus:border-sky-500 focus:outline-none w-28 ml-auto"
+                />
+              </div>
+
+              <div className="bg-bg-elevated rounded overflow-hidden border border-border-default">
+                <div className="grid grid-cols-3 gap-2 px-3 py-2 border-b border-border-default bg-bg-elevated/80 text-xs text-text-tertiary">
+                  <span>Level</span>
+                  <span className="text-center">NQ price</span>
+                  <span className="text-right">QQQ equiv</span>
+                </div>
+                {LEVEL_IDS.map((id, i) => {
+                  const activeRatio = parseFloat(manualNQRatioInput) || sessionRatio || 41.14
+                  const nqVal = parseFloat(manualNQLevels[id])
+                  const qqqVal = nqVal > 0 ? (nqVal / activeRatio).toFixed(2) : null
+                  return (
+                    <div key={id} className={`grid grid-cols-3 gap-2 px-3 py-2 items-center ${i < LEVEL_IDS.length - 1 ? 'border-b border-border-default' : ''}`}>
+                      <span className={`text-sm font-bold ${LEVEL_COLORS[id]}`}>{id}</span>
+                      <input
+                        type="number"
+                        step="0.25"
+                        placeholder={`NQ ${id}`}
+                        value={manualNQLevels[id]}
+                        onChange={e => setManualNQLevels(prev => ({ ...prev, [id]: e.target.value }))}
+                        className="bg-bg-elevated text-text-primary text-xs font-mono rounded px-2 py-1.5 text-center border border-border-strong focus:border-sky-500 focus:outline-none w-full"
+                      />
+                      <span className="text-xs font-mono text-text-tertiary text-right">
+                        {qqqVal ? `$${qqqVal}` : '—'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button
+                onClick={handleSaveManualNQ}
+                disabled={manualNQSaving || !LEVEL_IDS.every(id => parseFloat(manualNQLevels[id]) > 0)}
+                className={`w-full py-2 rounded text-xs font-bold transition-colors ${
+                  manualNQSaving || !LEVEL_IDS.every(id => parseFloat(manualNQLevels[id]) > 0)
+                    ? 'bg-bg-elevated text-text-tertiary cursor-not-allowed'
+                    : 'bg-sky-900 hover:bg-sky-700 text-sky-300 hover:text-white'
+                }`}
+              >
+                {manualNQSaving ? '⟳ Saving…' : '💾 Save NQ Levels'}
+              </button>
             </div>
           )}
 
