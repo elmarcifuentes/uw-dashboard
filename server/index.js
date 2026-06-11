@@ -2082,6 +2082,31 @@ async function fetchFromPolygon(ticker, bars, interval) {
   return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: `polygon (${ticker})` }
 }
 
+function filterOutlierBars(bars) {
+  if (bars.length < 10) return bars
+  const trs = bars.slice(1).map((b, i) => Math.max(
+    b.high - b.low,
+    Math.abs(b.high - bars[i].close),
+    Math.abs(b.low  - bars[i].close)
+  ))
+  const sorted = [...trs].sort((a, b) => a - b)
+  const median = sorted[Math.floor(sorted.length / 2)]
+  const threshold = median * 8  // 8× median catches overnight gaps without clipping volatile bars
+  let filtered = 0
+  const result = bars.filter((b, i) => {
+    if (i === 0) return true
+    const tr = Math.max(
+      b.high - b.low,
+      Math.abs(b.high - bars[i - 1].close),
+      Math.abs(b.low  - bars[i - 1].close)
+    )
+    if (tr > threshold) { filtered++; return false }
+    return true
+  })
+  if (filtered > 0) console.log(`[labs] filtered ${filtered} gap bars (TR > ${threshold.toFixed(0)} pts)`)
+  return result
+}
+
 async function fetchFromPolygonFutures(bars, interval) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
@@ -2103,13 +2128,13 @@ async function fetchFromPolygonFutures(bars, interval) {
       const data = await res.json()
       const total = data.results?.length ?? 0
       if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars in range ${fromStr}→${toStr}`); continue }
-      // Sort already asc; take last `bars`
-      const usedBars = data.results.slice(-bars)
-      console.log(`[labs] Polygon futures ${fticker}: total=${total} used=${usedBars.length}`)
+      // Sort already asc; take last `bars`, then filter overnight gap bars
+      const rawBars     = data.results.slice(-bars)
+      const usedBars    = filterOutlierBars(rawBars)
+      console.log(`[labs] Polygon futures ${fticker}: total=${total} raw=${rawBars.length} used=${usedBars.length}`)
       if (total > bars * 3) console.log(`[labs] Polygon returned ${total} bars — using last ${bars} (date range param ignored by Polygon futures API)`)
       const firstBar = usedBars[0]
       const lastBar  = usedBars[usedBars.length - 1]
-      const tsField  = firstBar.window_start ?? firstBar.t
       const firstTs  = new Date(toMs(firstBar.window_start ?? firstBar.t)).toISOString()
       const lastTs   = new Date(toMs(lastBar.window_start  ?? lastBar.t)).toISOString()
       console.log(`[labs] Polygon ${fticker} sample: first=${firstTs} last=${lastTs} first_close=${firstBar.close} last_close=${lastBar.close}`)
@@ -2296,6 +2321,22 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
 
     // Final level calculation — LEVEL_BARS only (ATR from recent bars = correct ✅)
     const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval)
+
+    // TR distribution diagnostic — helps spot overnight gap bars inflating ATR
+    const nq = nqData
+    const trVals = []
+    for (let i = 1; i < nq.closes.length; i++) {
+      trVals.push(Math.max(
+        nq.highs[i] - nq.lows[i],
+        Math.abs(nq.highs[i] - nq.closes[i-1]),
+        Math.abs(nq.lows[i]  - nq.closes[i-1])
+      ))
+    }
+    const maxTR      = Math.max(...trVals)
+    const avgTR      = trVals.reduce((a, b) => a + b, 0) / trVals.length
+    const outliers200 = trVals.filter(tr => tr > 200).length
+    console.log('[labs] NQ TR analysis:', `avg=${avgTR.toFixed(1)}`, `max=${maxTR.toFixed(1)}`, `outliers(>200)=${outliers200}`, `bars=${trVals.length}`)
+
     const nqResult = predictiveRanges(nqData.closes, nqData.highs, nqData.lows, length, mult, savedAvgNQ)
     if (!nqResult) { console.warn('[labs] NQ predictiveRanges returned null'); return null }
 
@@ -2578,6 +2619,7 @@ app.post('/labs/active-interval', async (req, res) => {
 app.post('/labs/reset-avg', (req, res) => {
   db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
   console.log('[labs] avg reset — will re-initialize on next calculation')
+  // No calculateLabsLevels() call here — frontend triggers /labs/recalculate separately
   res.json({ success: true })
 })
 
