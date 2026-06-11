@@ -1992,63 +1992,60 @@ async function fetchContractDetails(ticker) {
 async function detectActiveNQContract() {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) { console.warn('[contract] no POLYGON_API_KEY — keeping', activeNQContract); return }
+
+  // Step 1: update expiry for current contract via direct ticker fetch
+  await fetchContractDetails(activeNQContract)
+
+  // Step 2: check for rollover using product_code query, filtered to 0-120 days out
   try {
     const today = new Date().toISOString().split('T')[0]
     const url   = `https://api.polygon.io/futures/v1/contracts?product_code=NQ&active=true&as_of=${today}&limit=10&apiKey=${POLYGON_KEY}`
-    console.log('[contract] checking:', url.replace(POLYGON_KEY, 'REDACTED'))
-    const res   = await fetch(url)
-    const text  = await res.text()
-    console.log('[contract] response:', text.slice(0, 300))
-    const data  = JSON.parse(text)
-    if (!data.results?.length) {
-      console.warn('[contract] no active NQ contracts found — falling back to direct fetch for', activeNQContract)
-      await fetchContractDetails(activeNQContract)
-      return
-    }
-    const now = new Date()
-    const activeContracts = data.results
-      .filter(c => c.last_trade_date && new Date(c.last_trade_date) > now)
-      .sort((a, b) => new Date(a.last_trade_date) - new Date(b.last_trade_date))
-    const frontMonth = activeContracts[0]
-    if (!frontMonth) { console.warn('[contract] no valid front month found'); return }
+    console.log('[contract] rollover check:', url.replace(POLYGON_KEY, 'REDACTED'))
+    const res  = await fetch(url)
+    const text = await res.text()
+    console.log('[contract] list response:', text.slice(0, 300))
+    const data = JSON.parse(text)
+    const now  = new Date()
+    const frontMonth = (data.results || [])
+      .filter(c => {
+        if (!c.last_trade_date) return false
+        const daysOut = (new Date(c.last_trade_date) - now) / (1000 * 60 * 60 * 24)
+        return daysOut > 0 && daysOut < 120
+      })
+      .sort((a, b) => new Date(a.last_trade_date) - new Date(b.last_trade_date))[0]
+    if (!frontMonth) { console.log('[contract] no rollover candidate found'); return }
     const newTicker = frontMonth.ticker
-    const expiry    = frontMonth.last_trade_date
-    const daysLeft  = Math.max(0, Math.ceil((new Date(expiry) - now) / (1000 * 60 * 60 * 24)))
-    nqContractDaysToExpiry = daysLeft
+    if (newTicker === activeNQContract) return  // no rollover
+    const expiry   = frontMonth.last_trade_date
+    const daysLeft = Math.max(0, Math.ceil((new Date(expiry) - now) / (1000 * 60 * 60 * 24)))
+    const prevTicker = activeNQContract
+    console.log(`[contract] ROLLOVER: ${prevTicker} → ${newTicker} expires: ${expiry} days: ${daysLeft}`)
+    activeNQContract       = newTicker
     activeNQContractExpiry = expiry
-    console.log('[contract] front month:', newTicker, 'expires:', expiry, 'days:', daysLeft)
-    if (newTicker !== activeNQContract) {
-      const prevTicker = activeNQContract
-      console.log(`[contract] ROLLOVER: ${prevTicker} → ${newTicker}`)
-      activeNQContract   = newTicker
-      contractRolledFrom = prevTicker
-      db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
-        .run(JSON.stringify({ ticker: newTicker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
-      // Clear cached avg on rollover — new contract needs fresh convergence
-      db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
-      console.log('[contract] avg cleared for new contract convergence')
-      contractRecalibrating = true
+    nqContractDaysToExpiry = daysLeft
+    contractRolledFrom     = prevTicker
+    db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
+      .run(JSON.stringify({ ticker: newTicker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
+    db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
+    console.log('[contract] avg cleared for new contract convergence')
+    contractRecalibrating = true
+    sseEmitter.emit('event', {
+      type: 'contract_rollover', from: prevTicker, to: newTicker, expiry,
+      message: `NQ rolled ${prevTicker}→${newTicker} — recalibrating levels`,
+      timestamp: new Date().toISOString(),
+    })
+    calculateLabsLevels(labsSettings.interval).then(() => {
+      contractRecalibrating = false
       sseEmitter.emit('event', {
-        type: 'contract_rollover',
-        from: prevTicker, to: newTicker, expiry,
-        message: `NQ rolled ${prevTicker}→${newTicker} — recalibrating levels`,
-        timestamp: new Date().toISOString(),
+        type: 'contract_ready', contract: newTicker,
+        message: `${newTicker} levels active`, timestamp: new Date().toISOString(),
       })
-      calculateLabsLevels(labsSettings.interval).then(() => {
-        contractRecalibrating = false
-        sseEmitter.emit('event', {
-          type: 'contract_ready',
-          contract: newTicker,
-          message: `${newTicker} levels active`,
-          timestamp: new Date().toISOString(),
-        })
-      }).catch(err => {
-        contractRecalibrating = false
-        console.warn('[contract] recalibration failed:', err.message)
-      })
-    }
+    }).catch(err => {
+      contractRecalibrating = false
+      console.warn('[contract] recalibration failed:', err.message)
+    })
   } catch (err) {
-    console.warn('[contract] detection failed:', err.message, '— keeping', activeNQContract)
+    console.warn('[contract] rollover check failed:', err.message)
   }
 }
 
@@ -2260,9 +2257,10 @@ function calcATR(highs, lows, closes, length) {
 
 function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0, startAvg = null) {
   if (!closes?.length || closes.length < 2) return null
-  const atr     = calcATR(highs, lows, closes, length) * mult
-  if (!atr) return null
-  const holdAtr = atr / 2
+  const rawAtr  = calcATR(highs, lows, closes, length)
+  const bandWidth = rawAtr * mult
+  if (!bandWidth) return null
+  const holdAtr = bandWidth / 2
   let avg = startAvg !== null ? startAvg : closes[0]
   for (let i = 1; i < closes.length; i++) {
     if (!closes[i]) continue
@@ -2271,14 +2269,16 @@ function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0, startAv
   }
   if (!avg || isNaN(avg)) return null
   return {
-    R2:      parseFloat((avg + atr * 2).toFixed(2)),
-    R1:      parseFloat((avg + atr).toFixed(2)),
-    MID:     parseFloat(avg.toFixed(2)),
-    S1:      parseFloat((avg - atr).toFixed(2)),
-    S2:      parseFloat((avg - atr * 2).toFixed(2)),
-    atr:     parseFloat(atr.toFixed(4)),
-    holdAtr: parseFloat((atr / 2).toFixed(4)),
-    avg:     parseFloat(avg.toFixed(4)),
+    R2:       parseFloat((avg + bandWidth * 2).toFixed(2)),
+    R1:       parseFloat((avg + bandWidth).toFixed(2)),
+    MID:      parseFloat(avg.toFixed(2)),
+    S1:       parseFloat((avg - bandWidth).toFixed(2)),
+    S2:       parseFloat((avg - bandWidth * 2).toFixed(2)),
+    atr:      parseFloat(bandWidth.toFixed(4)),   // kept for back-compat (bandWidth)
+    rawAtr:   parseFloat(rawAtr.toFixed(4)),      // unscaled ATR
+    bandWidth: parseFloat(bandWidth.toFixed(4)),
+    holdAtr:  parseFloat(holdAtr.toFixed(4)),
+    avg:      parseFloat(avg.toFixed(4)),
   }
 }
 
@@ -2389,9 +2389,8 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
     const nqResult = predictiveRanges(nqData.closes, nqData.highs, nqData.lows, length, mult, savedAvgNQ)
     if (!nqResult) { console.warn('[labs] NQ predictiveRanges returned null'); return null }
 
-    const levelSpacing = labsSettings.mult * nqResult.atr
-    console.log('[labs] NQ:', `MID=${nqResult.MID?.toFixed(1)}`, `R1=${nqResult.R1?.toFixed(1)}`, `S1=${nqResult.S1?.toFixed(1)}`, `rawATR=${nqResult.atr?.toFixed(1)}`, `spacing=${levelSpacing?.toFixed(1)}`)
-    if (nqResult.atr > 150) console.warn('[labs] raw ATR too large:', nqResult.atr.toFixed(1), '— check bar data')
+    console.log('[labs] NQ:', `MID=${nqResult.MID?.toFixed(1)}`, `R1=${nqResult.R1?.toFixed(1)}`, `S1=${nqResult.S1?.toFixed(1)}`, `rawATR=${nqResult.rawAtr?.toFixed(1)}`, `band=${nqResult.bandWidth?.toFixed(1)}`)
+    if (nqResult.rawAtr > 150) console.warn('[labs] raw ATR too large:', nqResult.rawAtr.toFixed(1), '— check bar data')
 
     // Persist updated avg
     db.prepare(`
