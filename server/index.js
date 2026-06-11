@@ -2581,6 +2581,48 @@ function getFreshLiveRatio() {
   return parseFloat(r.toFixed(4))
 }
 
+// Rewrite ONLY the stored QQQ columns from the canonical rounded NQ ÷ ratio. NQ stays the
+// source of truth (untouched). Pure derivation rewrite — independent of level source mode,
+// systemPaused, and market hours (it is not a data fetch). Returns true if a row was rewritten.
+function rewriteQqqFromRatio(ratio) {
+  if (!ratio || ratio <= 0) return false
+  const today = getTodayET()
+  const row = db.prepare(`SELECT r2_nq, r1_nq, mid_nq, s1_nq, s2_nq FROM daily_levels WHERE date = ?`).get(today)
+  if (!row) return false
+  const q = (nq) => nq != null ? parseFloat((nq / ratio).toFixed(2)) : null
+  db.prepare(`
+    UPDATE daily_levels
+       SET r2_qqq = ?, r1_qqq = ?, mid_qqq = ?, s1_qqq = ?, s2_qqq = ?, nq_ratio = ?, updated_at = datetime('now')
+     WHERE date = ?
+  `).run(q(row.r2_nq), q(row.r1_nq), q(row.mid_nq), q(row.s1_nq), q(row.s2_nq), ratio, today)
+  console.log(`[ratio] daily_levels QQQ rewritten from NQ ÷ ${ratio} (MID_nq=${row.mid_nq} → MID_qqq=${q(row.mid_nq)})`)
+  return true
+}
+
+// Shared post-lock refresh — IDENTICAL behavior for scheduled, catch-up, and manual locks
+// (one definition, three call sites, so they can't drift apart). Assumes sessionRatio /
+// sessionRatioLockedAt / sessionRatioDate are already set + persisted by the caller.
+async function onRatioLocked(trigger) {
+  // Defensive — the ratio is already persisted by the caller; this refresh must never
+  // reject (it's awaited by the manual endpoint without its own try/catch).
+  try {
+    // 1) Recompute stored QQQ from canonical NQ ÷ new ratio (gate-free)
+    const rewrote = rewriteQqqFromRatio(sessionRatio)
+    // 2) Stamp Labs display + notify the UI of the new ratio (frontend recomputes QQQ Equiv live)
+    labsAutoLevels = { ...labsAutoLevels, appliedAt: new Date().toISOString() }
+    sseEmitter.emit('event', { type: 'ratio_locked', ratio: sessionRatio, lockedAt: sessionRatioLockedAt, timestamp: new Date().toISOString() })
+    sseEmitter.emit('event', { type: 'labs_levels_update', levels: labsAutoLevels, timestamp: new Date().toISOString() })
+    // 3) Rescore so scored levels + QQQ-denominated narratives reflect the new QQQ columns
+    if (runFullScore) {
+      try { await scoreNow(`ratio_lock:${trigger}`) }
+      catch (err) { console.error(`[ratio] post-lock rescore failed (${trigger}):`, err.message) }
+    }
+    console.log(`[ratio] post-lock refresh (${trigger}) — qqq rewritten=${rewrote}`)
+  } catch (err) {
+    console.error(`[ratio] post-lock refresh failed (${trigger}):`, err.message)
+  }
+}
+
 // ── Level Rounding Policy ───────────────────────────────────────────────────────
 // Applied/scored NQ levels are rounded to WHOLE points at APPLY TIME ONLY — never the
 // recurrence state. The persisted {avg, halfWidth, atrState} stays full precision;
@@ -2623,7 +2665,7 @@ async function runScoreWithNq(opts) {
 }
 
 // Apply auto levels to daily_levels + trigger rescore when mode is auto_nq
-async function applyAutoLevelsIfEnabled(opts = {}) {
+async function applyAutoLevelsIfEnabled() {
   if (systemPaused) return
   if (levelSourceMode === 'manual') return
   const nq = labsAutoLevels?.nq
@@ -2644,9 +2686,7 @@ async function applyAutoLevelsIfEnabled(opts = {}) {
   const nqChanged  = !existing || Math.abs((existing.mid_nq  || 0) - levelData.mid_nq)  > 20
   const qqqChanged = !existing || Math.abs((existing.mid_qqq || 0) - levelData.mid_qqq) > 0.50
   const changed = nqChanged || qqqChanged
-  // opts.force bypasses the change guard (e.g. a ratio re-lock changes QQQ via the ratio
-  // even when MID_nq is unchanged) — the guard THRESHOLD itself is untouched.
-  if (!changed && !opts.force) return
+  if (!changed) return
 
   db.prepare(`
     INSERT INTO daily_levels
@@ -2871,13 +2911,8 @@ setInterval(() => {
           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
         `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date }))
         console.log(`[ratio] LOCKED ${sessionRatio} at ${sessionRatioLockedAt} (${mode})`)
-        sseEmitter.emit('event', {
-          type: 'ratio_locked', ratio: sessionRatio, lockedAt: sessionRatioLockedAt,
-          timestamp: new Date().toISOString()
-        })
-        // Force re-apply so QQQ equivalents (derived via the ratio) refresh even if MID_nq
-        // didn't move enough to trip the >20pt guard.
-        if (levelSourceMode !== 'manual') applyAutoLevelsIfEnabled({ force: true })
+        // Shared post-lock refresh (QQQ rewrite + SSE + rescore) — same as the manual path
+        onRatioLocked(mode).catch(err => console.error('[ratio] post-lock failed:', err.message))
       } else if (_ratioDeferDate !== date) {
         _ratioDeferDate = date
         console.warn('[ratio] lock deferred: prices unavailable — will retry on later ticks')
@@ -3107,27 +3142,25 @@ app.post('/levels/source-mode', async (req, res) => {
   res.json({ success: true, mode })
 })
 
-app.post('/ratio/lock', (req, res) => {
+app.post('/ratio/lock', async (req, res) => {
   const { ratio } = req.body
   if (!ratio || isNaN(parseFloat(ratio))) return res.status(400).json({ error: 'Invalid ratio' })
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })  // ET date
   const now   = new Date().toLocaleTimeString('en-US', {
     timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit'
   })
   sessionRatio         = parseFloat(parseFloat(ratio).toFixed(4))
   sessionRatioLockedAt = `${now} (manual)`
-  sessionRatioDate     = today
+  sessionRatioDate     = today   // counts as today's lock — scheduler catch-up won't overwrite
   db.prepare(`
     INSERT INTO settings (key, value, updated_at)
     VALUES ('session_ratio', ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date: today }))
   console.log('[ratio] MANUALLY locked:', sessionRatio)
-  sseEmitter.emit('event', {
-    type: 'ratio_locked', ratio: sessionRatio, lockedAt: sessionRatioLockedAt,
-    timestamp: new Date().toISOString()
-  })
-  if (levelSourceMode !== 'manual') applyAutoLevelsIfEnabled()
+  // Same shared post-lock refresh as the scheduled/catch-up paths (QQQ rewrite + SSE +
+  // rescore). Runs regardless of market hours / pause — it's a derivation rewrite.
+  await onRatioLocked('manual')
   res.json({ success: true, ratio: sessionRatio, lockedAt: sessionRatioLockedAt })
 })
 
