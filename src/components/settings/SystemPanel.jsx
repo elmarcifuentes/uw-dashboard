@@ -484,172 +484,46 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
 
         <div className="space-y-2">
 
-          {/* Mode 1 — Full Auto */}
-          <button
-            onClick={() => handleModeChange('auto')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
-              levelSourceMode === 'auto'
-                ? 'border-indigo-600 bg-indigo-950/30'
-                : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className={`text-xs font-bold ${levelSourceMode === 'auto' ? 'text-indigo-400' : 'text-text-secondary'}`}>
-                  🤖 Auto — QQQ + NQ
-                </div>
-                <div className="text-xs text-text-muted mt-0.5">Both auto-calculated · updates automatically on bar close</div>
-              </div>
-              {levelSourceMode === 'auto' && <span className="text-indigo-500 text-xs shrink-0 ml-2">● active</span>}
-            </div>
-          </button>
-
-          {levelSourceMode === 'auto' && (
-            <div className="border border-indigo-900/40 bg-indigo-950/10 rounded-lg p-3 ml-2 space-y-3">
-              <button
-                onClick={handleRecalculate}
-                disabled={calculating}
-                className={`w-full py-2 rounded text-xs font-bold transition-colors ${
-                  calculating ? 'bg-bg-elevated text-text-tertiary' : 'bg-indigo-700 hover:bg-indigo-600 text-text-primary'
-                }`}
-              >
-                {calculating ? '⟳ Calculating...' : '⟳ Recalculate Levels'}
-              </button>
-              <LevelPreviewTable qqq={previewLevels?.qqq} nq={previewLevels?.nq} ratio={ratio} />
-              <button
-                onClick={handleForceScore}
-                disabled={scoring}
-                className={`w-full py-2 rounded text-xs font-bold transition-colors ${
-                  scoring ? 'bg-bg-elevated text-text-tertiary' : 'bg-green-800 hover:bg-green-700 text-text-primary'
-                }`}
-              >
-                {scoring ? '⟳ Scoring...' : '⚡ Score Now'}
-              </button>
-              <AutoScoreToggle enabled={autoScoreEnabled} onToggle={handleAutoScoreToggle} />
-              {previewLevels?.lastCalculated && (
-                <div className="text-xs text-text-disabled">
-                  Last calculated:{' '}
-                  {new Date(previewLevels.lastCalculated).toLocaleTimeString('en-US', {
-                    timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit'
-                  })} ET · {previewLevels.interval} bars · {previewLevels.qqq?.source}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Mode 2 — Auto QQQ + derived NQ */}
-          <button
-            onClick={() => handleModeChange('auto_qqq')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
-              levelSourceMode === 'auto_qqq'
-                ? 'border-blue-600 bg-blue-950/20'
-                : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className={`text-xs font-bold ${levelSourceMode === 'auto_qqq' ? 'text-blue-400' : 'text-text-secondary'}`}>
-                  🤖 Auto QQQ · Manual NQ
-                </div>
-                <div className="text-xs text-text-muted mt-0.5">QQQ auto-updates · NQ = QQQ × ratio with optional offset per level</div>
-              </div>
-              {levelSourceMode === 'auto_qqq' && <span className="text-blue-500 text-xs shrink-0 ml-2">● active</span>}
-            </div>
-          </button>
-
-          {levelSourceMode === 'auto_qqq' && (
-            <div className="border border-blue-900/40 bg-blue-950/10 rounded-lg p-3 ml-2 space-y-3">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-xs text-text-tertiary w-20 shrink-0">NQ Ratio</span>
-                <input
-                  type="number"
-                  value={nqOffsets.ratio || ''}
-                  onChange={e => setNqOffsets(prev => ({ ...prev, ratio: e.target.value || null }))}
-                  placeholder={`${ratio?.toFixed(3) || '41.142'} (live)`}
-                  step="0.001"
-                  className="bg-bg-elevated text-text-primary font-mono text-xs rounded px-2 py-1 border border-border-strong focus:border-blue-500 focus:outline-none w-28"
-                />
-                <span className="text-xs text-text-muted">blank = use live ratio</span>
-              </div>
-              <button onClick={() => setShowOffsets(v => !v)} className="text-xs text-text-muted hover:text-text-secondary">
-                {showOffsets ? '▲ hide offsets' : '▼ per-level NQ offsets (optional)'}
-              </button>
-              {showOffsets && (
-                <div className="space-y-1.5 pl-2">
-                  {LEVEL_IDS.map(id => (
-                    <div key={id} className="flex items-center gap-2">
-                      <span className={`text-xs font-bold w-8 shrink-0 ${
-                        id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
-                      }`}>{id}</span>
-                      <input
-                        type="number"
-                        value={nqOffsets[id] || 0}
-                        onChange={e => setNqOffsets(prev => ({ ...prev, [id]: parseInt(e.target.value) || 0 }))}
-                        step="1"
-                        className="bg-bg-elevated text-text-primary font-mono text-xs rounded px-2 py-1 border border-border-strong w-20 text-center"
-                      />
-                      <span className="text-xs text-text-disabled">NQ pts</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={handleCalculateNQ}
-                className="w-full py-2 rounded text-xs font-bold bg-blue-900/50 hover:bg-blue-800/50 text-blue-300 transition-colors"
-              >
-                ⟳ Calculate NQ Preview
-              </button>
-              {nqPreview && (
-                <div className="border border-blue-900/30 rounded p-2 space-y-1">
-                  <div className="text-xs text-text-muted mb-1">Preview — review before saving</div>
-                  {LEVEL_IDS.map(id => (
-                    <div key={id} className="flex justify-between text-xs">
-                      <span className={`font-bold w-8 ${
-                        id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
-                      }`}>{id}</span>
-                      <span className="text-text-primary font-mono">${nqPreview[id]?.qqq?.toFixed(2)}</span>
-                      <span className="text-blue-300 font-mono">NQ {nqPreview[id]?.nq?.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={handleAutoQqqSave}
-                disabled={scoring || !nqPreview}
-                className={`w-full py-2 rounded text-xs font-bold transition-colors ${
-                  scoring || !nqPreview
-                    ? 'bg-bg-elevated text-text-tertiary cursor-not-allowed'
-                    : 'bg-green-800 hover:bg-green-700 text-text-primary'
-                }`}
-              >
-                {scoring ? '⟳ Scoring...' : nqPreview ? '✓ Save + Score Now' : 'Calculate first to enable save'}
-              </button>
-              <AutoScoreToggle enabled={autoScoreEnabled} onToggle={handleAutoScoreToggle} />
-            </div>
-          )}
-
-          {/* Mode 3 — Auto NQ native + derived QQQ */}
-          <button
-            onClick={() => handleModeChange('auto_nq')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
-              levelSourceMode === 'auto_nq'
-                ? 'border-emerald-600 bg-emerald-950/20'
-                : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
-            }`}
-          >
-            <div className="flex items-center justify-between">
+          {/* Mode buttons — 2-column grid */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleModeChange('auto_nq')}
+              className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                levelSourceMode === 'auto_nq'
+                  ? 'border-emerald-600 bg-emerald-950/20'
+                  : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
+              }`}
+            >
               <div>
                 <div className={`text-xs font-bold ${levelSourceMode === 'auto_nq' ? 'text-emerald-400' : 'text-text-secondary'}`}>
-                  🤖 Auto NQ · Derived QQQ
+                  🤖 Auto NQ
                 </div>
-                <div className="text-xs text-text-muted mt-0.5">NQ native levels · QQQ = NQ ÷ ratio for UW scoring · ratio locks at 9:30</div>
+                <div className="text-xs text-text-muted mt-0.5">NQ native · QQQ derived · ratio locks 9:30</div>
+                {levelSourceMode === 'auto_nq' && <span className="text-emerald-500 text-xs">● active</span>}
               </div>
-              {levelSourceMode === 'auto_nq' && <span className="text-emerald-500 text-xs shrink-0 ml-2">● active</span>}
-            </div>
-          </button>
+            </button>
 
+            <button
+              onClick={() => handleModeChange('manual')}
+              className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                levelSourceMode === 'manual'
+                  ? 'border-gray-500 bg-bg-elevated/50'
+                  : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
+              }`}
+            >
+              <div>
+                <div className={`text-xs font-bold ${levelSourceMode === 'manual' ? 'text-text-secondary' : 'text-text-tertiary'}`}>
+                  ✏️ Manual
+                </div>
+                <div className="text-xs text-text-muted mt-0.5">Levels only change when you save</div>
+                {levelSourceMode === 'manual' && <span className="text-text-secondary text-xs">● active</span>}
+              </div>
+            </button>
+          </div>
+
+          {/* Auto NQ expanded panel */}
           {levelSourceMode === 'auto_nq' && (
-            <div className="border border-emerald-900/40 bg-emerald-950/10 rounded-lg p-3 ml-2 space-y-3">
+            <div className="border border-emerald-900/40 bg-emerald-950/10 rounded-lg p-3 space-y-3">
               {!sessionRatio ? (
                 <div className="text-xs px-2 py-1.5 rounded bg-bg-card2 text-text-muted">
                   Live ratio — locks automatically at 9:30 AM ET
@@ -752,28 +626,9 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
             </div>
           )}
 
-          {/* Mode 4 — Full Manual */}
-          <button
-            onClick={() => handleModeChange('manual')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
-              levelSourceMode === 'manual'
-                ? 'border-gray-500 bg-bg-elevated/50'
-                : 'border-border-default bg-bg-elevated/30 hover:border-border-strong'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className={`text-xs font-bold ${levelSourceMode === 'manual' ? 'text-text-secondary' : 'text-text-tertiary'}`}>
-                  ✏️ Manual — QQQ + NQ
-                </div>
-                <div className="text-xs text-text-muted mt-0.5">Levels only change when you save manually or accept webhook</div>
-              </div>
-              {levelSourceMode === 'manual' && <span className="text-text-secondary text-xs shrink-0 ml-2">● active</span>}
-            </div>
-          </button>
-
+          {/* Manual expanded panel */}
           {levelSourceMode === 'manual' && (
-            <div className="border border-border-default/40 bg-bg-elevated/20 rounded-lg p-3 ml-2 space-y-3">
+            <div className="border border-border-default/40 bg-bg-elevated/20 rounded-lg p-3 space-y-3">
               <div className="text-xs text-text-tertiary">Enter levels manually. Save to apply and begin scoring.</div>
               <div className="bg-bg-elevated rounded overflow-hidden border border-border-default">
                 <div className="grid grid-cols-3 gap-2 px-3 py-2 border-b border-border-default bg-bg-elevated/80">

@@ -16,13 +16,11 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
   const [autoLevels, setAutoLevels]     = useState(null)
   const [loading, setLoading]           = useState(true)
   const [applying, setApplying]         = useState(null)
-  const [activeSource, setActiveSource] = useState('qqq')
   const [currentLevels, setCurrentLevels] = useState(null)
   const [currentPrice, setCurrentPrice]   = useState(null)
   const [nqRatio, setNqRatio]             = useState(41.14)
   const [scoredLevels, setScoredLevels]   = useState(null)
   const [settings, setSettings]     = useState({ interval: '5m', length: 200, mult: 6.0, avgMode: 'daily' })
-  const [dataSources, setDataSources] = useState({ qqq: 'yahoo', nq: 'polygon' })
   const [nqContract, setNqContract]   = useState(null)
   const [nqContractExpiry, setNqContractExpiry] = useState(null)
 
@@ -33,7 +31,6 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
         setAutoLevels(data)
         if (data.settings)      setSettings(data.settings)
         else if (data.interval) setSettings(prev => ({ ...prev, interval: data.interval }))
-        if (data.dataSources)   setDataSources(data.dataSources)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -99,26 +96,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
 
   const handleIntervalChange = (interval) => handleSettingsChange({ ...settings, interval })
 
-  const handleSourceChange = async (ticker, source) => {
-    const newSources = { ...dataSources, [ticker]: source }
-    setDataSources(newSources)
-    setLoading(true)
-    try {
-      const res  = await fetch(`${API_URL}/labs/data-sources`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSources),
-      })
-      const data = await res.json()
-      if (data.dataSources) setDataSources(data.dataSources)
-    } catch (e) {
-      console.warn('[labs] source change failed:', e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const levels = autoLevels?.[activeSource]
+  const levels = autoLevels?.nq
 
   return (
     <div className="space-y-4">
@@ -128,7 +106,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
         <div>
           <h1 className="text-sm font-bold text-text-primary uppercase tracking-wide">TradesAlgo Labs</h1>
           <p className="text-xs text-text-muted mt-0.5">
-            Predictive Ranges · length={settings.length} · factor={settings.mult} · source: Yahoo Finance
+            Predictive Ranges · NQ native · length={settings.length} · factor={settings.mult}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -232,70 +210,12 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
           )}
         </div>
 
-        {/* QQQ source */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-tertiary">QQQ</span>
-          <div className="flex gap-1">
-            {['yahoo', 'polygon'].map(src => (
-              <button
-                key={src}
-                onClick={() => handleSourceChange('qqq', src)}
-                disabled={loading}
-                className={`px-2.5 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-40 ${
-                  dataSources.qqq === src
-                    ? 'bg-indigo-700 text-text-primary'
-                    : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {src === 'yahoo' ? 'Yahoo' : 'Polygon'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* NQ source */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-tertiary">NQ</span>
-          <div className="flex gap-1">
-            {['yahoo', 'polygon'].map(src => (
-              <button
-                key={src}
-                onClick={() => handleSourceChange('nq', src)}
-                disabled={loading}
-                className={`px-2.5 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-40 ${
-                  dataSources.nq === src
-                    ? 'bg-indigo-700 text-text-primary'
-                    : 'bg-bg-elevated text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {src === 'yahoo' ? 'Yahoo' : 'Polygon'}
-              </button>
-            ))}
-          </div>
-          {nqContract && (
-            <span className="text-micro text-text-muted font-mono">
-              {nqContract}{nqContractExpiry && <> · exp {nqContractExpiry}</>}
-            </span>
-          )}
-        </div>
-
-        <div className="w-px h-4 bg-bg-elevated" />
-
-        <div className="flex gap-1">
-          {['qqq', 'nq'].map(src => (
-            <button
-              key={src}
-              onClick={() => setActiveSource(src)}
-              className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${
-                activeSource === src ? 'bg-indigo-700 text-text-primary' : 'bg-bg-elevated text-text-secondary hover:text-gray-200'
-              }`}
-            >
-              {src}
-              {src === 'nq' && !autoLevels?.nq && (
-                <span className="ml-1 text-text-muted font-normal normal-case">(needs Polygon)</span>
-              )}
-            </button>
-          ))}
+        {/* NQ source info */}
+        <div className="flex items-center gap-1.5 text-xs text-text-muted">
+          <span>Source:</span>
+          <span className="text-text-secondary">Polygon</span>
+          {nqContract && <span className="font-mono text-text-tertiary">({nqContract})</span>}
+          <span>· Yahoo fallback</span>
         </div>
 
         {autoLevels?.lastCalculated && !loading && (
@@ -347,8 +267,8 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
                 <p className="text-micro text-text-muted mt-0.5">Daily — persistent ratchet avg that carries forward across restarts, keeping levels stable session-to-session. Weekly — anchors MID to last week's closing avg, uses intraday ATR for band spacing.</p>
               </div>
               <div>
-                <span className="text-micro font-bold text-text-secondary">Data Sources</span>
-                <p className="text-micro text-text-muted mt-0.5">Yahoo — free, reliable, slight delay. Polygon — paid, accurate, native futures. Default: QQQ→Yahoo, NQ→Polygon. Falls back to Yahoo if Polygon fails.</p>
+                <span className="text-micro font-bold text-text-secondary">Source</span>
+                <p className="text-micro text-text-muted mt-0.5">NQ → Polygon futures (active contract). Falls back to Yahoo if Polygon fails. QQQ levels are derived: NQ ÷ ratio.</p>
               </div>
             </div>
             <div className="absolute right-3 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-border-default" />
@@ -362,9 +282,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
         </div>
       ) : !levels ? (
         <div className="text-center py-12 text-text-muted text-sm">
-          {activeSource === 'nq'
-            ? 'NQ data requires Polygon.io futures subscription. Add POLYGON_API_KEY to Railway.'
-            : 'Level calculation failed. Check Railway logs.'}
+          NQ calculation failed. Check Railway logs — requires POLYGON_API_KEY for futures data.
         </div>
       ) : (
         <>
@@ -373,17 +291,16 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
               levels={levels}
               currentPrice={currentPrice}
               nqRatio={nqRatio}
-              activeSource={activeSource}
+              activeSource="nq"
               activeSymbol={activeSymbol}
             />
             <LevelComparison
               autoLevels={levels}
               currentLevels={currentLevels}
-              activeSource={activeSource}
               lastCalculated={autoLevels?.lastCalculated}
               interval={settings.interval}
-              onApply={() => handleApply(activeSource)}
-              applying={applying === activeSource}
+              onApply={() => handleApply('nq')}
+              applying={applying === 'nq'}
               activeSymbol={activeSymbol}
               nqRatio={nqRatio}
             />
@@ -398,15 +315,15 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
                 </div>
               </div>
               <button
-                onClick={() => handleApply(activeSource)}
-                disabled={applying === activeSource}
+                onClick={() => handleApply('nq')}
+                disabled={applying === 'nq'}
                 className={`px-4 py-2 rounded text-xs font-bold transition-colors ${
-                  applying === activeSource
+                  applying === 'nq'
                     ? 'bg-bg-elevated text-text-tertiary'
                     : 'bg-indigo-700 hover:bg-indigo-600 text-text-primary'
                 }`}
               >
-                {applying === activeSource ? '⟳ Applying...' : `↑ Push ${activeSource.toUpperCase()} to Levels`}
+                {applying === 'nq' ? '⟳ Applying...' : '↑ Push NQ to Levels'}
               </button>
             </div>
             {settings.interval !== '5m' && (
