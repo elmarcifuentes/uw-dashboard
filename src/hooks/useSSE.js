@@ -31,6 +31,9 @@ export function useSSE(url) {
   const [ratioIsLocked, setRatioIsLocked]     = useState(false)
   const [ratioIsFromToday, setRatioIsFromToday] = useState(false)
   const [contractRollover, setContractRollover] = useState(null)
+  const [nqContract, setNqContract]             = useState(null)
+  const [nqContractExpiry, setNqContractExpiry] = useState(null)
+  const [daysToExpiry, setDaysToExpiry]         = useState(null)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
   const priceHistoryRef = useRef([])
@@ -108,6 +111,9 @@ export function useSSE(url) {
               setSessionRatioLockedAt(data.sessionRatioLockedAt)
               setRatioIsFromToday(data.ratioIsFromToday ?? false)
             }
+            if (data?.nqContract)       setNqContract(data.nqContract)
+            if (data?.nqContractExpiry) setNqContractExpiry(data.nqContractExpiry)
+            if (data?.daysToExpiry)     setDaysToExpiry(data.daysToExpiry)
             if (data?.contractRecalibrating) {
               setContractRollover({
                 from: data.contractRolledFrom,
@@ -316,5 +322,8 @@ export function useSSE(url) {
     ratioIsLocked,
     ratioIsFromToday,
     contractRollover,
+    nqContract,
+    nqContractExpiry,
+    daysToExpiry,
   }
 }

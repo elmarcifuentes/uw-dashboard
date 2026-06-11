@@ -32,7 +32,7 @@ function AppInner() {
   const { activeSymbol, changeSymbol } = useSymbol()
   const [pendingTrade, setPendingTrade] = useState(null)
 
-  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt, activeTrades, setActiveTrades, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, contractRollover } = useSSE(`${API_URL}/stream`)
+  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt, activeTrades, setActiveTrades, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, contractRollover, nqContract, nqContractExpiry, daysToExpiry } = useSSE(`${API_URL}/stream`)
   const activeTrade = activeTrades?.[activeSymbol] || null
 
   const result        = useMemo(() => rescoreData?.result ?? null, [rescoreData])
@@ -92,7 +92,7 @@ function AppInner() {
               }}
             />
           )}
-          {activeTab === 'Settings'     && <SettingsTab systemPaused={systemPaused} pausedAt={pausedAt} activeSymbol={activeSymbol} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} ratioIsLocked={ratioIsLocked} ratioIsFromToday={ratioIsFromToday} />}
+          {activeTab === 'Settings'     && <SettingsTab systemPaused={systemPaused} pausedAt={pausedAt} activeSymbol={activeSymbol} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} ratioIsLocked={ratioIsLocked} ratioIsFromToday={ratioIsFromToday} nqContract={nqContract} nqContractExpiry={nqContractExpiry} daysToExpiry={daysToExpiry} />}
           {activeTab === 'Guide'        && <GuideTab />}
         </div>
       </main>

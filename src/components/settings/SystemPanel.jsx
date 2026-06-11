@@ -153,7 +153,7 @@ function LevelPreviewTable({ qqq, nq, ratio }) {
   )
 }
 
-export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday }) {
+export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, nqContract, nqContractExpiry, daysToExpiry }) {
   const [levels, setLevels]         = useState(emptyLevels())
   const [savedDate, setSavedDate]   = useState(null)
   const [isToday, setIsToday]       = useState(false)
@@ -738,6 +738,17 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                 )}
               </div>
               <AutoScoreToggle enabled={autoScoreEnabled} onToggle={handleAutoScoreToggle} />
+              {nqContract && (
+                <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
+                  <span className="text-micro font-price text-text-tertiary font-bold">{nqContract}</span>
+                  {nqContractExpiry && <span className="text-micro text-text-disabled">exp {nqContractExpiry}</span>}
+                  {daysToExpiry != null && (
+                    <span className={`text-micro px-1.5 py-0.5 rounded font-bold ${daysToExpiry <= 7 ? 'bg-state-exitSoft text-state-exit' : 'bg-bg-card2 text-text-muted'}`}>
+                      {daysToExpiry}d
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -814,6 +825,16 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
             </div>
           )}
         </div>
+        {nqContract && (
+          <div className="flex items-center gap-1.5 mt-3 text-micro text-text-disabled">
+            <span>Active contract:</span>
+            <span className="font-price text-text-tertiary">{nqContract}</span>
+            {nqContractExpiry && <><span>·</span><span>exp {nqContractExpiry}</span></>}
+            {daysToExpiry <= 7 && daysToExpiry != null && (
+              <span className="text-state-exit font-bold ml-1">⚠ rollover soon</span>
+            )}
+          </div>
+        )}
       </Section>
 
       {/* ── SAVED LEVELS ── */}
