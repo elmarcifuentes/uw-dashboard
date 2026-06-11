@@ -2026,8 +2026,8 @@ async function detectActiveNQContract() {
     contractRolledFrom     = prevTicker
     db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
       .run(JSON.stringify({ ticker: newTicker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
-    db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
-    console.log('[contract] avg cleared for new contract convergence')
+    db.prepare(`DELETE FROM settings WHERE key IN ('labs_pr_avg', 'labs_pr_avg_5m', 'labs_pr_avg_1m')`).run()
+    console.log('[contract] PR state cleared (both timeframes) for new contract convergence')
     contractRecalibrating = true
     sseEmitter.emit('event', {
       type: 'contract_rollover', from: prevTicker, to: newTicker, expiry,
@@ -2386,9 +2386,14 @@ function saveNQLevels(nqResult, interval) {
   return labsAutoLevels
 }
 
+// PR recurrence state is persisted PER TIMEFRAME so timeframes never mix.
+// 5m → labs_pr_avg_5m, 1m → labs_pr_avg_1m (any other tf gets its own isolated key).
+const prAvgKey = (interval) => 'labs_pr_avg_' + (interval || '5m')
+
 async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) {
   const INIT_BARS  = 1000
   const LEVEL_BARS = 250
+  const stateKey   = prAvgKey(interval)
   const { length, mult, avgMode = 'daily' } = labsSettings
   // Cold-start may run ONLY when there is no usable persisted state. opts.reason
   // labels WHY (reset | rollover); absent → 'no-state' (first run / empty DB).
@@ -2423,46 +2428,46 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
 
     const persistState = (s) => db.prepare(`
       INSERT INTO settings (key, value, updated_at)
-      VALUES ('labs_pr_avg', ?, datetime('now'))
+      VALUES (?, ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-    `).run(JSON.stringify({ avg: s.avg, halfWidth: s.halfWidth, atrState: s.atrState, lastBarTs: s.lastBarTs, savedAt: new Date().toISOString() }))
+    `).run(stateKey, JSON.stringify({ avg: s.avg, halfWidth: s.halfWidth, atrState: s.atrState, lastBarTs: s.lastBarTs, savedAt: new Date().toISOString() }))
 
     const coldStart = async () => {
-      console.log(`[labs] cold-start init from ${INIT_BARS} bars (closed bars only, RMA warmup)...`)
+      console.log(`[labs] [${interval}] cold-start init from ${INIT_BARS} bars (closed bars only, RMA warmup)...`)
       const init = await fetchOHLC('NQ=F', INIT_BARS, interval)
       if (!init?.times) { console.warn('[labs] init fetch missing timestamps — cannot run recurrence'); return null }
       const s = initRecurrence(dropForming(init.closes), dropForming(init.highs), dropForming(init.lows), dropForming(init.times), length, mult)
       if (!s) { console.warn('[labs] initRecurrence returned null'); return null }
-      console.log(`[labs] init complete: avg=${s.avg.toFixed(1)} halfWidth=${s.halfWidth.toFixed(1)} rawATR=${s.atrState.toFixed(1)} ratchets=${s.ratchets} bars=${s.barsProcessed}`)
+      console.log(`[labs] [${interval}] init complete: avg=${s.avg.toFixed(1)} halfWidth=${s.halfWidth.toFixed(1)} rawATR=${s.atrState.toFixed(1)} ratchets=${s.ratchets} bars=${s.barsProcessed}`)
       return { state: s, source: init.source }
     }
 
-    // 1) Load persisted full state (must be new-format with atrState + lastBarTs)
+    // 1) Load this timeframe's persisted full state (must be new-format with atrState + lastBarTs)
     let state = null
     try {
-      const saved = db.prepare(`SELECT value FROM settings WHERE key = 'labs_pr_avg'`).get()
+      const saved = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(stateKey)
       if (saved?.value) {
         const d = JSON.parse(saved.value)
         if (d.atrState != null && d.lastBarTs != null && d.halfWidth != null && d.avg != null) {
           state = { avg: d.avg, halfWidth: d.halfWidth, atrState: d.atrState, lastBarTs: d.lastBarTs }
-          console.log(`[labs] loaded PR state: avg=${state.avg.toFixed(1)} halfWidth=${state.halfWidth.toFixed(1)} rawATR=${state.atrState.toFixed(1)} lastBar=${new Date(state.lastBarTs).toISOString()}`)
+          console.log(`[labs] [${interval}] loaded PR state: avg=${state.avg.toFixed(1)} halfWidth=${state.halfWidth.toFixed(1)} rawATR=${state.atrState.toFixed(1)} lastBar=${new Date(state.lastBarTs).toISOString()}`)
         } else {
-          console.log('[labs] old-format/partial PR state — cold-start required')
+          console.log(`[labs] [${interval}] old-format/partial PR state — cold-start required`)
         }
       }
     } catch (e) {}
 
     let source
     if (!state) {
-      // No usable persisted state → cold-start (first run / reset / rollover only)
-      console.log(`[labs] recalc mode=cold-start reason=${coldStartReason}`)
+      // No usable persisted state for this timeframe → cold-start (first run / reset / rollover only)
+      console.log(`[labs] [${interval}] recalc mode=cold-start reason=${coldStartReason}`)
       const cs = await coldStart()
       if (!cs) return null
       state = cs.state; source = cs.source
       persistState(state)
     } else {
       // Advance saved state over ONLY newly-closed bars since lastBarTs — identical
-      // to the scheduled 5m cycle. No new closed bar → barsAdvanced=0 → no-op.
+      // to the scheduled cycle. No new closed bar → barsAdvanced=0 → no-op.
       const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval)
       if (!nqData?.times) { console.warn('[labs] recent fetch missing timestamps — skipping advance'); return null }
       source = nqData.source
@@ -2470,23 +2475,23 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
       const adv = advanceRecurrence(state, dropForming(nqData.closes), dropForming(nqData.highs), dropForming(nqData.lows), dropForming(nqData.times), length, mult)
       if (adv.needsReinit) {
         // Saved bar predates the window — only safe recovery is a re-init
-        console.log('[labs] recalc mode=cold-start reason=gap-too-large')
+        console.log(`[labs] [${interval}] recalc mode=cold-start reason=gap-too-large`)
         console.warn('[labs] saved bar predates window — re-initializing from long window')
         const cs = await coldStart()
         if (!cs) return null
         state = cs.state; source = cs.source
       } else {
         state = { avg: adv.avg, halfWidth: adv.halfWidth, atrState: adv.atrState, lastBarTs: adv.lastBarTs }
-        console.log(`[labs] recalc mode=advance barsAdvanced=${adv.barsAdvanced} (avg ${prevAvg.toFixed(1)} → ${state.avg.toFixed(1)}, ratcheted=${adv.ratchets > 0}, halfWidth=${state.halfWidth.toFixed(1)})`)
+        console.log(`[labs] [${interval}] avg ${prevAvg.toFixed(1)} → ${state.avg.toFixed(1)}, ratcheted=${adv.ratchets > 0}, halfWidth=${state.halfWidth.toFixed(1)}, mode=advance barsAdvanced=${adv.barsAdvanced}`)
         if (adv.ratchetBars?.length) {
-          console.log('[labs] ratchet bars: ' + adv.ratchetBars.map(ts => new Date(ts).toISOString()).join(', '))
+          console.log(`[labs] [${interval}] ratchet bars: ` + adv.ratchetBars.map(ts => new Date(ts).toISOString()).join(', '))
         }
       }
       persistState(state)
     }
 
     const nqResult = levelsFromState(state, mult)
-    console.log('[labs] NQ:', `MID=${nqResult.MID.toFixed(1)}`, `R1=${nqResult.R1.toFixed(1)}`, `S1=${nqResult.S1.toFixed(1)}`, `rawATR=${nqResult.rawAtr.toFixed(1)}`, `halfWidth=${nqResult.halfWidth.toFixed(1)}`)
+    console.log(`[labs] [${interval}] NQ:`, `MID=${nqResult.MID.toFixed(1)}`, `R1=${nqResult.R1.toFixed(1)}`, `S1=${nqResult.S1.toFixed(1)}`, `rawATR=${nqResult.rawAtr.toFixed(1)}`, `halfWidth=${nqResult.halfWidth.toFixed(1)}`)
     return saveNQLevels({ ...nqResult, source, interval }, interval)
   } catch (err) {
     console.error('[labs] calculation failed:', err.message)
@@ -2500,6 +2505,18 @@ try {
   if (savedSettings?.value) {
     labsSettings = { ...labsSettings, ...JSON.parse(savedSettings.value) }
     console.log('[labs] settings restored:', JSON.stringify(labsSettings))
+  }
+} catch (e) {}
+// Migrate legacy single-key PR state → per-timeframe 5m key (preserve converged state)
+try {
+  const legacy = db.prepare(`SELECT value FROM settings WHERE key = 'labs_pr_avg'`).get()
+  if (legacy?.value) {
+    const has5m = db.prepare(`SELECT 1 FROM settings WHERE key = 'labs_pr_avg_5m'`).get()
+    if (!has5m) {
+      db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('labs_pr_avg_5m', ?, datetime('now'))`).run(legacy.value)
+      console.log('[labs] migrated labs_pr_avg → labs_pr_avg_5m (converged 5m state preserved)')
+    }
+    db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
   }
 } catch (e) {}
 try {
@@ -2802,27 +2819,35 @@ app.post('/labs/settings', async (req, res) => {
   res.json({ success: true, settings: labsSettings, levels: labsAutoLevels })
 })
 
+// Authoritative Predictive-Ranges timeframe toggle (5m / 1m). Switching loads that
+// timeframe's persisted recurrence state (cold-starts if none) — the two never mix.
 app.post('/labs/active-interval', async (req, res) => {
   const { interval } = req.body
-  const valid = ['1m', '5m', '15m', '1h', '1d']
-  if (!valid.includes(interval)) return res.status(400).json({ error: 'Invalid interval' })
+  const valid = ['1m', '5m']
+  if (!valid.includes(interval)) return res.status(400).json({ error: 'Invalid timeframe (1m or 5m)' })
   labsSettings.activeInterval = interval
+  labsSettings.interval       = interval   // keep display field in sync with the active feed
   db.prepare(`
     INSERT INTO settings (key, value, updated_at)
     VALUES ('labs_settings', ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(JSON.stringify(labsSettings))
-  console.log('[labs] active interval set:', interval)
-  res.json({ success: true, activeInterval: interval })
+  console.log(`[labs] active timeframe → ${interval}`)
+  // Load (or cold-start) the target timeframe's state and display it. Switching back
+  // to a previously-converged timeframe restores its untouched state (advance only).
+  const result = await calculateLabsLevels(interval)
+  handleLabsUpdate(result)
+  res.json({ success: true, activeInterval: interval, levels: labsAutoLevels })
 })
 
 app.post('/labs/reset-avg', async (req, res) => {
-  db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
-  console.log('[labs] PR state reset — running fresh cold-start init')
+  const activeTf = labsSettings.activeInterval
+  db.prepare(`DELETE FROM settings WHERE key = ?`).run(prAvgKey(activeTf))
+  console.log(`[labs] PR state reset (${activeTf} only) — running fresh cold-start init`)
   res.json({ success: true })
-  // Trigger fresh cold-start init now (full recurrence state rebuilt from long window)
+  // Re-initialize ONLY the active timeframe; the other timeframe's state is untouched
   try {
-    const result = await calculateLabsLevels(labsSettings.activeInterval, { reason: 'reset' })
+    const result = await calculateLabsLevels(activeTf, { reason: 'reset' })
     handleLabsUpdate(result)
   } catch (err) {
     console.warn('[labs] reset re-init failed:', err.message)

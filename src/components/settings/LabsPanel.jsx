@@ -7,9 +7,8 @@ import TradeSetupCard from '../labs/TradeSetupCard'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const INTERVALS = [
-  { value: '1m',  label: '1 min'  },
-  { value: '5m',  label: '5 min'  },
-  { value: '15m', label: '15 min' },
+  { value: '5m', label: '5 min' },
+  { value: '1m', label: '1 min' },
 ]
 
 export default function LabsPanel({ activeSymbol = 'QQQ' }) {
@@ -94,7 +93,26 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
     }
   }
 
-  const handleIntervalChange = (interval) => handleSettingsChange({ ...settings, interval })
+  // Timeframe is the active recurrence feed (not a preview): switch loads that
+  // timeframe's persisted state on the server, cold-starting it only if none exists.
+  const handleIntervalChange = async (interval) => {
+    if (interval === settings.interval) return
+    setLoading(true)
+    try {
+      const res  = await fetch(`${API_URL}/labs/active-interval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval })
+      })
+      const data = await res.json()
+      if (data.levels)   setAutoLevels(data.levels)
+      setSettings(prev => ({ ...prev, interval }))
+    } catch (e) {
+      console.warn('[labs] timeframe change failed:', e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const levels = autoLevels?.nq
 
@@ -126,7 +144,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
       {/* Controls row: timeframe + source */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-text-tertiary">Preview Timeframe</span>
+          <span className="text-xs text-text-tertiary">Timeframe</span>
           <div className="flex gap-1">
             {INTERVALS.map(tf => (
               <button
@@ -143,7 +161,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
               </button>
             ))}
           </div>
-          <span className="text-xs text-text-muted">· preview only</span>
+          <span className="text-xs text-text-muted">· active feed</span>
         </div>
 
         <div className="w-px h-4 bg-bg-elevated" />
@@ -259,7 +277,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
               </div>
               <div>
                 <span className="text-micro font-bold text-text-secondary">Timeframe</span>
-                <p className="text-micro text-text-muted mt-0.5">Bar size for calculation. 5m matches intraday session structure. Preview only — active levels always use 5m.</p>
+                <p className="text-micro text-text-muted mt-0.5">Active recurrence feed. 5m (default) matches intraday session structure; 1m is more responsive. Each timeframe keeps its own persisted ratchet state — switching never re-initializes the other.</p>
               </div>
               <div>
                 <span className="text-micro font-bold text-text-secondary">Avg Mode</span>
@@ -311,7 +329,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
               <div>
                 <div className="text-xs text-text-secondary font-medium">Push to Active Levels</div>
                 <div className="text-xs text-text-muted mt-0.5">
-                  Applies current {settings.interval} preview to main scoring + triggers rescore
+                  Applies current {settings.interval} NQ levels to main scoring + triggers rescore
                 </div>
               </div>
               <button
@@ -326,11 +344,6 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
                 {applying === 'nq' ? '⟳ Applying...' : '↑ Push NQ to Levels'}
               </button>
             </div>
-            {settings.interval !== '5m' && (
-              <div className="mt-2 text-xs text-amber-600">
-                ⚠ Active levels use 5m by default. You are previewing {settings.interval} — push only if intentional.
-              </div>
-            )}
           </div>
 
           {scoredLevels?.length > 0 && (

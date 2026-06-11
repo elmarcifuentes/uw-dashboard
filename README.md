@@ -204,7 +204,7 @@ Every 60s, checks ET time:
 | Key | Value |
 |---|---|
 | `labs_auto_levels` | `{ nq: {...}, lastCalculated, interval, settings }` |
-| `labs_pr_avg` | `{ avg, halfWidth, atrState, lastBarTs, savedAt }` — full PR recurrence state |
+| `labs_pr_avg_5m` / `labs_pr_avg_1m` | `{ avg, halfWidth, atrState, lastBarTs, savedAt }` — full PR recurrence state, **per timeframe** (legacy `labs_pr_avg` auto-migrates to `_5m`) |
 | `labs_settings` | `{ interval, activeInterval, length, mult, avgMode }` |
 | `nq_contract` | `{ ticker, expiry, daysLeft, detectedAt }` |
 | `session_ratio` | `{ ratio, lockedAt, date }` |
@@ -225,7 +225,8 @@ Every 60s, checks ET time:
 | POST | `/rescore` | Force immediate rescore |
 | GET | `/labs/auto-levels` | Current Labs NQ levels |
 | POST | `/labs/recalculate` | Trigger Labs recalculation |
-| POST | `/labs/settings` | Update length / mult / avgMode |
+| POST | `/labs/settings` | Update length / mult / avgMode (preview interval) |
+| POST | `/labs/active-interval` | Set active PR timeframe (`5m` / `1m`) — loads that tf's state |
 | POST | `/labs/reset-avg` | Clear ratcheting avg |
 | POST | `/ratio/lock` | Manually lock a ratio value |
 | POST | `/webhook/accept` | Accept pending TradingView level push |
@@ -247,7 +248,8 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | `/labs/recalculate` made identical to the scheduled 5m cycle — advances persisted state over newly-closed bars only, never cold-starts (no new bar → no-op). Cold-start gated to no-state / reset / rollover / gap-too-large, each logged `recalc mode=cold-start reason=…`; advance logs `recalc mode=advance barsAdvanced=N`. |
+| _next_ | Predictive Ranges timeframe toggle (5m default / 1m). Recurrence state persisted per timeframe (`labs_pr_avg_5m` / `labs_pr_avg_1m`, legacy key migrated to `_5m`); the two never mix. Scheduler advances the active timeframe on its own bar close (every minute for 1m). `/labs/active-interval` is the authoritative toggle (loads/cold-starts target tf, restores prior tf untouched); `/labs/reset-avg` resets only the active tf; contract rollover clears both. Logs tagged `[labs] [5m]`/`[1m]`. |
+| `fddf6da` | `/labs/recalculate` made identical to the scheduled 5m cycle — advances persisted state over newly-closed bars only, never cold-starts (no new bar → no-op). Cold-start gated to no-state / reset / rollover / gap-too-large, each logged `recalc mode=cold-start reason=…`; advance logs `recalc mode=advance barsAdvanced=N`. |
 | `e18b1a9` | Faithful LuxAlgo PR port: persisted recurrence state `{avg, halfWidth, atrState, lastBarTs}`, advance over closed bars only (no sliding-window re-run), drop forming bar, ETH bars, removed `filterOutlierBars` from PR path. Fixes intraday band drift. |
 | `b4d08a2` | Startup rescore + `runAutoRescore` helper + Score Now button (Auto NQ) |
 | `dc3368b` | Add Manual NQ mode (3rd mode card); fix ratio preview (`data.qqq` → `data.nq`) |
