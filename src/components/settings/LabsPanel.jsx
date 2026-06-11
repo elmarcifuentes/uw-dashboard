@@ -23,10 +23,45 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
   const [nqContract, setNqContract]   = useState(null)
   const [nqContractExpiry, setNqContractExpiry] = useState(null)
   const [noData, setNoData]           = useState(false)   // backend reported stale/no fresh bars
+  const [applyConfirm, setApplyConfirm] = useState(null)  // "Applied & scored HH:MM:SS"
 
   // activeInterval is the backend's single source of truth — drive the toggle off it,
   // never the preview `interval` field (which can diverge and cause a visual revert).
   const activeTf = (data) => data?.activeInterval || data?.settings?.activeInterval || data?.settings?.interval
+
+  // Live refresh of the comparison inputs: Active (currently-scored NQ from /status) +
+  // Labs NQ (auto-levels) + scored levels. Polled so the Active column + Δ track the
+  // server through an auto-apply session instead of being frozen at mount.
+  const refreshLive = async () => {
+    try {
+      const status = await fetch(`${API_URL}/status`).then(r => r.json())
+      setCurrentPrice(status.lastPrice)
+      if (status.nq_ratio)         setNqRatio(Number(status.nq_ratio))
+      if (status.nqContract)       setNqContract(status.nqContract)
+      if (status.nqContractExpiry) setNqContractExpiry(status.nqContractExpiry)
+    } catch {}
+    try {
+      // Active = the NQ levels currently in scoring (daily_levels). Δ vs Labs NQ shows the
+      // ≤20pt change-guard drift between auto-applies. Shaped as [{id, nq_price}].
+      const row = (await fetch(`${API_URL}/levels`).then(r => r.json()))?.levels
+      if (row) setCurrentLevels([
+        { id: 'R2',  nq_price: row.r2_nq },
+        { id: 'R1',  nq_price: row.r1_nq },
+        { id: 'MID', nq_price: row.mid_nq },
+        { id: 'S1',  nq_price: row.s1_nq },
+        { id: 'S2',  nq_price: row.s2_nq },
+      ])
+    } catch {}
+    try {
+      const al = await fetch(`${API_URL}/labs/auto-levels`).then(r => r.json())
+      setAutoLevels(al)
+      if (al.fresh !== undefined) setNoData(al.fresh === false)
+    } catch {}
+    try {
+      const sl = await fetch(`${API_URL}/labs/scoring-latest`).then(r => r.json())
+      setScoredLevels(sl?.levels)
+    } catch {}
+  }
 
   useEffect(() => {
     fetch(`${API_URL}/labs/auto-levels`)
@@ -41,21 +76,10 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
       })
       .catch(() => setLoading(false))
 
-    fetch(`${API_URL}/status`)
-      .then(r => r.json())
-      .then(data => {
-        setCurrentPrice(data.lastPrice)
-        if (data.nq_ratio)          setNqRatio(Number(data.nq_ratio))
-        if (data.nqContract)        setNqContract(data.nqContract)
-        if (data.nqContractExpiry)  setNqContractExpiry(data.nqContractExpiry)
-        setCurrentLevels(data.levels)
-      })
-      .catch(() => {})
-
-    fetch(`${API_URL}/labs/scoring-latest`)
-      .then(r => r.json())
-      .then(data => setScoredLevels(data?.levels))
-      .catch(() => {})
+    refreshLive()
+    // Poll so Active + Δ track auto-apply through the session (lightweight; settings tab only)
+    const poll = setInterval(refreshLive, 20000)
+    return () => clearInterval(poll)
   }, [])
 
   const handleApply = async (source) => {
@@ -67,7 +91,18 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
         body: JSON.stringify({ source })
       })
       const data = await res.json()
-      if (data.success) alert(`✅ ${source.toUpperCase()} levels applied to main dashboard!`)
+      if (data.success) {
+        // Server applied + scored atomically — confirm with the scored timestamp
+        const t = data.scoredAt || data.appliedAt
+        const hhmmss = t
+          ? new Date(t).toLocaleTimeString('en-US', { hour12: false, timeZone: 'America/New_York' })
+          : ''
+        setApplyConfirm(`Applied & scored ${hhmmss} ET`)
+        setTimeout(() => setApplyConfirm(null), 8000)
+        await refreshLive()   // pull the new Active levels immediately so Δ updates now
+      }
+    } catch (e) {
+      console.warn('[labs] apply failed:', e.message)
     } finally {
       setApplying(null)
     }
@@ -358,6 +393,7 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
               interval={settings.interval}
               onApply={() => handleApply('nq')}
               applying={applying === 'nq'}
+              applyConfirm={applyConfirm}
               activeSymbol={activeSymbol}
               nqRatio={nqRatio}
             />
@@ -377,10 +413,12 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
                 className={`px-4 py-2 rounded text-xs font-bold transition-colors ${
                   applying === 'nq'
                     ? 'bg-bg-elevated text-text-tertiary'
-                    : 'bg-indigo-700 hover:bg-indigo-600 text-text-primary'
+                    : applyConfirm
+                      ? 'bg-emerald-800/60 text-emerald-200'
+                      : 'bg-indigo-700 hover:bg-indigo-600 text-text-primary'
                 }`}
               >
-                {applying === 'nq' ? '⟳ Applying...' : '↑ Push NQ to Levels'}
+                {applying === 'nq' ? '⟳ Applying & scoring…' : applyConfirm ? `✓ ${applyConfirm}` : '↑ Push NQ to Levels'}
               </button>
             </div>
           </div>

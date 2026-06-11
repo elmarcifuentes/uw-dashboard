@@ -1521,66 +1521,8 @@ app.post('/rescore', async (req, res) => {
   }
   console.log('[server] Manual rescore triggered from dashboard')
   try {
-    const result = await runFullScore({ trigger: 'manual', levelsOverride: getLevelsForScoring(db) })
-    result._received_at = new Date().toISOString()
-    const _manualRatio = getNqRatioFromDb(db)
-    if (_manualRatio) { result.nq_ratio = _manualRatio; console.log('[server] nq_ratio injected:', _manualRatio) }
-    latest = result
-    history.unshift(result)
-    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
-    provider.setLevels(result.levels)
-    checkExpansionGex(result)
-    updateDpHistory(result)
-    const manualSentiment = computeSentiment(result)
-    result._sentiment = manualSentiment
-    sseEmitter.emit('event', {
-      type:        'rescore',
-      result,
-      trigger:     'manual — dashboard button',
-      price:       result.current_price,
-      expansionGex: detectExpansionGex(result),
-      dpHistory:   { ...dpHistory },
-      sentiment:   manualSentiment,
-      timestamp:   new Date().toISOString(),
-    })
-    // Respond immediately — narrative generates in background
-    res.json({ success: true })
-    generateNarrativeForMode(result, dpHistory)
-      .then(narrative => {
-        console.log('[narrative] generated:', narrative?.length, 'lines')
-        console.log('[narrative] line 1:', narrative?.[0])
-        if (narrative?.length > 0) {
-          lastNarrative = narrative
-          sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
-          console.log('[narrative] SSE emitted (/rescore)')
-        }
-      })
-      .catch(err => console.warn('[narrative] async failed:', err.message))
-    generateLevelNarratives(result)
-      .then(levelNarratives => {
-        if (Object.keys(levelNarratives).length > 0) {
-          lastLevelNarratives = levelNarratives
-          sseEmitter.emit('event', { type: 'level_narratives_update', narratives: levelNarratives, timestamp: new Date().toISOString() })
-          console.log('[level-narrative] SSE emitted')
-        }
-      })
-      .catch(err => console.warn('[level-narrative] failed:', err.message))
-    generateSessionBrief(result)
-      .then(briefs => {
-        if (briefs?.session) {
-          sseEmitter.emit('event', { type: 'session_brief_update', session: briefs.session, tactical: briefs.tactical, timestamp: new Date().toISOString() })
-          console.log('[session-brief] SSE emitted')
-        }
-      })
-      .catch(err => console.warn('[session-brief] failed:', err.message))
-    generateAssistantRead(result)
-      .then(read => {
-        if (read) {
-          lastAssistantRead = read
-          sseEmitter.emit('event', { type: 'assistant_read_update', assistantRead: read, timestamp: new Date().toISOString() })
-        }
-      })
-      .catch(err => console.warn('[assistant] failed:', err.message))
+    const { scoredAt } = await scoreNow('manual — dashboard button')   // same canonical path Apply uses
+    res.json({ success: true, scoredAt })
   } catch (err) {
     console.error('[server] Manual rescore failed:', err.message)
     res.status(500).json({ error: err.message })
@@ -2754,6 +2696,46 @@ async function runAutoRescore(trigger = 'manual') {
   }
 }
 
+// Canonical FULL rescore — the exact path the "Score Now" button uses. Scores the
+// currently-active DB levels, updates latest/history/provider, emits 'rescore' SSE, then
+// regenerates narrative / level-narratives / session-brief / assistant-read in background.
+// Returns { result, scoredAt } once scoring + the rescore SSE are done (narratives lag).
+async function scoreNow(trigger) {
+  const result = await runFullScore({ trigger, levelsOverride: getLevelsForScoring(db) })
+  result._received_at = new Date().toISOString()
+  const ratio = getNqRatioFromDb(db)
+  if (ratio) result.nq_ratio = ratio
+  latest = result
+  history.unshift(result)
+  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
+  provider.setLevels(result.levels)
+  checkExpansionGex(result)
+  updateDpHistory(result)
+  if (result.current_price) trackLevelTouches(result.current_price, result.levels, db)
+  const sentiment = computeSentiment(result)
+  result._sentiment = sentiment
+  const scoredAt = new Date().toISOString()
+  sseEmitter.emit('event', {
+    type: 'rescore', result, trigger,
+    price: result.current_price, expansionGex: detectExpansionGex(result),
+    dpHistory: { ...dpHistory }, sentiment, timestamp: scoredAt,
+  })
+  // Background narrative regeneration (slow) — identical set to the /rescore path
+  generateNarrativeForMode(result, dpHistory)
+    .then(narrative => { if (narrative?.length > 0) { lastNarrative = narrative; sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() }) } })
+    .catch(err => console.warn('[narrative] async failed:', err.message))
+  generateLevelNarratives(result)
+    .then(ln => { if (Object.keys(ln).length > 0) { lastLevelNarratives = ln; sseEmitter.emit('event', { type: 'level_narratives_update', narratives: ln, timestamp: new Date().toISOString() }) } })
+    .catch(err => console.warn('[level-narrative] failed:', err.message))
+  generateSessionBrief(result)
+    .then(briefs => { if (briefs?.session) sseEmitter.emit('event', { type: 'session_brief_update', session: briefs.session, tactical: briefs.tactical, timestamp: new Date().toISOString() }) })
+    .catch(err => console.warn('[session-brief] failed:', err.message))
+  generateAssistantRead(result)
+    .then(read => { if (read) { lastAssistantRead = read; sseEmitter.emit('event', { type: 'assistant_read_update', assistantRead: read, timestamp: new Date().toISOString() }) } })
+    .catch(err => console.warn('[assistant] failed:', err.message))
+  return { result, scoredAt }
+}
+
 // Calculate fresh on startup (async, non-blocking)
 // After levels are applied, trigger an initial rescore so all tabs populate immediately
 calculateLabsLevels(labsSettings.activeInterval)
@@ -3009,33 +2991,26 @@ app.post('/labs/apply-to-main', async (req, res) => {
       nq_ratio=excluded.nq_ratio, updated_at=datetime('now')
   `).run(today, levelData.r2_nq, levelData.r2_qqq, levelData.r1_nq, levelData.r1_qqq, levelData.mid_nq, levelData.mid_qqq, levelData.s1_nq, levelData.s1_qqq, levelData.s2_nq, levelData.s2_qqq, ratio)
 
+  const appliedAt = new Date().toISOString()
   console.log(`[labs] levels applied to main: ${source} R1_qqq=${levelData.r1_qqq}`)
-  res.json({ success: true, levelData })
 
-  // Auto-rescore with new levels if scorer available
-  if (runFullScore) {
-    try {
-      const levelsOverride = getLevelsForScoring(db)
-      const result = await runFullScore({ trigger: 'labs_apply', levelsOverride })
-      result._received_at = new Date().toISOString()
-      latest = result
-      history.unshift(result)
-      if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
-      provider.setLevels(result.levels)
-      checkExpansionGex(result)
-      updateDpHistory(result)
-      const sent = computeSentiment(result)
-      result._sentiment = sent
-      sseEmitter.emit('event', {
-        type: 'rescore', result, trigger: 'labs_apply',
-        price: result.current_price, expansionGex: detectExpansionGex(result),
-        dpHistory: { ...dpHistory }, sentiment: sent,
-        timestamp: new Date().toISOString(),
-      })
-    } catch (err) {
-      console.error('[labs] apply rescore failed:', err.message)
-    }
+  // Sync labsAutoLevels to EXACTLY what was applied (derived QQQ + appliedAt) so the Labs
+  // panel and all tabs reflect the same numbers; emit so displays refresh immediately.
+  labsAutoLevels = {
+    ...labsAutoLevels,
+    qqq: { R2: levelData.r2_qqq, R1: levelData.r1_qqq, MID: levelData.mid_qqq, S1: levelData.s1_qqq, S2: levelData.s2_qqq },
+    appliedAt,
   }
+  sseEmitter.emit('event', { type: 'labs_levels_update', levels: labsAutoLevels, timestamp: appliedAt })
+
+  // ATOMIC: run the SAME full rescore the Score Now button uses (incl. narratives),
+  // awaited, so the response confirms scoring completed. No separate Score Now needed.
+  let scoredAt = null
+  if (runFullScore) {
+    try { ({ scoredAt } = await scoreNow('labs_apply')) }
+    catch (err) { console.error('[labs] apply rescore failed:', err.message) }
+  }
+  res.json({ success: true, appliedAt, scoredAt, levelData })
 })
 
 app.post('/scoring/auto-score', (req, res) => {

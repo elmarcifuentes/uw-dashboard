@@ -1,5 +1,5 @@
 export default function LevelComparison({
-  autoLevels, currentLevels, lastCalculated, interval, onApply, applying,
+  autoLevels, currentLevels, lastCalculated, interval, onApply, applying, applyConfirm,
   activeSymbol = 'QQQ', nqRatio,
 }) {
   const levelIds = ['R2', 'R1', 'MID', 'S1', 'S2']
@@ -23,13 +23,16 @@ export default function LevelComparison({
         <button
           onClick={onApply}
           disabled={applying}
+          title="Writes these NQ levels to active scoring and runs a full rescore (scores + narratives) — no separate Score Now needed"
           className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${
             applying
               ? 'bg-bg-elevated text-text-tertiary cursor-not-allowed'
-              : 'bg-indigo-700 hover:bg-indigo-600 text-text-primary'
+              : applyConfirm
+                ? 'bg-emerald-800/60 text-emerald-200'
+                : 'bg-indigo-700 hover:bg-indigo-600 text-text-primary'
           }`}
         >
-          {applying ? '⟳ Applying...' : 'Apply NQ Levels'}
+          {applying ? '⟳ Applying & scoring…' : applyConfirm ? `✓ ${applyConfirm}` : 'Apply NQ Levels'}
         </button>
       </div>
 

@@ -652,6 +652,7 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
               <button
                 onClick={handleForceScore}
                 disabled={scoring}
+                title="Standalone rescore of the levels currently active in the DB — does NOT push new levels. Use it to refresh scores/narratives on demand. (Apply NQ in Labs already scores automatically.)"
                 className={`w-full py-1.5 rounded text-xs font-bold transition-colors ${
                   scoring
                     ? 'bg-bg-elevated text-text-tertiary cursor-not-allowed'
@@ -660,6 +661,9 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
               >
                 {scoring ? '⟳ Scoring...' : '▶ Score Now'}
               </button>
+              <div className="text-micro text-text-disabled mt-1 leading-snug">
+                Rescores the active levels. Applying NQ in Labs already scores — this is a manual refresh.
+              </div>
               {nqContract && (
                 <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
                   <span className="text-micro font-price text-text-tertiary font-bold">{nqContract}</span>
