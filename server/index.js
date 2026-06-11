@@ -1958,11 +1958,21 @@ async function fetchContractDetails(ticker) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) return
   try {
-    const url  = `https://api.polygon.io/futures/v1/contracts/${ticker}?apiKey=${POLYGON_KEY}`
-    const res  = await fetch(url)
-    const data = await res.json()
-    console.log('[contract] direct fetch:', JSON.stringify(data).slice(0, 200))
-    const contract = data.results
+    // Try /contracts/:ticker first, then query-param form if that returns HTML/error
+    const urls = [
+      `https://api.polygon.io/futures/v1/contracts/${ticker}?apiKey=${POLYGON_KEY}`,
+      `https://api.polygon.io/futures/v1/contracts?ticker=${ticker}&apiKey=${POLYGON_KEY}`,
+    ]
+    let data
+    for (const url of urls) {
+      const res  = await fetch(url)
+      const text = await res.text()
+      console.log('[contract] direct fetch:', url.replace(POLYGON_KEY, 'REDACTED'), '→', text.slice(0, 200))
+      try { data = JSON.parse(text) } catch { continue }
+      if (data?.results) break
+    }
+    // /contracts/:ticker → results is object; /contracts?ticker= → results is array
+    const contract = Array.isArray(data?.results) ? data.results[0] : data?.results
     if (contract?.last_trade_date) {
       activeNQContractExpiry = contract.last_trade_date
       nqContractDaysToExpiry = contract.days_to_maturity ?? null
@@ -1982,10 +1992,12 @@ async function detectActiveNQContract() {
   if (!POLYGON_KEY) { console.warn('[contract] no POLYGON_API_KEY — keeping', activeNQContract); return }
   try {
     const today = new Date().toISOString().split('T')[0]
-    const url   = `https://api.polygon.io/futures/v1/contracts?product_code=NQ&active=true&as_of=${today}&sort=days_to_maturity.asc&limit=5&apiKey=${POLYGON_KEY}`
+    const url   = `https://api.polygon.io/futures/v1/contracts?product_code=NQ&active=true&as_of=${today}&limit=10&apiKey=${POLYGON_KEY}`
     console.log('[contract] checking:', url.replace(POLYGON_KEY, 'REDACTED'))
     const res   = await fetch(url)
-    const data  = await res.json()
+    const text  = await res.text()
+    console.log('[contract] response:', text.slice(0, 300))
+    const data  = JSON.parse(text)
     console.log('[contract] response:', JSON.stringify(data).slice(0, 300))
     if (!data.results?.length) {
       console.warn('[contract] no active NQ contracts found — falling back to direct fetch for', activeNQContract)
@@ -2125,8 +2137,8 @@ function filterOutlierBars(bars) {
   }
   const sorted = [...trs].sort((a, b) => a - b)
   const median = sorted[Math.floor(sorted.length / 2)]
-  // 4× median: avg~65 → threshold~260, catches all overnight gap bars (>200 pts)
-  const threshold = median * 4
+  // 3× median: avg~65 → threshold~195, catches gap bars at 200+ pts
+  const threshold = median * 3
   let smoothed = 0
   const result = [bars[0]]
   for (let i = 1; i < bars.length; i++) {
