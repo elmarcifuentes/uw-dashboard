@@ -2533,8 +2533,45 @@ async function applyAutoLevelsIfEnabled() {
   }
 }
 
+// Shared rescore helper — runs scoring, updates latest, emits SSE
+// Used by startup, manual-nq save, and Score Now button
+async function runAutoRescore(trigger = 'manual') {
+  if (!runFullScore) { console.log(`[rescore] scorer unavailable (${trigger})`); return }
+  if (systemPaused)  { console.log(`[rescore] skipped — system paused (${trigger})`); return }
+  const levels = getLevelsForScoring(db)
+  if (!levels) { console.log('[rescore] no levels in DB — enter levels first'); return }
+  console.log(`[rescore] running (trigger=${trigger})`)
+  try {
+    const result = await runFullScore({ trigger, levelsOverride: levels })
+    result._received_at = new Date().toISOString()
+    const ratio = getNqRatioFromDb(db)
+    if (ratio) result.nq_ratio = ratio
+    latest = result
+    history.unshift(result)
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
+    provider.setLevels(result.levels)
+    emitStaleIfChanged(result)
+    checkExpansionGex(result)
+    updateDpHistory(result)
+    if (result.current_price) trackLevelTouches(result.current_price, result.levels, db)
+    const sentiment = computeSentiment(result)
+    result._sentiment = sentiment
+    sseEmitter.emit('event', {
+      type: 'rescore', result, trigger,
+      price: result.current_price, expansionGex: detectExpansionGex(result),
+      dpHistory: { ...dpHistory }, sentiment, timestamp: new Date().toISOString(),
+    })
+    console.log(`[rescore] complete (${trigger}) — ${result.levels.length} levels`)
+  } catch (err) {
+    console.error(`[rescore] failed (${trigger}):`, err.message)
+  }
+}
+
 // Calculate fresh on startup (async, non-blocking)
-calculateLabsLevels(labsSettings.activeInterval).then(() => applyAutoLevelsIfEnabled())
+// After levels are applied, trigger an initial rescore so all tabs populate immediately
+calculateLabsLevels(labsSettings.activeInterval)
+  .then(() => applyAutoLevelsIfEnabled())
+  .then(() => setTimeout(() => runAutoRescore('startup'), 4000))
 
 // ─── SCHEDULER HELPERS ───────────────────────────────────────────────────────
 

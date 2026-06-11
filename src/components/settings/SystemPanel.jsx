@@ -649,6 +649,17 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                 )}
               </div>
               <AutoScoreToggle enabled={autoScoreEnabled} onToggle={handleAutoScoreToggle} />
+              <button
+                onClick={handleForceScore}
+                disabled={scoring}
+                className={`w-full py-1.5 rounded text-xs font-bold transition-colors ${
+                  scoring
+                    ? 'bg-bg-elevated text-text-tertiary cursor-not-allowed'
+                    : 'bg-emerald-900/40 hover:bg-emerald-800/50 text-emerald-300 border border-emerald-800/40'
+                }`}
+              >
+                {scoring ? '⟳ Scoring...' : '▶ Score Now'}
+              </button>
               {nqContract && (
                 <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
                   <span className="text-micro font-price text-text-tertiary font-bold">{nqContract}</span>
