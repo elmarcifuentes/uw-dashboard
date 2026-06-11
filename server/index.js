@@ -2087,26 +2087,44 @@ async function fetchFromPolygonFutures(bars, interval) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
   const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
+  // Use explicit date range to guarantee recent bars — sort+limit returns stale historical data
+  const now  = new Date()
+  const from = new Date(now); from.setDate(from.getDate() - 10)
+  const fromStr = from.toISOString().split('T')[0]
+  const toStr   = now.toISOString().split('T')[0]
+  // Nanosecond timestamps from Polygon futures API → ms
+  const toMs = t => t > 1e15 ? Math.round(t / 1e6) : t
   // Try auto-detected contract first, fall back to math-based candidates
   const candidates = [activeNQContract, ...getNqFuturesCandidates().filter(t => t !== activeNQContract)]
   for (const fticker of candidates) {
     try {
-      const fetchLimit = bars + 50
-      const url   = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&limit=${fetchLimit}&sort=desc&apiKey=${POLYGON_KEY}`
+      const url = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&from=${fromStr}&to=${toStr}&sort=asc&limit=50000&apiKey=${POLYGON_KEY}`
       console.log(`[labs] Polygon URL: ${url.replace(POLYGON_KEY, 'REDACTED')}`)
-      const res   = await fetch(url)
-      const data  = await res.json()
+      const res  = await fetch(url)
+      const data = await res.json()
       const total = data.results?.length ?? 0
-      if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars`); continue }
-      // desc → asc, then take last `bars`
-      const all     = data.results.slice().reverse()
-      const results = all.slice(-bars)
-      console.log(`[labs] Polygon futures ${fticker}: requested=${fetchLimit} total=${total} used=${results.length}`)
-      console.log(`[labs] Polygon ${fticker} sample: first bar: ${JSON.stringify(results[0])} last bar: ${JSON.stringify(results[results.length - 1])}`)
-      if (results.length >= Math.min(bars, 10)) {
-        return { closes: results.map(r => r.close), highs: results.map(r => r.high), lows: results.map(r => r.low), source: `polygon-futures (${fticker})` }
+      if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars in range ${fromStr}→${toStr}`); continue }
+      // Sort already asc; take last `bars`
+      const usedBars = data.results.slice(-bars)
+      console.log(`[labs] Polygon futures ${fticker}: total=${total} used=${usedBars.length}`)
+      const firstBar = usedBars[0]
+      const lastBar  = usedBars[usedBars.length - 1]
+      const tsField  = firstBar.window_start ?? firstBar.t
+      const firstTs  = new Date(toMs(firstBar.window_start ?? firstBar.t)).toISOString()
+      const lastTs   = new Date(toMs(lastBar.window_start  ?? lastBar.t)).toISOString()
+      console.log(`[labs] Polygon ${fticker} sample: first=${firstTs} last=${lastTs} first_close=${firstBar.close} last_close=${lastBar.close}`)
+      // Staleness check
+      const ageDays = (Date.now() - toMs(lastBar.window_start ?? lastBar.t)) / 86400000
+      if (ageDays > 5) console.warn(`[labs] WARNING: last Polygon bar is ${ageDays.toFixed(1)} days old — may be stale`)
+      // Price sanity check
+      if (lastBar.close < 20000 || lastBar.close > 50000) {
+        console.warn(`[labs] Polygon ${fticker}: price ${lastBar.close} out of NQ range — skipping`)
+        continue
       }
-      console.warn(`[labs] Polygon futures ${fticker}: only ${results.length} usable bars (need ${bars})`)
+      if (usedBars.length >= Math.min(bars, 10)) {
+        return { closes: usedBars.map(b => b.close), highs: usedBars.map(b => b.high), lows: usedBars.map(b => b.low), source: `polygon-futures (${fticker})` }
+      }
+      console.warn(`[labs] Polygon futures ${fticker}: only ${usedBars.length} usable bars`)
     } catch (err) {
       console.warn(`[labs] Polygon futures ${fticker} failed:`, err.message)
     }
@@ -2353,14 +2371,16 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
 
     const qqqResult = predictiveRanges(qqqData.closes, qqqData.highs, qqqData.lows, length, mult, savedAvgQQQ)
     if (!qqqResult) { console.warn('[labs] QQQ predictiveRanges returned null'); return null }
-    if (qqqResult.atr > 10) console.warn(`[labs] WARNING: QQQ ATR=${qqqResult.atr.toFixed(2)} seems too large — check bar data`)
-    console.log(`[labs] ATR check: QQQ=${qqqResult.atr?.toFixed(3)}`)
-    console.log(`[labs] QQQ: R1=${qqqResult.R1} MID=${qqqResult.MID} S1=${qqqResult.S1}`)
 
     const nqResult_raw = nqData
       ? predictiveRanges(nqData.closes, nqData.highs, nqData.lows, length, mult, savedAvgNQ)
       : null
     const nqResult = nqResult_raw || deriveNQfromQQQ(qqqResult, getActiveRatio())
+
+    console.log(`[labs] ATR check: QQQ=${qqqResult.atr?.toFixed(3)} NQ=${nqResult?.atr?.toFixed(1)}`)
+    if (qqqResult.atr > 10)   console.warn(`[labs] WARNING: QQQ ATR=${qqqResult.atr.toFixed(2)} seems too large — check bar data`)
+    if (nqResult?.atr > 500)  console.warn(`[labs] WARNING: NQ ATR=${nqResult.atr.toFixed(1)} seems too large — check bar data`)
+    console.log(`[labs] QQQ: R1=${qqqResult.R1} MID=${qqqResult.MID} S1=${qqqResult.S1}`)
     if (nqResult) console.log(`[labs] NQ: R1=${nqResult.R1} MID=${nqResult.MID} S1=${nqResult.S1}`)
 
     // Persist updated avg
