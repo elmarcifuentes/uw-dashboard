@@ -1,12 +1,14 @@
 import DpSparkline from '../DpSparkline'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 import { formatNarrative } from '../../utils/formatNarrative'
+import { levelNq } from '../../utils/levelNq'
 
 export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRatio, dpHistory, levelNarrative, onClose, activeSymbol = 'NQ' }) {
   const level = levels?.find(l => l.id === levelId)
   if (!level) return null
 
-  const nq   = nqRatio ? Math.round(level.price * nqRatio).toLocaleString() : null
+  const nqVal = levelNq(level, nqRatio)
+  const nq   = nqVal != null ? Math.round(nqVal).toLocaleString() : null
   const dist = currentPrice != null ? (currentPrice - level.price).toFixed(2) : null
   const dp   = level.dark_pool ?? 0
   const dpPct = ((dp + 1) / 2) * 100

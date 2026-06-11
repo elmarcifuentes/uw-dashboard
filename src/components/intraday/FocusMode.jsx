@@ -1,4 +1,5 @@
 import { formatNarrative } from '../../utils/formatNarrative'
+import { levelNq } from '../../utils/levelNq'
 import { CircleCheck, TriangleAlert, Zap, DoorOpen } from 'lucide-react'
 
 function VelocityIndicator({ velocity }) {
@@ -66,6 +67,14 @@ export default function FocusMode({
   const fmtPrice = (p) => {
     if (p == null) return '—'
     const val = isNQ && nqRatio ? Math.round(p * nqRatio * 4) / 4 : p
+    return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  // Level-aware: show the canonical stored NQ for a scored level instead of QQQ × ratio
+  const fmtLevel = (lvl) => {
+    if (!lvl) return '—'
+    const val = isNQ ? levelNq(lvl, nqRatio) : lvl.price
+    if (val == null) return '—'
     return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
@@ -193,7 +202,7 @@ export default function FocusMode({
                 <span className="text-micro text-signal-resistance font-bold uppercase tracking-wider">
                   {resistance.id} — Resistance
                 </span>
-                <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtPrice(resistance.price)}</div>
+                <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtLevel(resistance)}</div>
               </div>
               <div className="text-right">
                 <div className="text-micro text-text-tertiary uppercase">above by</div>
@@ -222,7 +231,7 @@ export default function FocusMode({
                 <span className="text-micro text-signal-support font-bold uppercase tracking-wider">
                   {support.id} — Support
                 </span>
-                <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtPrice(support.price)}</div>
+                <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtLevel(support)}</div>
               </div>
               <div className="text-right">
                 <div className="text-micro text-text-tertiary uppercase">below by</div>

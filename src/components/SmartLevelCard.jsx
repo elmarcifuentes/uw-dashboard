@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import DpSparkline from './DpSparkline'
 import { stripMarkdown } from '../utils/stripMarkdown'
+import { levelNq } from '../utils/levelNq'
 import { formatNarrative } from '../utils/formatNarrative'
 
 const CLS_COLOR  = { sell_resistance: 'text-red-400',   buy_support: 'text-green-400',  no_edge: 'text-text-secondary',  continuation: 'text-blue-400'  }
@@ -23,7 +24,7 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
     </div>
   )
 
-  const nq        = nqRatio ? Math.round(level.price * nqRatio * 4) / 4 : null
+  const nq        = levelNq(level, nqRatio)
   const dist      = currentPrice != null ? (currentPrice - level.price) : null
   const distStr   = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
   const distNq    = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio * 4) / 4 : null

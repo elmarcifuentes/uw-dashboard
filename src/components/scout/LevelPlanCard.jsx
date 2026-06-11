@@ -1,6 +1,7 @@
 import { calculateTradeSetup } from '../../utils/tradeSetup'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 import { formatNarrative } from '../../utils/formatNarrative'
+import { levelNq } from '../../utils/levelNq'
 
 export default function LevelPlanCard({
   level, allLevels, currentPrice, nqRatio,
@@ -28,7 +29,7 @@ export default function LevelPlanCard({
     : setup.quality === 'acceptable' ? 'text-amber-400'
     : 'text-red-400'
 
-  const levelNq = Math.round(level.price * r * 4) / 4
+  const levelNqVal = levelNq(level, r)
 
   return (
     <div className="space-y-3">
@@ -36,7 +37,7 @@ export default function LevelPlanCard({
       <div>
         <div className="flex items-baseline gap-2">
           <span className={`text-xl font-bold ${classColor}`}>{level.id}</span>
-          <span className="text-text-primary font-mono text-lg">{fmt(level.price, levelNq)}</span>
+          <span className="text-text-primary font-mono text-lg">{fmt(level.price, levelNqVal)}</span>
         </div>
         <div className={`text-xs font-bold mt-0.5 ${classColor}`}>
           {level.classification?.replace('_', ' ').toUpperCase()}

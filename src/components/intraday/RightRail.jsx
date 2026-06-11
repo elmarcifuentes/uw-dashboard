@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { levelNq } from '../../utils/levelNq'
 import DpSparkline from '../DpSparkline'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 import { formatNarrative } from '../../utils/formatNarrative'
@@ -217,7 +218,7 @@ export default function RightRail({
                 <div className="flex justify-between items-baseline">
                   <span className="text-sm font-bold text-text-primary font-price">
                     {activeSymbol === 'NQ' && nqRatio
-                      ? '$' + (Math.round(activeLevelData.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      ? '$' + (levelNq(activeLevelData, nqRatio)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       : '$' + (activeLevelData.price?.toFixed(2) ?? '—')}
                   </span>
                   {currentPrice != null && (

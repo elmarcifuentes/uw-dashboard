@@ -4,6 +4,7 @@ import DpSparkline from './DpSparkline'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import { calculateTradeSetup } from '../utils/tradeSetup'
 import { formatNarrative } from '../utils/formatNarrative'
+import { levelNq } from '../utils/levelNq'
 
 const CLASS_COLOR = {
   sell_resistance: 'text-signal-resistance',
@@ -41,7 +42,7 @@ export default function LevelCard({
 }) {
   const [expanded, setExpanded] = useState(false)
 
-  const nq      = nqRatio ? Math.round(level.price * nqRatio * 4) / 4 : null
+  const nq      = levelNq(level, nqRatio)
   const dist    = currentPrice != null ? (currentPrice - level.price) : null
   const distNq  = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio * 4) / 4 : null
 

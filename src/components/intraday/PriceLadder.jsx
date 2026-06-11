@@ -1,4 +1,5 @@
 import { memo, useState, useRef, useEffect, Fragment } from 'react'
+import { levelNq } from '../../utils/levelNq'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
 import { getLevelProximity, getProximityStyles } from '../../utils/proximity'
 import DpSparkline from '../DpSparkline'
@@ -242,7 +243,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                 </span>
                 <span className="text-text-primary font-price font-medium">
                   {activeSymbol === 'NQ' && nqRatio
-                    ? '$' + (Math.round(level.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    ? '$' + (levelNq(level, nqRatio)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                     : '$' + (level.price?.toFixed(2) ?? '—')}
                 </span>
               </div>

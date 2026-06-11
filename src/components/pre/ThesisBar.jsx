@@ -1,4 +1,5 @@
 import { formatNarrative } from '../../utils/formatNarrative'
+import { levelNq } from '../../utils/levelNq'
 
 export default function ThesisBar({
   sentiment, levels, cascade, assistantRead, currentPrice, nqRatio, activeSymbol = 'NQ'
@@ -61,7 +62,7 @@ export default function ThesisBar({
               </span>
               <span className="text-xs text-text-primary font-mono">
                 {activeSymbol === 'NQ' && nqRatio
-                  ? '$' + (Math.round(dominant.price * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  ? '$' + (levelNq(dominant, nqRatio)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : '$' + (dominant.price?.toFixed(2) ?? '—')}
               </span>
               {dominant.full_stack && (

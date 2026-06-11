@@ -24,6 +24,8 @@ export function calculateTradeSetup(level, allLevels, currentPrice, nqRatio) {
   const rr = parseFloat((moveQqq / riskQqq).toFixed(1))
 
   const nq = (p) => nqRatio ? Math.round(p * nqRatio) : null
+  // entry/target ARE levels — use their canonical stored NQ; stop is derived (reconstruct)
+  const lvlNq = (lvl, p) => lvl?.nq_price != null ? lvl.nq_price : nq(p)
 
   const flags = []
   if (level.full_stack) flags.push('★ FULL STACK — highest conviction')
@@ -36,8 +38,8 @@ export function calculateTradeSetup(level, allLevels, currentPrice, nqRatio) {
 
   return {
     direction: isShort ? 'short' : 'long',
-    entry:  { qqq: entry,                            nq: nq(entry),  level: level.id },
-    target: { qqq: parseFloat(target.toFixed(2)),    nq: nq(target), level: targetLevel.id, classification: targetLevel.classification },
+    entry:  { qqq: entry,                            nq: lvlNq(level, entry),        level: level.id },
+    target: { qqq: parseFloat(target.toFixed(2)),    nq: lvlNq(targetLevel, target), level: targetLevel.id, classification: targetLevel.classification },
     stop:   { qqq: parseFloat(stop.toFixed(2)),      nq: nq(stop) },
     move:   { qqq: parseFloat(moveQqq.toFixed(2)),   nq: nqRatio ? Math.round(moveQqq * nqRatio) : null },
     risk:   { qqq: parseFloat(riskQqq.toFixed(2)),   nq: nqRatio ? Math.round(riskQqq * nqRatio) : null },

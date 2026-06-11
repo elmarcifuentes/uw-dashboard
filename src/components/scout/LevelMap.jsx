@@ -1,4 +1,5 @@
 import { getLevelProximity } from '../../utils/proximity'
+import { levelNq } from '../../utils/levelNq'
 
 export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, onLevelSelect, selectedLevel }) {
   if (!levels?.length) return null
@@ -6,8 +7,9 @@ export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, 
   const sorted = [...levels].sort((a, b) => b.price - a.price)
   const r = nqRatio || 41.14
 
-  const fmt = (p) => activeSymbol === 'NQ'
-    ? (Math.round(p * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })
+  // nqOverride = canonical stored NQ for a level (pass for level rows; omit for raw prices)
+  const fmt = (p, nqOverride) => activeSymbol === 'NQ'
+    ? ((nqOverride != null ? nqOverride : Math.round(p * r * 4) / 4)).toLocaleString('en-US', { minimumFractionDigits: 2 })
     : `$${p?.toFixed(2)}`
 
   const fmtCurrent = currentPrice != null
@@ -53,7 +55,7 @@ export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, 
               }`}
             >
               <span className={`w-8 shrink-0 font-bold ${idColor(level)}`}>{level.id}</span>
-              <span className="w-24 shrink-0 text-text-primary">{fmt(level.price)}</span>
+              <span className="w-24 shrink-0 text-text-primary">{fmt(level.price, levelNq(level, r))}</span>
               <div className="flex-1 h-3 bg-bg-card2 rounded overflow-hidden">
                 <div
                   className={`h-full rounded transition-all ${barColor(level)}`}

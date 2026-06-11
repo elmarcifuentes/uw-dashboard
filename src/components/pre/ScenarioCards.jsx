@@ -1,3 +1,5 @@
+import { levelNq } from '../../utils/levelNq'
+
 export default function ScenarioCards({
   assistantRead, levels, cascade, currentPrice, nqRatio, activeSymbol = 'NQ'
 }) {
@@ -13,7 +15,7 @@ export default function ScenarioCards({
 
   const fmtLvl = (l) => {
     if (!l) return ''
-    const val = activeSymbol === 'NQ' && nqRatio ? Math.round(l.price * nqRatio * 4) / 4 : l.price
+    const val = activeSymbol === 'NQ' && nqRatio ? levelNq(l, nqRatio) : l.price
     return '$' + (val?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—')
   }
 

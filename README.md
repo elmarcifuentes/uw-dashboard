@@ -129,6 +129,27 @@ sessionRatio || nqOffsets.ratio || latest?.nq_ratio || getNqRatioFromDb(db) || 4
 
 ---
 
+## Level Rounding Policy
+
+Applied/scored levels are rounded to **whole points** (e.g. 29,679.67 → 29,680) at **apply time only**, via a single definition in `server/index.js`:
+
+```js
+const LEVEL_ROUNDING = 'whole'
+function roundLevel(x) { return Math.round(x) }   // the ONE change point
+function roundAppliedLevels(nqRaw, ratio) { /* round NQ, derive QQQ from rounded NQ */ }
+```
+
+Rules:
+- **Recurrence state is NEVER rounded.** The persisted `{avg, halfWidth, atrState}` stays full precision — rounding the path-dependent state would compound and diverge from TradingView. Only the *outputs* at apply time are rounded.
+- **Rounded NQ is canonical.** Written to `daily_levels`, used for scoring; **QQQ derives from the rounded NQ** (`rounded NQ ÷ ratio`) so NQ and QQQ stay consistent.
+- Both apply paths use it: auto-apply (`applyAutoLevelsIfEnabled`) and manual `/labs/apply-to-main`. The >20pt change guard compares rounded-vs-rounded; the ≤0.5 rounding (≤1pt NQ, ≤~0.02 QQQ) is far below the 20pt/0.50 thresholds, so it can't flap the guard.
+- **Displays use the stored canonical value, never `QQQ × ratio`.** Server attaches `nq_price` (from `daily_levels`) to each scored level (`runScoreWithNq`); the frontend reads it via `levelNq(level, nqRatio)` (`src/utils/levelNq.js`), falling back to reconstruction only when absent. This eliminates the old one-tick Labs-vs-other-tabs discrepancy.
+- **Labs PR table:** *NQ Native* keeps raw recurrence decimals (for TradingView comparison); *Active* shows the rounded applied value; *Δ* = raw vs rounded, so a resting ±0.5 is expected and correct.
+
+To change granularity (e.g. quarter-tick `Math.round(x*4)/4`), change **only `roundLevel()`** — nothing else in the pipeline assumes whole points. Takes effect on the **next apply; no state reset needed.**
+
+---
+
 ## Labs — Predictive Ranges
 
 ATR-based support/resistance for NQ futures. Primary auto-level source in `auto_nq` mode.
@@ -249,7 +270,8 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | **Atomic Apply NQ** — `/labs/apply-to-main` now writes `daily_levels` → syncs `labsAutoLevels` (+SSE) → runs the **same** full rescore as Score Now (via shared `scoreNow()`, incl. narratives) → responds `{appliedAt, scoredAt}`. Button shows "✓ Applied & scored HH:MM:SS"; no separate Score Now needed. `/rescore` refactored onto `scoreNow()`. Labs comparison **Active + Δ restored to live** (reads `/levels` daily_levels, 20s poll) — was reading a nonexistent `/status.levels`. Score Now tooltip documents its standalone-rescore role. |
+| _next_ | **Whole-point level rounding at apply time** — single `roundLevel()`/`LEVEL_ROUNDING` policy; recurrence state stays full precision; QQQ derives from rounded NQ. Every tab now displays the stored canonical NQ (`runScoreWithNq` attaches `nq_price`; frontend `levelNq()` helper) instead of `QQQ × ratio`, killing the one-tick discrepancy. Labs Native keeps raw decimals, Active rounded, Δ = raw vs rounded. See **Level Rounding Policy**. |
+| `5111048` | **Atomic Apply NQ** — `/labs/apply-to-main` now writes `daily_levels` → syncs `labsAutoLevels` (+SSE) → runs the **same** full rescore as Score Now (via shared `scoreNow()`, incl. narratives) → responds `{appliedAt, scoredAt}`. Button shows "✓ Applied & scored HH:MM:SS"; no separate Score Now needed. `/rescore` refactored onto `scoreNow()`. Labs comparison **Active + Δ restored to live** (reads `/levels` daily_levels, 20s poll) — was reading a nonexistent `/status.levels`. Score Now tooltip documents its standalone-rescore role. |
 | `8883910` | **Deterministic anchored cold-start** — warmup window anchored at a FIXED per-(contract,tf) point (`labs_pr_anchor_{contract}`, persisted, reused on every reset) instead of sliding `now−8d`, which reseeded the path each run. 5m floor 60d, 1m ~10 trading days; spans anchor→now with `next_url` pagination if it exceeds one page. Reset/cold-start reproduce byte-identical levels. Logs `[labs] [tf] cold-start anchor={ts} bars={n} seed={firstClose}`. Rollover clears anchors. |
 | `954ae4e` | **Futures fetch uses correct params** (`window_start.gte/.lte` + `sort=window_start.desc`) — `from`/`to`/`sort` were stocks-v2 params the futures endpoint ignored, returning oldest-from-inception (1m stuck ~25k). **Load-side stale-state discard** (>5d anchor → cold-start, not advance). **Toggle/calc desync fixed** — `activeInterval` is the single source of truth; selection persists before calc and sticks on abort; abort surfaces `no_fresh_data` and the UI shows "No fresh data / Retry" instead of stale levels. |
 | `9811564` | **Length/Factor changes now take effect** — `/labs/settings` detects a length/mult change, wipes all `labs_pr_avg%` state, and cold-starts the active timeframe with new params (`[labs] params changed … → state reset, cold-start`). Interval-only change resets nothing. |

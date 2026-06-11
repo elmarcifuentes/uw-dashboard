@@ -919,7 +919,7 @@ provider.onRescore(async ({ price, reason }) => {
   }
   console.log(`[server] Auto-rescore triggered: ${reason} at $${price}`)
   try {
-    const result = await runFullScore({ trigger: 'auto', levelsOverride: levelsForScoring })
+    const result = await runScoreWithNq({ trigger: 'auto', levelsOverride: levelsForScoring })
     result._received_at = new Date().toISOString()
     const _autoRatio = getNqRatioFromDb(db)
     if (_autoRatio) { result.nq_ratio = _autoRatio; console.log('[server] nq_ratio injected:', _autoRatio) }
@@ -1772,7 +1772,7 @@ app.post('/webhook/accept', async (req, res) => {
     if (runFullScore) {
       try {
         const levelsOverride = getLevelsForScoring(db)
-        const result = await runFullScore({ trigger: 'webhook_accept', levelsOverride })
+        const result = await runScoreWithNq({ trigger: 'webhook_accept', levelsOverride })
         result._received_at = new Date().toISOString()
         latest = result
         history.unshift(result)
@@ -2572,6 +2572,47 @@ function getActiveRatio() {
   return sessionRatio || nqOffsets.ratio || latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
 }
 
+// ── Level Rounding Policy ───────────────────────────────────────────────────────
+// Applied/scored NQ levels are rounded to WHOLE points at APPLY TIME ONLY — never the
+// recurrence state. The persisted {avg, halfWidth, atrState} stays full precision;
+// rounding the path-dependent state would compound and diverge from TradingView.
+// To change granularity (e.g. quarter-tick), change ONLY roundLevel() — nothing else in
+// the pipeline assumes whole points; it takes effect on the next apply, no state reset.
+const LEVEL_ROUNDING = 'whole'
+function roundLevel(x) {
+  return Math.round(x)            // LEVEL_ROUNDING='whole'. Quarter-tick: Math.round(x * 4) / 4.
+}
+// Canonical applied levels: round each NQ level, then derive QQQ from the ROUNDED NQ
+// (rounded NQ ÷ ratio) so NQ and its QQQ equivalent stay consistent everywhere.
+function roundAppliedLevels(nqRaw, ratio) {
+  const out = {}
+  for (const k of ['r2', 'r1', 'mid', 's1', 's2']) {
+    const nq = roundLevel(nqRaw[`${k}_nq`])
+    out[`${k}_nq`]  = nq
+    out[`${k}_qqq`] = parseFloat((nq / ratio).toFixed(2))
+  }
+  return out
+}
+
+// Wraps runFullScore and attaches the CANONICAL stored NQ price (daily_levels) to each
+// scored level by id, so every tab can show the same whole-point value instead of
+// reconstructing NQ from QQQ × ratio (which drifts by a tick).
+async function runScoreWithNq(opts) {
+  const result = await runFullScore(opts)
+  if (result?.levels?.length) {
+    const today = getTodayET()
+    const row = db.prepare(`SELECT * FROM daily_levels WHERE date = ?`).get(today)
+            || db.prepare(`SELECT * FROM daily_levels ORDER BY date DESC LIMIT 1`).get()
+    if (row) {
+      for (const lv of result.levels) {
+        const id = String(lv.id || lv.level_id || '').toLowerCase()
+        if (row[`${id}_nq`] != null) lv.nq_price = row[`${id}_nq`]
+      }
+    }
+  }
+  return result
+}
+
 // Apply auto levels to daily_levels + trigger rescore when mode is auto_nq
 async function applyAutoLevelsIfEnabled() {
   if (systemPaused) return
@@ -2580,15 +2621,15 @@ async function applyAutoLevelsIfEnabled() {
   if (!nq) { console.log('[levels] no auto levels yet'); return }
 
   const ratio = getActiveRatio()
-  const levelData = {
-    r2_nq:  nq.R2,  r2_qqq:  parseFloat((nq.R2  / ratio).toFixed(2)),
-    r1_nq:  nq.R1,  r1_qqq:  parseFloat((nq.R1  / ratio).toFixed(2)),
-    mid_nq: nq.MID, mid_qqq: parseFloat((nq.MID / ratio).toFixed(2)),
-    s1_nq:  nq.S1,  s1_qqq:  parseFloat((nq.S1  / ratio).toFixed(2)),
-    s2_nq:  nq.S2,  s2_qqq:  parseFloat((nq.S2  / ratio).toFixed(2)),
-  }
+  // Canonical applied levels = rounded NQ, QQQ derived from rounded NQ (apply-time only).
+  const levelData = roundAppliedLevels(
+    { r2_nq: nq.R2, r1_nq: nq.R1, mid_nq: nq.MID, s1_nq: nq.S1, s2_nq: nq.S2 },
+    ratio
+  )
 
-  // Skip write + rescore if levels haven't meaningfully changed
+  // Skip write + rescore if levels haven't meaningfully changed. Both sides are rounded,
+  // so the ≤0.5 rounding (≤1pt NQ, ≤~0.02 QQQ) is far below the 20pt / 0.50 thresholds —
+  // it cannot flap the guard at the boundary.
   const today    = getTodayET()
   const existing = db.prepare(`SELECT mid_nq, mid_qqq FROM daily_levels WHERE date = ?`).get(today)
   const nqChanged  = !existing || Math.abs((existing.mid_nq  || 0) - levelData.mid_nq)  > 20
@@ -2615,17 +2656,13 @@ async function applyAutoLevelsIfEnabled() {
     levelData.s2_nq, levelData.s2_qqq,
     ratio
   )
-  console.log(`[levels] auto-applied: mode=${levelSourceMode} R1=${levelData.r1_qqq} MID=${levelData.mid_qqq}`)
+  console.log(`[levels] auto-applied (rounded): mode=${levelSourceMode} MID_nq=${levelData.mid_nq} R1_qqq=${levelData.r1_qqq}`)
 
-  // Sync labsAutoLevels to exactly what was applied so Labs panel shows identical values
-  labsAutoLevels = {
-    ...labsAutoLevels,
-    nq:  { R2: levelData.r2_nq,  R1: levelData.r1_nq,  MID: levelData.mid_nq,  S1: levelData.s1_nq,  S2: levelData.s2_nq  },
-    qqq: { R2: levelData.r2_qqq, R1: levelData.r1_qqq, MID: levelData.mid_qqq, S1: levelData.s1_qqq, S2: levelData.s2_qqq },
-    appliedAt: new Date().toISOString(),
-  }
+  // Do NOT overwrite labsAutoLevels.nq — the Labs "NQ Native" column must keep the RAW
+  // recurrence values for TradingView comparison. Active (rounded) is read from daily_levels;
+  // Δ = raw vs rounded (a resting ±0.5 is expected). Just stamp appliedAt + notify.
+  labsAutoLevels = { ...labsAutoLevels, appliedAt: new Date().toISOString() }
   sseEmitter.emit('event', { type: 'labs_levels_update', levels: labsAutoLevels, timestamp: new Date().toISOString() })
-  console.log('[levels] labs display synced to applied levels')
 
   sseEmitter.emit('event', {
     type: 'levels_auto_updated', mode: levelSourceMode,
@@ -2638,7 +2675,7 @@ async function applyAutoLevelsIfEnabled() {
       try {
         const levelsForScoring = getLevelsForScoring(db)
         if (!levelsForScoring) return
-        const result = await runFullScore({ trigger: 'auto_level_update', levelsOverride: levelsForScoring })
+        const result = await runScoreWithNq({ trigger: 'auto_level_update', levelsOverride: levelsForScoring })
         result._received_at = new Date().toISOString()
         const savedRatio = getNqRatioFromDb(db)
         if (savedRatio) result.nq_ratio = savedRatio
@@ -2671,7 +2708,7 @@ async function runAutoRescore(trigger = 'manual') {
   if (!levels) { console.log('[rescore] no levels in DB — enter levels first'); return }
   console.log(`[rescore] running (trigger=${trigger})`)
   try {
-    const result = await runFullScore({ trigger, levelsOverride: levels })
+    const result = await runScoreWithNq({ trigger, levelsOverride: levels })
     result._received_at = new Date().toISOString()
     const ratio = getNqRatioFromDb(db)
     if (ratio) result.nq_ratio = ratio
@@ -2701,7 +2738,7 @@ async function runAutoRescore(trigger = 'manual') {
 // regenerates narrative / level-narratives / session-brief / assistant-read in background.
 // Returns { result, scoredAt } once scoring + the rescore SSE are done (narratives lag).
 async function scoreNow(trigger) {
-  const result = await runFullScore({ trigger, levelsOverride: getLevelsForScoring(db) })
+  const result = await runScoreWithNq({ trigger, levelsOverride: getLevelsForScoring(db) })
   result._received_at = new Date().toISOString()
   const ratio = getNqRatioFromDb(db)
   if (ratio) result.nq_ratio = ratio
@@ -2959,24 +2996,12 @@ app.post('/labs/apply-to-main', async (req, res) => {
 
   const ratio = latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
 
-  let levelData
-  if (source === 'qqq') {
-    levelData = {
-      r2_qqq: levels.R2,  r2_nq: Math.round(levels.R2  * ratio * 4) / 4,
-      r1_qqq: levels.R1,  r1_nq: Math.round(levels.R1  * ratio * 4) / 4,
-      mid_qqq: levels.MID, mid_nq: Math.round(levels.MID * ratio * 4) / 4,
-      s1_qqq: levels.S1,  s1_nq: Math.round(levels.S1  * ratio * 4) / 4,
-      s2_qqq: levels.S2,  s2_nq: Math.round(levels.S2  * ratio * 4) / 4,
-    }
-  } else {
-    levelData = {
-      r2_nq: levels.R2,   r2_qqq: parseFloat((levels.R2  / ratio).toFixed(2)),
-      r1_nq: levels.R1,   r1_qqq: parseFloat((levels.R1  / ratio).toFixed(2)),
-      mid_nq: levels.MID, mid_qqq: parseFloat((levels.MID / ratio).toFixed(2)),
-      s1_nq: levels.S1,   s1_qqq: parseFloat((levels.S1  / ratio).toFixed(2)),
-      s2_nq: levels.S2,   s2_qqq: parseFloat((levels.S2  / ratio).toFixed(2)),
-    }
-  }
+  // Canonical applied levels via the single rounding policy (round NQ, derive QQQ from
+  // rounded NQ). NQ source uses the raw recurrence values; qqq source derives raw NQ first.
+  const rawNq = source === 'qqq'
+    ? { r2_nq: levels.R2 * ratio, r1_nq: levels.R1 * ratio, mid_nq: levels.MID * ratio, s1_nq: levels.S1 * ratio, s2_nq: levels.S2 * ratio }
+    : { r2_nq: levels.R2, r1_nq: levels.R1, mid_nq: levels.MID, s1_nq: levels.S1, s2_nq: levels.S2 }
+  const levelData = roundAppliedLevels(rawNq, ratio)
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
   db.prepare(`
