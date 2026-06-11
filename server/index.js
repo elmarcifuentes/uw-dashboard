@@ -1918,6 +1918,7 @@ app.get('/narrative', (req, res) => {
 // ─── LABS: Auto Level Detection ─────────────────────────────────────────────
 
 let labsAutoLevels = { nq: null, lastCalculated: null }
+let labsFresh      = true   // false when the last calc aborted (stale feed / no fresh bars)
 let labsSettings   = { interval: '5m', activeInterval: '5m', length: 200, mult: 6.0, avgMode: 'daily' }
 
 const YAHOO_INTERVAL_MAP = {
@@ -2158,32 +2159,34 @@ async function fetchFromPolygonFutures(bars, interval, opts = {}) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
   const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
-  // Advance fetches (persisted state present) only need bars newer than lastBarTs —
-  // shrink `from` to lastBarTs minus a 1h buffer. Cold-start keeps the 10-day window.
-  // (Polygon ignores `from` today; this caps transfer if they ever start honoring it.)
+  // /futures/v1/aggs honors window_start.gte/.lte (ns or YYYY-MM-DD) — NOT the stocks-v2
+  // from/to/sort params, which it silently ignores. Bound the window so the response only
+  // contains RECENT bars even if sort is ignored; advance needs only bars past lastBarTs.
   const fetchMode = opts.sinceTs ? 'advance' : 'cold-start'
-  const now  = new Date()
-  const from = opts.sinceTs
-    ? new Date(opts.sinceTs - 60 * 60 * 1000)           // lastBarTs − 1h
-    : (() => { const d = new Date(now); d.setDate(d.getDate() - 10); return d })()
-  const fromStr = from.toISOString().split('T')[0]
-  const toStr   = now.toISOString().split('T')[0]
+  const nowMs  = Date.now()
+  const fromMs = opts.sinceTs
+    ? opts.sinceTs - 60 * 60 * 1000                  // advance: lastBarTs − 1h
+    : nowMs - 8 * 24 * 60 * 60 * 1000                // cold-start: 8 days (≥1000 bars even at 5m)
+  // ms → ns as string (ns exceeds Number.MAX_SAFE_INTEGER — never do ms*1e6 as a number)
+  const gteNs = `${fromMs}000000`
+  const lteNs = `${nowMs}000000`
+  const fromIso = new Date(fromMs).toISOString()
+  const toIso   = new Date(nowMs).toISOString()
   // Nanosecond timestamps from Polygon futures API → ms
   const toMs = t => t > 1e15 ? Math.round(t / 1e6) : t
   // Try auto-detected contract first, fall back to math-based candidates
   const candidates = [activeNQContract, ...getNqFuturesCandidates().filter(t => t !== activeNQContract)]
   for (const fticker of candidates) {
     try {
-      // sort=desc + limit ensures Polygon returns from the NEWEST end. With sort=asc the
-      // 50k response cap returns the OLDEST bars from contract inception — at 1m that
-      // truncates before the present, so slice(-N) selected months-stale bars.
-      const limit = Math.min(bars + 50, 50000)
-      const url = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&from=${fromStr}&to=${toStr}&sort=desc&limit=${limit}&apiKey=${POLYGON_KEY}`
+      // window_start.gte/.lte bound the window (honored); sort=window_start.desc requests
+      // newest-first (dotted field.direction syntax this endpoint uses). limit high so the
+      // bounded window is never truncated. Newest bars are then selected by timestamp below.
+      const url = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&window_start.gte=${gteNs}&window_start.lte=${lteNs}&sort=window_start.desc&limit=50000&apiKey=${POLYGON_KEY}`
       console.log(`[labs] Polygon URL: ${url.replace(POLYGON_KEY, 'REDACTED')}`)
       const res  = await fetch(url)
       const data = await res.json()
       const total = data.results?.length ?? 0
-      if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars in range ${fromStr}→${toStr}`); continue }
+      if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars in range ${fromIso}→${toIso}`); continue }
       // Deterministically select the NEWEST `bars` by timestamp regardless of API order,
       // then sort ascending for the recurrence. Keeps gap bars (TradingView ratchets on them).
       const usedBars = [...data.results]
@@ -2494,6 +2497,18 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
       }
     } catch (e) {}
 
+    // Load-side validation: state whose anchor is ancient must NOT be advanced — advancing
+    // across weeks/months of bars from a stale anchor is never correct. Discard → cold-start.
+    if (state) {
+      const ageMs = Date.now() - state.lastBarTs
+      const MAX_STATE_AGE_MS = 5 * 24 * 60 * 60 * 1000   // ~3 trading days of catch-up headroom
+      if (!(state.lastBarTs > 0) || ageMs > MAX_STATE_AGE_MS) {
+        console.warn(`[labs] [${interval}] DISCARDING stale state lastBar=${new Date(state.lastBarTs).toISOString()} (${(ageMs / 86400000).toFixed(1)}d old) — cold-starting`)
+        db.prepare(`DELETE FROM settings WHERE key = ?`).run(stateKey)
+        state = null
+      }
+    }
+
     let source
     if (!state) {
       // No usable persisted state for this timeframe → cold-start (first run / reset / rollover only)
@@ -2728,7 +2743,11 @@ function levelsChanged(oldLevels, newLevels) {
 }
 
 function handleLabsUpdate(result) {
-  if (!result) return
+  labsFresh = !!result   // a null result means the calc aborted (stale feed / no fresh bars)
+  if (!result) {
+    sseEmitter.emit('event', { type: 'labs_no_fresh_data', activeInterval: labsSettings.activeInterval, timestamp: new Date().toISOString() })
+    return
+  }
   const old = labsAutoLevels?.nq
   if (levelsChanged(old, result?.nq)) {
     console.log('[labs] ⚡ levels shifted')
@@ -2823,7 +2842,9 @@ console.log('[cron] minute-tick scheduler started')
 // ─── LABS ENDPOINTS ──────────────────────────────────────────────────────────
 
 app.get('/labs/auto-levels', (req, res) => {
-  res.json({ ...labsAutoLevels, timestamp: new Date().toISOString() })
+  // activeInterval is the single source of truth for the active feed; surface it so the
+  // UI toggle never reads the preview `interval` field. labsFresh=false → no fresh data.
+  res.json({ ...labsAutoLevels, activeInterval: labsSettings.activeInterval, fresh: labsFresh, timestamp: new Date().toISOString() })
 })
 
 app.get('/labs/scoring-latest', (req, res) => {
@@ -2831,12 +2852,16 @@ app.get('/labs/scoring-latest', (req, res) => {
 })
 
 app.post('/labs/recalculate', async (req, res) => {
-  // Identical to the scheduled 5m cycle: advance persisted state over newly closed
-  // bars only (never cold-start). No new closed bar → no-op. Reset/rollover are the
-  // only ways to force a re-init.
+  // Always runs the ACTIVE timeframe (never the preview `interval`). Advances persisted
+  // state over newly closed bars only; never cold-starts. Abort (stale feed) → status.
   const result = await calculateLabsLevels(labsSettings.activeInterval)
   handleLabsUpdate(result)
-  res.json({ success: true, levels: labsAutoLevels })
+  res.json({
+    success: true,
+    activeInterval: labsSettings.activeInterval,
+    status: result ? 'ok' : 'no_fresh_data',
+    levels: result ? labsAutoLevels : null,
+  })
 })
 
 app.post('/labs/settings', async (req, res) => {
@@ -2891,11 +2916,17 @@ app.post('/labs/active-interval', async (req, res) => {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(JSON.stringify(labsSettings))
   console.log(`[labs] active timeframe → ${interval}`)
-  // Load (or cold-start) the target timeframe's state and display it. Switching back
-  // to a previously-converged timeframe restores its untouched state (advance only).
+  // Selection is already persisted above — it STICKS even if the calc below aborts.
+  // Load (or cold-start) the target timeframe's state. Switching back to a converged
+  // timeframe restores its untouched state (advance only). Abort (stale feed) → status.
   const result = await calculateLabsLevels(interval)
   handleLabsUpdate(result)
-  res.json({ success: true, activeInterval: interval, levels: labsAutoLevels })
+  res.json({
+    success: true,
+    activeInterval: interval,
+    status: result ? 'ok' : 'no_fresh_data',
+    levels: result ? labsAutoLevels : null,
+  })
 })
 
 app.post('/labs/reset-avg', async (req, res) => {

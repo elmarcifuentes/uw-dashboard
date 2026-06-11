@@ -22,14 +22,21 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
   const [settings, setSettings]     = useState({ interval: '5m', length: 200, mult: 6.0, avgMode: 'daily' })
   const [nqContract, setNqContract]   = useState(null)
   const [nqContractExpiry, setNqContractExpiry] = useState(null)
+  const [noData, setNoData]           = useState(false)   // backend reported stale/no fresh bars
+
+  // activeInterval is the backend's single source of truth — drive the toggle off it,
+  // never the preview `interval` field (which can diverge and cause a visual revert).
+  const activeTf = (data) => data?.activeInterval || data?.settings?.activeInterval || data?.settings?.interval
 
   useEffect(() => {
     fetch(`${API_URL}/labs/auto-levels`)
       .then(r => r.json())
       .then(data => {
         setAutoLevels(data)
-        if (data.settings)      setSettings(data.settings)
-        else if (data.interval) setSettings(prev => ({ ...prev, interval: data.interval }))
+        const tf = activeTf(data)
+        if (data.settings) setSettings({ ...data.settings, interval: tf || data.settings.interval })
+        else if (tf)       setSettings(prev => ({ ...prev, interval: tf }))
+        setNoData(data.fresh === false)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -68,11 +75,23 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
 
   const handleRecalculate = async () => {
     setLoading(true)
-    await fetch(`${API_URL}/labs/recalculate`, { method: 'POST' })
-    const data = await fetch(`${API_URL}/labs/auto-levels`).then(r => r.json())
-    setAutoLevels(data)
-    if (data.settings) setSettings(data.settings)
-    setLoading(false)
+    try {
+      const res  = await fetch(`${API_URL}/labs/recalculate`, { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (data && (data.status === 'no_fresh_data' || data.levels === null)) {
+        setNoData(true)
+      } else {
+        setNoData(false)
+        const al = await fetch(`${API_URL}/labs/auto-levels`).then(r => r.json())
+        setAutoLevels(al)
+        const tf = activeTf(al)
+        if (al.settings) setSettings(s => ({ ...s, ...al.settings, interval: tf || al.settings.interval }))
+      }
+    } catch (e) {
+      console.warn('[labs] recalculate failed:', e.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSettingsChange = async (newSettings) => {
@@ -84,8 +103,10 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
         body: JSON.stringify(newSettings)
       })
       const data = await res.json()
-      if (data.levels)   setAutoLevels(data.levels)
-      if (data.settings) setSettings(data.settings)
+      // A length/mult change cold-starts; if the feed is stale the cold-start aborts.
+      if (data.levels?.nq) { setAutoLevels(data.levels); setNoData(false) }
+      else if (data.levels === null) setNoData(true)
+      if (data.settings) setSettings(s => ({ ...s, ...data.settings, interval: activeTf(data) || data.settings.interval }))
     } catch (e) {
       console.warn('[labs] settings change failed:', e.message)
     } finally {
@@ -95,9 +116,12 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
 
   // Timeframe is the active recurrence feed (not a preview): switch loads that
   // timeframe's persisted state on the server, cold-starting it only if none exists.
+  // The selection STICKS even if the calc aborts on stale bars — we surface no-data
+  // rather than reverting.
   const handleIntervalChange = async (interval) => {
     if (interval === settings.interval) return
     setLoading(true)
+    setSettings(prev => ({ ...prev, interval }))   // selection sticks immediately
     try {
       const res  = await fetch(`${API_URL}/labs/active-interval`, {
         method: 'POST',
@@ -105,8 +129,12 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
         body: JSON.stringify({ interval })
       })
       const data = await res.json()
-      if (data.levels)   setAutoLevels(data.levels)
-      setSettings(prev => ({ ...prev, interval }))
+      if (data.status === 'no_fresh_data' || data.levels === null) {
+        setNoData(true)            // keep the selected tf, show no-data
+      } else {
+        setNoData(false)
+        if (data.levels) setAutoLevels(data.levels)
+      }
     } catch (e) {
       console.warn('[labs] timeframe change failed:', e.message)
     } finally {
@@ -297,6 +325,17 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
       {loading ? (
         <div className="text-center py-12 text-text-muted text-sm animate-pulse">
           Calculating Predictive Ranges ({settings.interval})...
+        </div>
+      ) : noData ? (
+        <div className="text-center py-12 text-sm border border-amber-800/40 bg-amber-950/10 rounded-lg">
+          <div className="text-amber-400 font-bold">⚠ No fresh market data ({settings.interval})</div>
+          <div className="text-text-muted mt-1">The futures feed returned stale bars — levels are not being updated to avoid showing wrong numbers.</div>
+          <button
+            onClick={handleRecalculate}
+            className="mt-3 px-3 py-1.5 rounded text-xs font-bold bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 border border-amber-800/40 transition-colors"
+          >
+            ⟳ Retry
+          </button>
         </div>
       ) : !levels ? (
         <div className="text-center py-12 text-text-muted text-sm">
