@@ -2107,6 +2107,7 @@ async function fetchFromPolygonFutures(bars, interval) {
       // Sort already asc; take last `bars`
       const usedBars = data.results.slice(-bars)
       console.log(`[labs] Polygon futures ${fticker}: total=${total} used=${usedBars.length}`)
+      if (total > bars * 3) console.log(`[labs] Polygon returned ${total} bars — using last ${bars} (date range param ignored by Polygon futures API)`)
       const firstBar = usedBars[0]
       const lastBar  = usedBars[usedBars.length - 1]
       const tsField  = firstBar.window_start ?? firstBar.t
@@ -2190,8 +2191,6 @@ function calcATR(highs, lows, closes, length) {
   for (let i = length; i < trValues.length; i++) {
     atr = (atr * (length - 1) + trValues[i]) / length
   }
-  const tr10avg = trValues.slice(0, 10).reduce((a, b) => a + b, 0) / Math.min(10, trValues.length)
-  console.log(`[labs] calcATR: bars=${highs.length} length=${length} tr[0]=${trValues[0]?.toFixed(3)} tr_avg10=${tr10avg.toFixed(3)} atr=${atr.toFixed(3)}`)
   return atr
 }
 
@@ -2378,8 +2377,8 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
     const nqResult = nqResult_raw || deriveNQfromQQQ(qqqResult, getActiveRatio())
 
     console.log(`[labs] ATR check: QQQ=${qqqResult.atr?.toFixed(3)} NQ=${nqResult?.atr?.toFixed(1)}`)
-    if (qqqResult.atr > 10)   console.warn(`[labs] WARNING: QQQ ATR=${qqqResult.atr.toFixed(2)} seems too large — check bar data`)
-    if (nqResult?.atr > 500)  console.warn(`[labs] WARNING: NQ ATR=${nqResult.atr.toFixed(1)} seems too large — check bar data`)
+    if (qqqResult.atr > 10)   console.warn('[labs] QQQ ATR too large:', qqqResult.atr.toFixed(2), '— check bar data')
+    if (nqResult?.atr > 500)  console.warn('[labs] NQ ATR too large:',  nqResult.atr.toFixed(1),  '— check bar data')
     console.log(`[labs] QQQ: R1=${qqqResult.R1} MID=${qqqResult.MID} S1=${qqqResult.S1}`)
     if (nqResult) console.log(`[labs] NQ: R1=${nqResult.R1} MID=${nqResult.MID} S1=${nqResult.S1}`)
 
