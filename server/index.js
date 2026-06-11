@@ -2028,7 +2028,9 @@ async function detectActiveNQContract() {
     db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
       .run(JSON.stringify({ ticker: newTicker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
     db.prepare(`DELETE FROM settings WHERE key IN ('labs_pr_avg', 'labs_pr_avg_5m', 'labs_pr_avg_1m')`).run()
-    console.log('[contract] PR state cleared (both timeframes) for new contract convergence')
+    // Drop stale cold-start anchors so the new contract computes fresh ones on first cold-start
+    db.prepare(`DELETE FROM settings WHERE key LIKE 'labs_pr_anchor_%'`).run()
+    console.log('[contract] PR state + anchors cleared (both timeframes) for new contract convergence')
     contractRecalibrating = true
     sseEmitter.emit('event', {
       type: 'contract_rollover', from: prevTicker, to: newTicker, expiry,
@@ -2159,49 +2161,51 @@ async function fetchFromPolygonFutures(bars, interval, opts = {}) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
   const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
-  // /futures/v1/aggs honors window_start.gte/.lte (ns or YYYY-MM-DD) — NOT the stocks-v2
-  // from/to/sort params, which it silently ignores. Bound the window so the response only
-  // contains RECENT bars even if sort is ignored; advance needs only bars past lastBarTs.
-  const fetchMode = opts.sinceTs ? 'advance' : 'cold-start'
+  // /futures/v1/aggs honors window_start.gte/.lte (ns) — NOT the stocks-v2 from/to/sort.
+  //  • cold-start: anchored at a FIXED per-contract anchor (opts.anchorMs) → deterministic
+  //    warmup; ASCENDING + next_url pagination to span anchor→now even past one page.
+  //  • advance: window = lastBarTs−1h → now, single newest page.
+  const isColdStart = opts.anchorMs != null
+  const fetchMode   = isColdStart ? 'cold-start' : (opts.sinceTs ? 'advance' : 'cold-start')
   const nowMs  = Date.now()
-  const fromMs = opts.sinceTs
-    ? opts.sinceTs - 60 * 60 * 1000                  // advance: lastBarTs − 1h
-    : nowMs - 8 * 24 * 60 * 60 * 1000                // cold-start: 8 days (≥1000 bars even at 5m)
+  const fromMs = isColdStart ? opts.anchorMs
+               : opts.sinceTs ? opts.sinceTs - 60 * 60 * 1000     // advance: lastBarTs − 1h
+               : nowMs - 8 * 24 * 60 * 60 * 1000                  // legacy fallback (unanchored)
   // ms → ns as string (ns exceeds Number.MAX_SAFE_INTEGER — never do ms*1e6 as a number)
   const gteNs = `${fromMs}000000`
   const lteNs = `${nowMs}000000`
   const fromIso = new Date(fromMs).toISOString()
   const toIso   = new Date(nowMs).toISOString()
-  // Nanosecond timestamps from Polygon futures API → ms
+  const sortDir = isColdStart ? 'asc' : 'desc'   // cold-start ascends from the anchor; advance takes newest
   const toMs = t => t > 1e15 ? Math.round(t / 1e6) : t
-  // Try auto-detected contract first, fall back to math-based candidates
   const candidates = [activeNQContract, ...getNqFuturesCandidates().filter(t => t !== activeNQContract)]
   for (const fticker of candidates) {
     try {
-      // window_start.gte/.lte bound the window (honored); sort=window_start.desc requests
-      // newest-first (dotted field.direction syntax this endpoint uses). limit high so the
-      // bounded window is never truncated. Newest bars are then selected by timestamp below.
-      const url = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&window_start.gte=${gteNs}&window_start.lte=${lteNs}&sort=window_start.desc&limit=50000&apiKey=${POLYGON_KEY}`
+      let url = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&window_start.gte=${gteNs}&window_start.lte=${lteNs}&sort=window_start.${sortDir}&limit=50000&apiKey=${POLYGON_KEY}`
       console.log(`[labs] Polygon URL: ${url.replace(POLYGON_KEY, 'REDACTED')}`)
-      const res  = await fetch(url)
-      const data = await res.json()
-      const total = data.results?.length ?? 0
-      if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars in range ${fromIso}→${toIso}`); continue }
-      // Deterministically select the NEWEST `bars` by timestamp regardless of API order,
-      // then sort ascending for the recurrence. Keeps gap bars (TradingView ratchets on them).
-      const usedBars = [...data.results]
-        .sort((a, b) => toMs(a.window_start ?? a.t) - toMs(b.window_start ?? b.t))
-        .slice(-bars)
-      console.log(`[labs] fetch mode=${fetchMode} bars=${usedBars.length} (total=${total}, ${fticker})`)
+      // Cold-start follows next_url to the present; advance is a single page.
+      const allRows = []
+      let pages = 0
+      while (url && pages < 50) {
+        pages++
+        const res  = await fetch(url)
+        const data = await res.json()
+        if (data.results?.length) allRows.push(...data.results)
+        url = (isColdStart && data.next_url)
+          ? (data.next_url.includes('apiKey=') ? data.next_url : `${data.next_url}&apiKey=${POLYGON_KEY}`)
+          : null
+      }
+      if (allRows.length === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars in range ${fromIso}→${toIso}`); continue }
+      // Sort ascending by timestamp (defensive vs API order). Cold-start keeps the FULL
+      // anchor→now span; advance takes the newest `bars`. Gap bars kept (TV ratchets on them).
+      const sorted = [...allRows].sort((a, b) => toMs(a.window_start ?? a.t) - toMs(b.window_start ?? b.t))
+      const usedBars = isColdStart ? sorted : sorted.slice(-bars)
+      console.log(`[labs] fetch mode=${fetchMode} bars=${usedBars.length} pages=${pages} (fetched=${allRows.length}, ${fticker})`)
       const firstBar = usedBars[0]
       const lastBar  = usedBars[usedBars.length - 1]
       const firstTs  = new Date(toMs(firstBar.window_start ?? firstBar.t)).toISOString()
       const lastTs   = new Date(toMs(lastBar.window_start  ?? lastBar.t)).toISOString()
       console.log(`[labs] Polygon ${fticker} sample: first=${firstTs} last=${lastTs} first_close=${firstBar.close} last_close=${lastBar.close}`)
-      // Staleness check
-      const ageDays = (Date.now() - toMs(lastBar.window_start ?? lastBar.t)) / 86400000
-      if (ageDays > 5) console.warn(`[labs] WARNING: last Polygon bar is ${ageDays.toFixed(1)} days old — may be stale`)
-      // Price sanity check
       if (lastBar.close < 20000 || lastBar.close > 50000) {
         console.warn(`[labs] Polygon ${fticker}: price ${lastBar.close} out of NQ range — skipping`)
         continue
@@ -2229,8 +2233,9 @@ async function fetchOHLC(ticker, bars = 250, interval = '1d', opts = {}) {
     result = await fetchFromYahoo(ticker, bars, interval)
   }
 
-  // Hard cap — never pass more bars than requested to calcATR
-  if (result?.closes?.length > bars) {
+  // Hard cap — never pass more bars than requested to calcATR.
+  // EXCEPT cold-start (opts.anchorMs): the anchored warmup must span anchor→now intact.
+  if (!opts.anchorMs && result?.closes?.length > bars) {
     console.warn(`[labs] fetchOHLC ${ticker}: got ${result.closes.length} bars, slicing to ${bars}`)
     result = {
       closes: result.closes.slice(-bars),
@@ -2403,6 +2408,27 @@ function saveNQLevels(nqResult, interval) {
 // 5m → labs_pr_avg_5m, 1m → labs_pr_avg_1m (any other tf gets its own isolated key).
 const prAvgKey = (interval) => 'labs_pr_avg_' + (interval || '5m')
 
+// Cold-start warmup window is anchored at a FIXED per-(contract,timeframe) point so every
+// reset/cold-start seeds the path-dependent recurrence from the SAME first bar → identical
+// levels. A sliding now−Nd anchor reseeded the path each run (the bug this fixes).
+const anchorKey = (contract) => `labs_pr_anchor_${contract}`
+function getColdStartAnchor(contract, interval) {
+  const key = anchorKey(contract)
+  let obj = {}
+  try { const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key); if (row?.value) obj = JSON.parse(row.value) } catch (e) {}
+  if (obj[interval] != null) return obj[interval]
+  // First-ever cold-start for this contract+tf: compute and persist a fixed anchor.
+  // 1m: ~10 trading days (≈14 cal). 5m: 60-day floor — deep enough to erase the seed at Factor 6.
+  const nowMs = Date.now()
+  const anchorMs = interval === '1m'
+    ? nowMs - 14 * 24 * 60 * 60 * 1000
+    : nowMs - 60 * 24 * 60 * 60 * 1000
+  obj[interval] = anchorMs
+  db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`).run(key, JSON.stringify(obj))
+  console.log(`[labs] [${interval}] persisted NEW cold-start anchor for ${contract}: ${new Date(anchorMs).toISOString()}`)
+  return anchorMs
+}
+
 // Approx NQ futures (ETH/Globex) open state in ET. Used only to decide whether a stale
 // feed is suspicious — when the market is closed, old last-bars are legitimate.
 function isFuturesMarketOpen() {
@@ -2469,12 +2495,13 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
     `).run(stateKey, JSON.stringify({ avg: s.avg, halfWidth: s.halfWidth, atrState: s.atrState, lastBarTs: s.lastBarTs, savedAt: new Date().toISOString() }))
 
     const coldStart = async () => {
-      console.log(`[labs] [${interval}] cold-start init from ${INIT_BARS} bars (closed bars only, RMA warmup)...`)
-      const init = await fetchOHLC('NQ=F', INIT_BARS, interval)
+      // Fixed per-(contract,tf) anchor → deterministic warmup → reproducible levels on reset.
+      const anchorMs = getColdStartAnchor(activeNQContract, interval)
+      const init = await fetchOHLC('NQ=F', INIT_BARS, interval, { anchorMs })
       if (!init?.times) { console.warn('[labs] init fetch missing timestamps — cannot run recurrence'); return null }
       const closes = dropForming(init.closes), highs = dropForming(init.highs), lows = dropForming(init.lows), times = dropForming(init.times)
       const lastFedTs = times[times.length - 1]
-      console.log(`[labs] [${interval}] cold-start bars fed: first=${new Date(times[0]).toISOString()} last=${new Date(lastFedTs).toISOString()} n=${times.length}`)
+      console.log(`[labs] [${interval}] cold-start anchor=${new Date(anchorMs).toISOString()} bars=${times.length} seed=${closes[0]} (first=${new Date(times[0]).toISOString()} last=${new Date(lastFedTs).toISOString()})`)
       if (!barsAreFresh(lastFedTs, interval)) return null   // stale feed → abort, do not write state
       const s = initRecurrence(closes, highs, lows, times, length, mult)
       if (!s) { console.warn('[labs] initRecurrence returned null'); return null }

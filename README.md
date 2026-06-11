@@ -205,6 +205,7 @@ Every 60s, checks ET time:
 |---|---|
 | `labs_auto_levels` | `{ nq: {...}, lastCalculated, interval, settings }` |
 | `labs_pr_avg_5m` / `labs_pr_avg_1m` | `{ avg, halfWidth, atrState, lastBarTs, savedAt }` — full PR recurrence state, **per timeframe** (legacy `labs_pr_avg` auto-migrates to `_5m`) |
+| `labs_pr_anchor_{contract}` | `{ "5m": <ms>, "1m": <ms> }` — fixed per-(contract,tf) cold-start warmup anchor; reused on every reset for reproducible levels. Cleared on rollover. |
 | `labs_settings` | `{ interval, activeInterval, length, mult, avgMode }` |
 | `nq_contract` | `{ ticker, expiry, daysLeft, detectedAt }` |
 | `session_ratio` | `{ ratio, lockedAt, date }` |
@@ -248,7 +249,8 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | **Futures fetch uses correct params** (`window_start.gte/.lte` + `sort=window_start.desc`) — `from`/`to`/`sort` were stocks-v2 params the futures endpoint ignored, returning oldest-from-inception (1m stuck ~25k). **Load-side stale-state discard** (>5d anchor → cold-start, not advance). **Toggle/calc desync fixed** — `activeInterval` is the single source of truth; selection persists before calc and sticks on abort; abort surfaces `no_fresh_data` and the UI shows "No fresh data / Retry" instead of stale levels. |
+| _next_ | **Deterministic anchored cold-start** — warmup window anchored at a FIXED per-(contract,tf) point (`labs_pr_anchor_{contract}`, persisted, reused on every reset) instead of sliding `now−8d`, which reseeded the path each run. 5m floor 60d, 1m ~10 trading days; spans anchor→now with `next_url` pagination if it exceeds one page. Reset/cold-start reproduce byte-identical levels. Logs `[labs] [tf] cold-start anchor={ts} bars={n} seed={firstClose}`. Rollover clears anchors. |
+| `954ae4e` | **Futures fetch uses correct params** (`window_start.gte/.lte` + `sort=window_start.desc`) — `from`/`to`/`sort` were stocks-v2 params the futures endpoint ignored, returning oldest-from-inception (1m stuck ~25k). **Load-side stale-state discard** (>5d anchor → cold-start, not advance). **Toggle/calc desync fixed** — `activeInterval` is the single source of truth; selection persists before calc and sticks on abort; abort surfaces `no_fresh_data` and the UI shows "No fresh data / Retry" instead of stale levels. |
 | `9811564` | **Length/Factor changes now take effect** — `/labs/settings` detects a length/mult change, wipes all `labs_pr_avg%` state, and cold-starts the active timeframe with new params (`[labs] params changed … → state reset, cold-start`). Interval-only change resets nothing. |
 | _next_ | **Fixed stale-bar fetch** — Polygon futures now queried `sort=desc` (newest end) + deterministic newest-by-timestamp selection; `sort=asc&limit=50000` was returning oldest-from-inception, truncating before present at 1m (levels stuck ~25,000). Added a hard recency guard: during market hours, if newest closed bar >30 min old → `[labs] STALE BARS` and state is NOT written. Cold-start logs the first/last bar fed. |
 | `6aa3599` | Advance fetches request `from = lastBarTs − 1h` (cold-start keeps 10-day window) to cap Polygon transfer; log `[labs] fetch mode={advance\|cold-start} bars={n}`. |
