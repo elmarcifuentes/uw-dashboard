@@ -2084,26 +2084,31 @@ async function fetchFromPolygon(ticker, bars, interval) {
 
 function filterOutlierBars(bars) {
   if (bars.length < 10) return bars
-  const trs = bars.slice(1).map((b, i) => Math.max(
-    b.high - b.low,
-    Math.abs(b.high - bars[i].close),
-    Math.abs(b.low  - bars[i].close)
-  ))
+  const trs = []
+  for (let i = 1; i < bars.length; i++) {
+    trs.push(Math.max(
+      bars[i].high - bars[i].low,
+      Math.abs(bars[i].high - bars[i - 1].close),
+      Math.abs(bars[i].low  - bars[i - 1].close)
+    ))
+  }
   const sorted = [...trs].sort((a, b) => a - b)
   const median = sorted[Math.floor(sorted.length / 2)]
-  const threshold = median * 8  // 8× median catches overnight gaps without clipping volatile bars
-  let filtered = 0
-  const result = bars.filter((b, i) => {
-    if (i === 0) return true
-    const tr = Math.max(
-      b.high - b.low,
-      Math.abs(b.high - bars[i - 1].close),
-      Math.abs(b.low  - bars[i - 1].close)
-    )
-    if (tr > threshold) { filtered++; return false }
-    return true
-  })
-  if (filtered > 0) console.log(`[labs] filtered ${filtered} gap bars (TR > ${threshold.toFixed(0)} pts)`)
+  // 4× median: avg~65 → threshold~260, catches all overnight gap bars (>200 pts)
+  const threshold = median * 4
+  let smoothed = 0
+  const result = [bars[0]]
+  for (let i = 1; i < bars.length; i++) {
+    if (trs[i - 1] > threshold) {
+      smoothed++
+      // Replace OHLC spike with flat bar at prev close — preserves series length,
+      // eliminates gap from ATR, keeps actual close for ratcheting avg
+      result.push({ ...bars[i], open: bars[i - 1].close, high: bars[i - 1].close, low: bars[i - 1].close })
+    } else {
+      result.push(bars[i])
+    }
+  }
+  if (smoothed > 0) console.log(`[labs] smoothed ${smoothed} gap bars (threshold=${threshold.toFixed(0)} pts)`)
   return result
 }
 
