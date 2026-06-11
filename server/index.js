@@ -1219,6 +1219,8 @@ app.get('/status', (req, res) => {
     sessionRatioLockedAt,
     ratioIsLocked: !!sessionRatio,
     ratioIsFromToday: sessionRatioDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+    nqContract: activeNQContract,
+    nqContractExpiry: activeNQContractExpiry,
   })
 })
 
@@ -1942,6 +1944,63 @@ const POLYGON_FUTURES_RESOLUTION = {
   '1d':  '1session',
 }
 
+// ─── NQ CONTRACT AUTO-DETECTION ──────────────────────────────────────────────
+
+let activeNQContract        = 'NQM6' // overwritten by detectActiveNQContract()
+let activeNQContractExpiry  = null
+
+async function detectActiveNQContract() {
+  const POLYGON_KEY = process.env.POLYGON_API_KEY
+  if (!POLYGON_KEY) { console.warn('[contract] no POLYGON_API_KEY — keeping', activeNQContract); return }
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const url   = `https://api.polygon.io/futures/v1/contracts?product_code=NQ&active=true&as_of=${today}&sort=days_to_maturity.asc&limit=5&apiKey=${POLYGON_KEY}`
+    const res   = await fetch(url)
+    const data  = await res.json()
+    if (!data.results?.length) {
+      console.warn('[contract] no active NQ contracts found — keeping', activeNQContract)
+      return
+    }
+    const frontMonth = data.results
+      .filter(c => (c.days_to_maturity || 0) > 0)
+      .sort((a, b) => (a.days_to_maturity || 999) - (b.days_to_maturity || 999))[0]
+    if (!frontMonth) { console.warn('[contract] no valid front month found'); return }
+    const newTicker = frontMonth.ticker
+    const daysLeft  = frontMonth.days_to_maturity
+    const expiry    = frontMonth.last_trade_date
+    if (newTicker !== activeNQContract) {
+      console.log(`[contract] ROLLOVER: ${activeNQContract} → ${newTicker} (${daysLeft} days left)`)
+      activeNQContract       = newTicker
+      activeNQContractExpiry = expiry
+      db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
+        .run(JSON.stringify({ ticker: newTicker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
+      // Clear cached avg on rollover — new contract needs fresh convergence
+      db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
+      console.log('[contract] avg cleared for new contract convergence')
+    } else {
+      console.log(`[contract] active: ${activeNQContract} (${daysLeft} days to expiry)`)
+    }
+    activeNQContractExpiry = expiry
+  } catch (err) {
+    console.warn('[contract] detection failed:', err.message, '— keeping', activeNQContract)
+  }
+}
+
+// Restore persisted contract on startup
+try {
+  const saved = db.prepare(`SELECT value FROM settings WHERE key = 'nq_contract'`).get()
+  if (saved?.value) {
+    const data = JSON.parse(saved.value)
+    activeNQContract       = data.ticker
+    activeNQContractExpiry = data.expiry
+    console.log('[contract] restored:', activeNQContract, 'expires:', activeNQContractExpiry)
+  }
+} catch (e) {}
+
+// Detect on startup (async — fallback value used if API hasn't resolved yet)
+detectActiveNQContract()
+
+// ─── NQ CONTRACT CANDIDATES (fallback math-based) ────────────────────────────
 // Returns [frontMonth, nextMonth] contract tickers for NQ (e.g. ['NQM6','NQU6'])
 // CME quarterly schedule: Mar=H, Jun=M, Sep=U, Dec=Z — single-digit year required
 function getNqFuturesCandidates() {
@@ -2000,9 +2059,10 @@ async function fetchFromPolygonFutures(bars, interval) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
   const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
-  for (const fticker of getNqFuturesCandidates()) {
+  // Try auto-detected contract first, fall back to math-based candidates
+  const candidates = [activeNQContract, ...getNqFuturesCandidates().filter(t => t !== activeNQContract)]
+  for (const fticker of candidates) {
     try {
-      // Request exactly bars+50 so we have headroom after filtering nulls; sort desc (newest first)
       const fetchLimit = bars + 50
       const url   = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&limit=${fetchLimit}&sort=desc&apiKey=${POLYGON_KEY}`
       console.log(`[labs] Polygon URL: ${url.replace(POLYGON_KEY, 'REDACTED')}`)
@@ -2014,7 +2074,7 @@ async function fetchFromPolygonFutures(bars, interval) {
       const all     = data.results.slice().reverse()
       const results = all.slice(-bars)
       console.log(`[labs] Polygon futures ${fticker}: requested=${fetchLimit} total=${total} used=${results.length}`)
-      console.log(`[labs] Polygon NQM6 sample: first bar: ${JSON.stringify(results[0])} last bar: ${JSON.stringify(results[results.length - 1])}`)
+      console.log(`[labs] Polygon ${fticker} sample: first bar: ${JSON.stringify(results[0])} last bar: ${JSON.stringify(results[results.length - 1])}`)
       if (results.length >= Math.min(bars, 10)) {
         return { closes: results.map(r => r.close), highs: results.map(r => r.high), lows: results.map(r => r.low), source: `polygon-futures (${fticker})` }
       }
@@ -2493,6 +2553,12 @@ function setupLabsCron(cron, interval) {
 import('node-cron').then(({ default: cron }) => {
   labsCron = cron
   setupLabsCron(cron, labsSettings.activeInterval)
+
+  // Daily NQ contract check at 6am ET — catches rollover before market open
+  cron.schedule('0 6 * * 1-5', () => {
+    console.log('[contract] daily check...')
+    detectActiveNQContract()
+  }, { timezone: 'America/New_York' })
 
   // Lock NQ/QQQ ratio at 9:30 AM ET for consistent session level conversion
   cron.schedule('30 9 * * 1-5', () => {

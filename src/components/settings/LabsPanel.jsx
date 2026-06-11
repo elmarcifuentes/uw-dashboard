@@ -23,6 +23,8 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
   const [scoredLevels, setScoredLevels]   = useState(null)
   const [settings, setSettings]     = useState({ interval: '5m', length: 200, mult: 6.0, avgMode: 'daily' })
   const [dataSources, setDataSources] = useState({ qqq: 'yahoo', nq: 'polygon' })
+  const [nqContract, setNqContract]   = useState(null)
+  const [nqContractExpiry, setNqContractExpiry] = useState(null)
 
   useEffect(() => {
     fetch(`${API_URL}/labs/auto-levels`)
@@ -40,7 +42,9 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
       .then(r => r.json())
       .then(data => {
         setCurrentPrice(data.lastPrice)
-        if (data.nq_ratio) setNqRatio(Number(data.nq_ratio))
+        if (data.nq_ratio)          setNqRatio(Number(data.nq_ratio))
+        if (data.nqContract)        setNqContract(data.nqContract)
+        if (data.nqContractExpiry)  setNqContractExpiry(data.nqContractExpiry)
         setCurrentLevels(data.levels)
       })
       .catch(() => {})
@@ -268,6 +272,11 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
               </button>
             ))}
           </div>
+          {nqContract && (
+            <span className="text-micro text-text-muted font-mono">
+              {nqContract}{nqContractExpiry && <> · exp {nqContractExpiry}</>}
+            </span>
+          )}
         </div>
 
         <div className="w-px h-4 bg-bg-elevated" />
