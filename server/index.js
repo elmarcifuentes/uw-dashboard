@@ -1954,16 +1954,42 @@ let contractRecalibrating   = false
 let contractRolledFrom      = null
 let nqContractDaysToExpiry  = null
 
+async function fetchContractDetails(ticker) {
+  const POLYGON_KEY = process.env.POLYGON_API_KEY
+  if (!POLYGON_KEY) return
+  try {
+    const url  = `https://api.polygon.io/futures/v1/contracts/${ticker}?apiKey=${POLYGON_KEY}`
+    const res  = await fetch(url)
+    const data = await res.json()
+    console.log('[contract] direct fetch:', JSON.stringify(data).slice(0, 200))
+    const contract = data.results
+    if (contract?.last_trade_date) {
+      activeNQContractExpiry = contract.last_trade_date
+      nqContractDaysToExpiry = contract.days_to_maturity ?? null
+      console.log(`[contract] ${ticker} expires: ${activeNQContractExpiry} days: ${nqContractDaysToExpiry}`)
+      db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
+        .run(JSON.stringify({ ticker, expiry: activeNQContractExpiry, daysLeft: nqContractDaysToExpiry, detectedAt: new Date().toISOString() }))
+    } else {
+      console.warn('[contract] direct fetch: no last_trade_date in response')
+    }
+  } catch (err) {
+    console.warn('[contract] direct fetch failed:', err.message)
+  }
+}
+
 async function detectActiveNQContract() {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) { console.warn('[contract] no POLYGON_API_KEY — keeping', activeNQContract); return }
   try {
     const today = new Date().toISOString().split('T')[0]
     const url   = `https://api.polygon.io/futures/v1/contracts?product_code=NQ&active=true&as_of=${today}&sort=days_to_maturity.asc&limit=5&apiKey=${POLYGON_KEY}`
+    console.log('[contract] checking:', url.replace(POLYGON_KEY, 'REDACTED'))
     const res   = await fetch(url)
     const data  = await res.json()
+    console.log('[contract] response:', JSON.stringify(data).slice(0, 300))
     if (!data.results?.length) {
-      console.warn('[contract] no active NQ contracts found — keeping', activeNQContract)
+      console.warn('[contract] no active NQ contracts found — falling back to direct fetch for', activeNQContract)
+      await fetchContractDetails(activeNQContract)
       return
     }
     const frontMonth = data.results
@@ -2026,6 +2052,11 @@ try {
 
 // Detect on startup (async — fallback value used if API hasn't resolved yet)
 detectActiveNQContract()
+
+// If persisted record had no expiry, fetch it directly
+if (!activeNQContractExpiry) {
+  fetchContractDetails(activeNQContract)
+}
 
 // ─── NQ CONTRACT CANDIDATES (fallback math-based) ────────────────────────────
 // Returns [frontMonth, nextMonth] contract tickers for NQ (e.g. ['NQM6','NQU6'])
