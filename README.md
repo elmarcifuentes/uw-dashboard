@@ -247,8 +247,9 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | Faithful LuxAlgo PR port: persisted recurrence state `{avg, halfWidth, atrState, lastBarTs}`, advance over closed bars only (no sliding-window re-run), drop forming bar, ETH bars, removed `filterOutlierBars` from PR path. Fixes intraday band drift. |
-| _next_ | Startup rescore + `runAutoRescore` helper + Score Now button (Auto NQ) |
+| _next_ | `/labs/recalculate` made identical to the scheduled 5m cycle — advances persisted state over newly-closed bars only, never cold-starts (no new bar → no-op). Cold-start gated to no-state / reset / rollover / gap-too-large, each logged `recalc mode=cold-start reason=…`; advance logs `recalc mode=advance barsAdvanced=N`. |
+| `e18b1a9` | Faithful LuxAlgo PR port: persisted recurrence state `{avg, halfWidth, atrState, lastBarTs}`, advance over closed bars only (no sliding-window re-run), drop forming bar, ETH bars, removed `filterOutlierBars` from PR path. Fixes intraday band drift. |
+| `b4d08a2` | Startup rescore + `runAutoRescore` helper + Score Now button (Auto NQ) |
 | `dc3368b` | Add Manual NQ mode (3rd mode card); fix ratio preview (`data.qqq` → `data.nq`) |
 | `7ded55f` | `predictiveRanges` returns `rawAtr`; contract detection split into expiry + rollover |
 | `dd5397e` | ATR log fixed (was printing band width as ATR); contract days calculated manually |

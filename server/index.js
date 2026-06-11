@@ -2034,7 +2034,7 @@ async function detectActiveNQContract() {
       message: `NQ rolled ${prevTicker}→${newTicker} — recalibrating levels`,
       timestamp: new Date().toISOString(),
     })
-    calculateLabsLevels(labsSettings.interval).then(() => {
+    calculateLabsLevels(labsSettings.interval, { reason: 'rollover' }).then(() => {
       contractRecalibrating = false
       sseEmitter.emit('event', {
         type: 'contract_ready', contract: newTicker,
@@ -2386,10 +2386,13 @@ function saveNQLevels(nqResult, interval) {
   return labsAutoLevels
 }
 
-async function calculateLabsLevels(interval = labsSettings.interval) {
+async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) {
   const INIT_BARS  = 1000
   const LEVEL_BARS = 250
   const { length, mult, avgMode = 'daily' } = labsSettings
+  // Cold-start may run ONLY when there is no usable persisted state. opts.reason
+  // labels WHY (reset | rollover); absent → 'no-state' (first run / empty DB).
+  const coldStartReason = opts.reason || 'no-state'
   console.log(`[labs] calculating: mode=${avgMode} interval=${interval}`)
 
   try {
@@ -2451,25 +2454,30 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
 
     let source
     if (!state) {
+      // No usable persisted state → cold-start (first run / reset / rollover only)
+      console.log(`[labs] recalc mode=cold-start reason=${coldStartReason}`)
       const cs = await coldStart()
       if (!cs) return null
       state = cs.state; source = cs.source
       persistState(state)
     } else {
-      // 2) Advance saved state over ONLY newly-closed bars since lastBarTs
+      // Advance saved state over ONLY newly-closed bars since lastBarTs — identical
+      // to the scheduled 5m cycle. No new closed bar → barsAdvanced=0 → no-op.
       const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval)
       if (!nqData?.times) { console.warn('[labs] recent fetch missing timestamps — skipping advance'); return null }
       source = nqData.source
       const prevAvg = state.avg
       const adv = advanceRecurrence(state, dropForming(nqData.closes), dropForming(nqData.highs), dropForming(nqData.lows), dropForming(nqData.times), length, mult)
       if (adv.needsReinit) {
-        console.warn('[labs] saved bar predates window (gap too large) — re-initializing from long window')
+        // Saved bar predates the window — only safe recovery is a re-init
+        console.log('[labs] recalc mode=cold-start reason=gap-too-large')
+        console.warn('[labs] saved bar predates window — re-initializing from long window')
         const cs = await coldStart()
         if (!cs) return null
         state = cs.state; source = cs.source
       } else {
         state = { avg: adv.avg, halfWidth: adv.halfWidth, atrState: adv.atrState, lastBarTs: adv.lastBarTs }
-        console.log(`[labs] avg ${prevAvg.toFixed(1)} → ${state.avg.toFixed(1)}, ratcheted=${adv.ratchets > 0}, halfWidth=${state.halfWidth.toFixed(1)}, barsAdvanced=${adv.barsAdvanced}`)
+        console.log(`[labs] recalc mode=advance barsAdvanced=${adv.barsAdvanced} (avg ${prevAvg.toFixed(1)} → ${state.avg.toFixed(1)}, ratcheted=${adv.ratchets > 0}, halfWidth=${state.halfWidth.toFixed(1)})`)
         if (adv.ratchetBars?.length) {
           console.log('[labs] ratchet bars: ' + adv.ratchetBars.map(ts => new Date(ts).toISOString()).join(', '))
         }
@@ -2765,8 +2773,11 @@ app.get('/labs/scoring-latest', (req, res) => {
 })
 
 app.post('/labs/recalculate', async (req, res) => {
-  await calculateLabsLevels(labsSettings.activeInterval)
-  await applyAutoLevelsIfEnabled()
+  // Identical to the scheduled 5m cycle: advance persisted state over newly closed
+  // bars only (never cold-start). No new closed bar → no-op. Reset/rollover are the
+  // only ways to force a re-init.
+  const result = await calculateLabsLevels(labsSettings.activeInterval)
+  handleLabsUpdate(result)
   res.json({ success: true, levels: labsAutoLevels })
 })
 
@@ -2811,7 +2822,7 @@ app.post('/labs/reset-avg', async (req, res) => {
   res.json({ success: true })
   // Trigger fresh cold-start init now (full recurrence state rebuilt from long window)
   try {
-    const result = await calculateLabsLevels(labsSettings.activeInterval)
+    const result = await calculateLabsLevels(labsSettings.activeInterval, { reason: 'reset' })
     handleLabsUpdate(result)
   } catch (err) {
     console.warn('[labs] reset re-init failed:', err.message)
