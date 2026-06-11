@@ -140,32 +140,41 @@ ATR-based support/resistance for NQ futures. Primary auto-level source in `auto_
 
 ### Key functions
 
+Faithful LuxAlgo Predictive Ranges port with **persisted recurrence state** — the
+recurrence is advanced one closed bar at a time, never re-run over a sliding window
+(which previously caused uniform intraday band drift). Bars are ETH/Globex.
+
 ```js
 calcATR(highs, lows, closes, length)
-// Wilder-smoothed ATR
+// Wilder-smoothed ATR (used by weekly mode only)
 
-predictiveRanges(closes, highs, lows, length, mult, startAvg)
-// Returns: { R2, R1, MID, S1, S2,
-//            atr (= bandWidth, kept for back-compat),
-//            rawAtr (unscaled),
-//            bandWidth (rawAtr × mult),
-//            holdAtr, avg }
+trueRange(high, low, prevClose)            // max(h-l, |h-prevC|, |l-prevC|)
 
-filterOutlierBars(bars)
-// Replaces overnight gap spikes with flat bar at prev close
-// Threshold: 3× median TR (~195 pts for NQ 5m)
-// Preserves series length; close price kept for ratcheting avg
+initRecurrence(closes, highs, lows, times, length, mult)
+// COLD START over a long window (INIT_BARS). RMA-ATR warmup + ratchet convergence.
+// Per closed bar: atr = RMA-ATR(length) × mult;
+//   close-avg > atr → avg += atr ; avg-close > atr → avg -= atr ; else hold
+//   halfWidth = atr/2 updates ONLY on ratchet bars, held otherwise
+// Returns state { avg, halfWidth, atrState, lastBarTs, ratchets, barsProcessed }
+
+advanceRecurrence(state, closes, highs, lows, times, length, mult)
+// Advances saved state over ONLY bars newer than state.lastBarTs.
+// Returns { avg, halfWidth, atrState, lastBarTs, ratchets, ratchetBars, barsAdvanced }
+// or { needsReinit:true } if the saved bar predates the window (gap too large).
+
+levelsFromState(state, mult)
+// Levels = avg ± halfWidth, avg ± 2*halfWidth (spacing = halfWidth, frozen between ratchets)
 
 calculateLabsLevels(interval)
-// Full calc — daily or weekly avg mode
-// LEVEL_BARS = 250, INIT_BARS = 1000
+// Daily mode: load labs_pr_avg state → advance over newly closed bars (drop forming bar) → save state.
+// Cold-start only on first run / reset / contract rollover. LEVEL_BARS = 250, INIT_BARS = 1000.
 
-saveNQLevels(nqResult, interval)
-// Persists to labsAutoLevels + SQLite 'labs_auto_levels' key
-
-applyAutoLevelsIfEnabled()
-// Writes to daily_levels + SSE emit + triggers rescore
+saveNQLevels / applyAutoLevelsIfEnabled  — unchanged (persist + SSE + rescore)
 ```
+
+**filterOutlierBars** is no longer in the PR path — TradingView ratchets on overnight
+gap bars, so flattening them desynced the recurrence. Function is kept (unused) for
+potential non-PR use only.
 
 ### Avg modes
 - **Daily** — ratcheting avg persisted in `labs_pr_avg` SQLite key; stable across restarts
@@ -195,7 +204,7 @@ Every 60s, checks ET time:
 | Key | Value |
 |---|---|
 | `labs_auto_levels` | `{ nq: {...}, lastCalculated, interval, settings }` |
-| `labs_pr_avg` | `{ avg, savedAt }` — daily ratcheting avg |
+| `labs_pr_avg` | `{ avg, halfWidth, atrState, lastBarTs, savedAt }` — full PR recurrence state |
 | `labs_settings` | `{ interval, activeInterval, length, mult, avgMode }` |
 | `nq_contract` | `{ ticker, expiry, daysLeft, detectedAt }` |
 | `session_ratio` | `{ ratio, lockedAt, date }` |
@@ -238,6 +247,8 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
+| _next_ | Faithful LuxAlgo PR port: persisted recurrence state `{avg, halfWidth, atrState, lastBarTs}`, advance over closed bars only (no sliding-window re-run), drop forming bar, ETH bars, removed `filterOutlierBars` from PR path. Fixes intraday band drift. |
+| _next_ | Startup rescore + `runAutoRescore` helper + Score Now button (Auto NQ) |
 | `dc3368b` | Add Manual NQ mode (3rd mode card); fix ratio preview (`data.qqq` → `data.nq`) |
 | `7ded55f` | `predictiveRanges` returns `rawAtr`; contract detection split into expiry + rollover |
 | `dd5397e` | ATR log fixed (was printing band width as ATR); contract days calculated manually |

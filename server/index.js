@@ -2097,13 +2097,14 @@ async function fetchFromYahoo(ticker, bars, interval) {
   const data    = await res.json()
   const result  = data.chart.result[0]
   const quotes  = result.indicators.quote[0]
+  const ts      = result.timestamp || []
   const valid   = []
   for (let i = 0; i < quotes.close.length; i++) {
     if (quotes.close[i] && quotes.high[i] && quotes.low[i])
-      valid.push({ c: quotes.close[i], h: quotes.high[i], l: quotes.low[i] })
+      valid.push({ c: quotes.close[i], h: quotes.high[i], l: quotes.low[i], t: (ts[i] || 0) * 1000 })
   }
   const last = valid.slice(-bars)
-  return { closes: last.map(v => v.c), highs: last.map(v => v.h), lows: last.map(v => v.l), source: 'yahoo' }
+  return { closes: last.map(v => v.c), highs: last.map(v => v.h), lows: last.map(v => v.l), times: last.map(v => v.t), source: 'yahoo' }
 }
 
 async function fetchFromPolygon(ticker, bars, interval) {
@@ -2120,7 +2121,7 @@ async function fetchFromPolygon(ticker, bars, interval) {
   if (count < bars) throw new Error(`only ${count} bars (need ${bars})`)
   const results  = data.results.slice(-bars)
   console.log(`[labs] ${ticker}: source=polygon bars=${count}`)
-  return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), source: `polygon (${ticker})` }
+  return { closes: results.map(r => r.c), highs: results.map(r => r.h), lows: results.map(r => r.l), times: results.map(r => r.t), source: `polygon (${ticker})` }
 }
 
 function filterOutlierBars(bars) {
@@ -2174,10 +2175,10 @@ async function fetchFromPolygonFutures(bars, interval) {
       const data = await res.json()
       const total = data.results?.length ?? 0
       if (total === 0) { console.warn(`[labs] Polygon futures ${fticker}: 0 bars in range ${fromStr}→${toStr}`); continue }
-      // Sort already asc; take last `bars`, then filter overnight gap bars
-      const rawBars     = data.results.slice(-bars)
-      const usedBars    = filterOutlierBars(rawBars)
-      console.log(`[labs] Polygon futures ${fticker}: total=${total} raw=${rawBars.length} used=${usedBars.length}`)
+      // Sort already asc; take last `bars`. Keep ALL bars including overnight gaps —
+      // TradingView's PR ratchets on gap bars, so flattening them desyncs the recurrence.
+      const usedBars    = data.results.slice(-bars)
+      console.log(`[labs] Polygon futures ${fticker}: total=${total} used=${usedBars.length} (gap bars kept for PR recurrence)`)
       if (total > bars * 3) console.log(`[labs] Polygon returned ${total} bars — using last ${bars} (date range param ignored by Polygon futures API)`)
       const firstBar = usedBars[0]
       const lastBar  = usedBars[usedBars.length - 1]
@@ -2193,7 +2194,7 @@ async function fetchFromPolygonFutures(bars, interval) {
         continue
       }
       if (usedBars.length >= Math.min(bars, 10)) {
-        return { closes: usedBars.map(b => b.close), highs: usedBars.map(b => b.high), lows: usedBars.map(b => b.low), source: `polygon-futures (${fticker})` }
+        return { closes: usedBars.map(b => b.close), highs: usedBars.map(b => b.high), lows: usedBars.map(b => b.low), times: usedBars.map(b => toMs(b.window_start ?? b.t)), source: `polygon-futures (${fticker})` }
       }
       console.warn(`[labs] Polygon futures ${fticker}: only ${usedBars.length} usable bars`)
     } catch (err) {
@@ -2222,6 +2223,7 @@ async function fetchOHLC(ticker, bars = 250, interval = '1d') {
       closes: result.closes.slice(-bars),
       highs:  result.highs.slice(-bars),
       lows:   result.lows.slice(-bars),
+      times:  result.times ? result.times.slice(-bars) : undefined,
       source: result.source,
     }
   }
@@ -2255,30 +2257,96 @@ function calcATR(highs, lows, closes, length) {
   return atr
 }
 
-function predictiveRanges(closes, highs, lows, length = 200, mult = 6.0, startAvg = null) {
-  if (!closes?.length || closes.length < 2) return null
-  const rawAtr  = calcATR(highs, lows, closes, length)
-  const bandWidth = rawAtr * mult
-  if (!bandWidth) return null
-  const holdAtr = bandWidth / 2
-  let avg = startAvg !== null ? startAvg : closes[0]
-  for (let i = 1; i < closes.length; i++) {
-    if (!closes[i]) continue
-    if (closes[i] > avg + holdAtr)      avg = closes[i] - holdAtr
-    else if (closes[i] < avg - holdAtr) avg = closes[i] + holdAtr
+// ── Faithful LuxAlgo Predictive Ranges, ported with persistable recurrence state ──
+// Reference (per CLOSED bar):
+//   atr = RMA-ATR(length) * mult
+//   close - avg > atr  → avg += atr   (ratchet up)
+//   avg - close > atr  → avg -= atr   (ratchet down)
+//   else               → hold
+//   halfWidth = atr / 2  updates ONLY on ratchet bars, held otherwise
+//   levels = avg ± halfWidth, avg ± 2*halfWidth
+// State persisted across recalcs: { avg, halfWidth, atrState (running RMA, no mult), lastBarTs }
+
+function trueRange(high, low, prevClose) {
+  return Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose))
+}
+
+// Cold start — build full recurrence state from a long window of CLOSED bars (RMA warmup).
+function initRecurrence(closes, highs, lows, times, length, mult) {
+  const n = closes.length
+  if (n < 2) return null
+  let avg = closes[0]
+  let halfWidth = 0
+  let atrState = 0
+  let lastBarTs = times[0]
+  let ratchets = 0
+  const seedBuf = []      // first `length` TR values → SMA seed for RMA (matches Pine ta.rma)
+  let seeded = false
+  for (let i = 1; i < n; i++) {
+    const tr = trueRange(highs[i], lows[i], closes[i - 1])
+    if (!seeded) {
+      seedBuf.push(tr)
+      if (seedBuf.length === length) { atrState = seedBuf.reduce((a, b) => a + b, 0) / length; seeded = true }
+    } else {
+      atrState = (atrState * (length - 1) + tr) / length
+    }
+    const atr = (seeded ? atrState : 0) * mult
+    if (atr > 0) {
+      if      (closes[i] - avg > atr) { avg += atr; halfWidth = atr / 2; ratchets++ }
+      else if (avg - closes[i] > atr) { avg -= atr; halfWidth = atr / 2; ratchets++ }
+    }
+    lastBarTs = times[i]
   }
+  if (!seeded && seedBuf.length) atrState = seedBuf.reduce((a, b) => a + b, 0) / seedBuf.length
+  if (halfWidth === 0) halfWidth = (atrState * mult) / 2   // ensure non-zero bands if no ratchet fired
   if (!avg || isNaN(avg)) return null
+  return { avg, halfWidth, atrState, lastBarTs, ratchets, barsProcessed: n - 1 }
+}
+
+// Advance saved state over CLOSED bars newer than state.lastBarTs only (no window re-run).
+function advanceRecurrence(state, closes, highs, lows, times, length, mult) {
+  let { avg, halfWidth, atrState, lastBarTs } = state
+  const n = closes.length
+  // Find the window index at/just-before lastBarTs (gives prevClose for the first new bar)
+  let idx = -1
+  for (let i = 0; i < n; i++) {
+    if (times[i] <= lastBarTs) idx = i
+    else break
+  }
+  if (idx === -1) return { needsReinit: true }   // saved bar predates window → gap too large
+  let ratchets = 0
+  let advanced = 0
+  const ratchetBars = []
+  for (let i = idx + 1; i < n; i++) {
+    const tr = trueRange(highs[i], lows[i], closes[i - 1])
+    atrState = (atrState * (length - 1) + tr) / length
+    const atr = atrState * mult
+    let ratcheted = false
+    if      (closes[i] - avg > atr) { avg += atr; halfWidth = atr / 2; ratcheted = true }
+    else if (avg - closes[i] > atr) { avg -= atr; halfWidth = atr / 2; ratcheted = true }
+    if (ratcheted) { ratchets++; ratchetBars.push(times[i]) }
+    lastBarTs = times[i]
+    advanced++
+  }
+  return { avg, halfWidth, atrState, lastBarTs, ratchets, ratchetBars, barsAdvanced: advanced }
+}
+
+// Build the level object from recurrence state (faithful geometry: spacing = halfWidth).
+function levelsFromState(state, mult) {
+  const { avg, halfWidth, atrState } = state
+  const bandWidth = atrState * mult
   return {
-    R2:       parseFloat((avg + bandWidth * 2).toFixed(2)),
-    R1:       parseFloat((avg + bandWidth).toFixed(2)),
-    MID:      parseFloat(avg.toFixed(2)),
-    S1:       parseFloat((avg - bandWidth).toFixed(2)),
-    S2:       parseFloat((avg - bandWidth * 2).toFixed(2)),
-    atr:      parseFloat(bandWidth.toFixed(4)),   // kept for back-compat (bandWidth)
-    rawAtr:   parseFloat(rawAtr.toFixed(4)),      // unscaled ATR
-    bandWidth: parseFloat(bandWidth.toFixed(4)),
-    holdAtr:  parseFloat(holdAtr.toFixed(4)),
-    avg:      parseFloat(avg.toFixed(4)),
+    R2:        parseFloat((avg + 2 * halfWidth).toFixed(2)),
+    R1:        parseFloat((avg + halfWidth).toFixed(2)),
+    MID:       parseFloat(avg.toFixed(2)),
+    S1:        parseFloat((avg - halfWidth).toFixed(2)),
+    S2:        parseFloat((avg - 2 * halfWidth).toFixed(2)),
+    avg:       parseFloat(avg.toFixed(4)),
+    halfWidth: parseFloat(halfWidth.toFixed(4)),
+    rawAtr:    parseFloat(atrState.toFixed(4)),   // unscaled running RMA ATR
+    bandWidth: parseFloat(bandWidth.toFixed(4)),  // rawAtr × mult (live, for display)
+    atr:       parseFloat(bandWidth.toFixed(4)),  // back-compat display field
+    holdAtr:   parseFloat(halfWidth.toFixed(4)),
   }
 }
 
@@ -2347,60 +2415,71 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
       return saveNQLevels(nqResult, interval)
     }
 
-    // ── DAILY PERSISTENT AVG MODE ──────────────────────────────────────────────
-    let savedAvgNQ = null
-    try {
-      const saved = db.prepare(`SELECT value FROM settings WHERE key = 'labs_pr_avg'`).get()
-      if (saved?.value) {
-        const data = JSON.parse(saved.value)
-        savedAvgNQ = data.avgNQ
-        console.log(`[labs] cached avg: NQ=${savedAvgNQ?.toFixed(1)}`)
-      }
-    } catch (e) {}
+    // ── DAILY PERSISTENT AVG MODE — faithful LuxAlgo PR with persisted recurrence state ──
+    const dropForming = arr => (arr && arr.length ? arr.slice(0, -1) : arr)   // drop last (in-progress) bar
 
-    if (!savedAvgNQ) {
-      console.log(`[labs] initializing avg from ${INIT_BARS} bars (avg only, ATR discarded)...`)
-      const nqInit = await fetchOHLC('NQ=F', INIT_BARS, interval).catch(() => null)
-      if (nqInit) {
-        const nqInitR = predictiveRanges(nqInit.closes, nqInit.highs, nqInit.lows, length, mult, null)
-        savedAvgNQ = nqInitR?.avg ?? null
-      }
-      console.log(`[labs] converged avg: NQ=${savedAvgNQ?.toFixed(1)}`)
-    }
-
-    // Final level calculation — LEVEL_BARS only (ATR from recent bars = correct ✅)
-    const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval)
-
-    // TR distribution diagnostic — helps spot overnight gap bars inflating ATR
-    const nq = nqData
-    const trVals = []
-    for (let i = 1; i < nq.closes.length; i++) {
-      trVals.push(Math.max(
-        nq.highs[i] - nq.lows[i],
-        Math.abs(nq.highs[i] - nq.closes[i-1]),
-        Math.abs(nq.lows[i]  - nq.closes[i-1])
-      ))
-    }
-    const maxTR      = Math.max(...trVals)
-    const avgTR      = trVals.reduce((a, b) => a + b, 0) / trVals.length
-    const outliers200 = trVals.filter(tr => tr > 200).length
-    console.log('[labs] NQ TR analysis:', `avg=${avgTR.toFixed(1)}`, `max=${maxTR.toFixed(1)}`, `outliers(>200)=${outliers200}`, `bars=${trVals.length}`)
-
-    const nqResult = predictiveRanges(nqData.closes, nqData.highs, nqData.lows, length, mult, savedAvgNQ)
-    if (!nqResult) { console.warn('[labs] NQ predictiveRanges returned null'); return null }
-
-    console.log('[labs] NQ:', `MID=${nqResult.MID?.toFixed(1)}`, `R1=${nqResult.R1?.toFixed(1)}`, `S1=${nqResult.S1?.toFixed(1)}`, `rawATR=${nqResult.rawAtr?.toFixed(1)}`, `band=${nqResult.bandWidth?.toFixed(1)}`)
-    if (nqResult.rawAtr > 150) console.warn('[labs] raw ATR too large:', nqResult.rawAtr.toFixed(1), '— check bar data')
-
-    // Persist updated avg
-    db.prepare(`
+    const persistState = (s) => db.prepare(`
       INSERT INTO settings (key, value, updated_at)
       VALUES ('labs_pr_avg', ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-    `).run(JSON.stringify({ avgNQ: nqResult.avg, savedAt: new Date().toISOString() }))
-    console.log(`[labs] avg saved: NQ=${nqResult.avg?.toFixed(1)}`)
+    `).run(JSON.stringify({ avg: s.avg, halfWidth: s.halfWidth, atrState: s.atrState, lastBarTs: s.lastBarTs, savedAt: new Date().toISOString() }))
 
-    return saveNQLevels({ ...nqResult, source: nqData.source, interval }, interval)
+    const coldStart = async () => {
+      console.log(`[labs] cold-start init from ${INIT_BARS} bars (closed bars only, RMA warmup)...`)
+      const init = await fetchOHLC('NQ=F', INIT_BARS, interval)
+      if (!init?.times) { console.warn('[labs] init fetch missing timestamps — cannot run recurrence'); return null }
+      const s = initRecurrence(dropForming(init.closes), dropForming(init.highs), dropForming(init.lows), dropForming(init.times), length, mult)
+      if (!s) { console.warn('[labs] initRecurrence returned null'); return null }
+      console.log(`[labs] init complete: avg=${s.avg.toFixed(1)} halfWidth=${s.halfWidth.toFixed(1)} rawATR=${s.atrState.toFixed(1)} ratchets=${s.ratchets} bars=${s.barsProcessed}`)
+      return { state: s, source: init.source }
+    }
+
+    // 1) Load persisted full state (must be new-format with atrState + lastBarTs)
+    let state = null
+    try {
+      const saved = db.prepare(`SELECT value FROM settings WHERE key = 'labs_pr_avg'`).get()
+      if (saved?.value) {
+        const d = JSON.parse(saved.value)
+        if (d.atrState != null && d.lastBarTs != null && d.halfWidth != null && d.avg != null) {
+          state = { avg: d.avg, halfWidth: d.halfWidth, atrState: d.atrState, lastBarTs: d.lastBarTs }
+          console.log(`[labs] loaded PR state: avg=${state.avg.toFixed(1)} halfWidth=${state.halfWidth.toFixed(1)} rawATR=${state.atrState.toFixed(1)} lastBar=${new Date(state.lastBarTs).toISOString()}`)
+        } else {
+          console.log('[labs] old-format/partial PR state — cold-start required')
+        }
+      }
+    } catch (e) {}
+
+    let source
+    if (!state) {
+      const cs = await coldStart()
+      if (!cs) return null
+      state = cs.state; source = cs.source
+      persistState(state)
+    } else {
+      // 2) Advance saved state over ONLY newly-closed bars since lastBarTs
+      const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval)
+      if (!nqData?.times) { console.warn('[labs] recent fetch missing timestamps — skipping advance'); return null }
+      source = nqData.source
+      const prevAvg = state.avg
+      const adv = advanceRecurrence(state, dropForming(nqData.closes), dropForming(nqData.highs), dropForming(nqData.lows), dropForming(nqData.times), length, mult)
+      if (adv.needsReinit) {
+        console.warn('[labs] saved bar predates window (gap too large) — re-initializing from long window')
+        const cs = await coldStart()
+        if (!cs) return null
+        state = cs.state; source = cs.source
+      } else {
+        state = { avg: adv.avg, halfWidth: adv.halfWidth, atrState: adv.atrState, lastBarTs: adv.lastBarTs }
+        console.log(`[labs] avg ${prevAvg.toFixed(1)} → ${state.avg.toFixed(1)}, ratcheted=${adv.ratchets > 0}, halfWidth=${state.halfWidth.toFixed(1)}, barsAdvanced=${adv.barsAdvanced}`)
+        if (adv.ratchetBars?.length) {
+          console.log('[labs] ratchet bars: ' + adv.ratchetBars.map(ts => new Date(ts).toISOString()).join(', '))
+        }
+      }
+      persistState(state)
+    }
+
+    const nqResult = levelsFromState(state, mult)
+    console.log('[labs] NQ:', `MID=${nqResult.MID.toFixed(1)}`, `R1=${nqResult.R1.toFixed(1)}`, `S1=${nqResult.S1.toFixed(1)}`, `rawATR=${nqResult.rawAtr.toFixed(1)}`, `halfWidth=${nqResult.halfWidth.toFixed(1)}`)
+    return saveNQLevels({ ...nqResult, source, interval }, interval)
   } catch (err) {
     console.error('[labs] calculation failed:', err.message)
     return null
@@ -2726,11 +2805,17 @@ app.post('/labs/active-interval', async (req, res) => {
   res.json({ success: true, activeInterval: interval })
 })
 
-app.post('/labs/reset-avg', (req, res) => {
+app.post('/labs/reset-avg', async (req, res) => {
   db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
-  console.log('[labs] avg reset — will re-initialize on next calculation')
-  // No calculateLabsLevels() call here — frontend triggers /labs/recalculate separately
+  console.log('[labs] PR state reset — running fresh cold-start init')
   res.json({ success: true })
+  // Trigger fresh cold-start init now (full recurrence state rebuilt from long window)
+  try {
+    const result = await calculateLabsLevels(labsSettings.activeInterval)
+    handleLabsUpdate(result)
+  } catch (err) {
+    console.warn('[labs] reset re-init failed:', err.message)
+  }
 })
 
 app.post('/labs/apply-to-main', async (req, res) => {
