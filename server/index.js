@@ -2005,6 +2005,7 @@ async function fetchFromPolygonFutures(bars, interval) {
       // Request exactly bars+50 so we have headroom after filtering nulls; sort desc (newest first)
       const fetchLimit = bars + 50
       const url   = `https://api.polygon.io/futures/v1/aggs/${fticker}?resolution=${resolution}&limit=${fetchLimit}&sort=desc&apiKey=${POLYGON_KEY}`
+      console.log(`[labs] Polygon URL: ${url.replace(POLYGON_KEY, 'REDACTED')}`)
       const res   = await fetch(url)
       const data  = await res.json()
       const total = data.results?.length ?? 0
@@ -2013,6 +2014,7 @@ async function fetchFromPolygonFutures(bars, interval) {
       const all     = data.results.slice().reverse()
       const results = all.slice(-bars)
       console.log(`[labs] Polygon futures ${fticker}: requested=${fetchLimit} total=${total} used=${results.length}`)
+      console.log(`[labs] Polygon NQM6 sample: first bar: ${JSON.stringify(results[0])} last bar: ${JSON.stringify(results[results.length - 1])}`)
       if (results.length >= Math.min(bars, 10)) {
         return { closes: results.map(r => r.close), highs: results.map(r => r.high), lows: results.map(r => r.low), source: `polygon-futures (${fticker})` }
       }
