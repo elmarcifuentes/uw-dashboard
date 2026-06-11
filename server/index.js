@@ -1221,6 +1221,9 @@ app.get('/status', (req, res) => {
     ratioIsFromToday: sessionRatioDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
     nqContract: activeNQContract,
     nqContractExpiry: activeNQContractExpiry,
+    contractRecalibrating,
+    contractRolledFrom,
+    daysToExpiry: nqContractDaysToExpiry,
   })
 })
 
@@ -1948,6 +1951,9 @@ const POLYGON_FUTURES_RESOLUTION = {
 
 let activeNQContract        = 'NQM6' // overwritten by detectActiveNQContract()
 let activeNQContractExpiry  = null
+let contractRecalibrating   = false
+let contractRolledFrom      = null
+let nqContractDaysToExpiry  = null
 
 async function detectActiveNQContract() {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
@@ -1968,15 +1974,37 @@ async function detectActiveNQContract() {
     const newTicker = frontMonth.ticker
     const daysLeft  = frontMonth.days_to_maturity
     const expiry    = frontMonth.last_trade_date
+    nqContractDaysToExpiry = daysLeft
     if (newTicker !== activeNQContract) {
-      console.log(`[contract] ROLLOVER: ${activeNQContract} → ${newTicker} (${daysLeft} days left)`)
+      const prevTicker = activeNQContract
+      console.log(`[contract] ROLLOVER: ${prevTicker} → ${newTicker} (${daysLeft} days left)`)
       activeNQContract       = newTicker
       activeNQContractExpiry = expiry
+      contractRolledFrom     = prevTicker
       db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
         .run(JSON.stringify({ ticker: newTicker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
       // Clear cached avg on rollover — new contract needs fresh convergence
       db.prepare(`DELETE FROM settings WHERE key = 'labs_pr_avg'`).run()
       console.log('[contract] avg cleared for new contract convergence')
+      contractRecalibrating = true
+      sseEmitter.emit('event', {
+        type: 'contract_rollover',
+        from: prevTicker, to: newTicker, expiry,
+        message: `NQ rolled ${prevTicker}→${newTicker} — recalibrating levels`,
+        timestamp: new Date().toISOString(),
+      })
+      calculateLabsLevels(labsSettings.interval).then(() => {
+        contractRecalibrating = false
+        sseEmitter.emit('event', {
+          type: 'contract_ready',
+          contract: newTicker,
+          message: `${newTicker} levels active`,
+          timestamp: new Date().toISOString(),
+        })
+      }).catch(err => {
+        contractRecalibrating = false
+        console.warn('[contract] recalibration failed:', err.message)
+      })
     } else {
       console.log(`[contract] active: ${activeNQContract} (${daysLeft} days to expiry)`)
     }

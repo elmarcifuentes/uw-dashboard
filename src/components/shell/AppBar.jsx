@@ -23,7 +23,7 @@ function formatPausedTime(isoString) {
   } catch { return '' }
 }
 
-export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive, systemPaused, pausedAt, activeSymbol = 'NQ', onSymbolChange }) {
+export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive, systemPaused, pausedAt, activeSymbol = 'NQ', onSymbolChange, contractRollover }) {
   const [showInfo, setShowInfo] = useState(false)
 
   return (
@@ -124,6 +124,16 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
           <span className="text-state-paused/60">— data frozen</span>
           {pausedAt && <span className="text-text-muted">since {formatPausedTime(pausedAt)} ET</span>}
           <span className="text-text-muted hidden sm:block">· Resume in Controls tab</span>
+        </div>
+      )}
+      {contractRollover?.recalibrating && (
+        <div className="bg-bg-elevated border-t border-state-cascadeWatch/30 px-4 py-1 flex items-center gap-2 text-micro">
+          <span className="text-state-cascadeWatch animate-pulse font-bold">⚡ {contractRollover.message}</span>
+        </div>
+      )}
+      {contractRollover && !contractRollover.recalibrating && (
+        <div className="bg-bg-elevated border-t border-state-hold/30 px-4 py-1 flex items-center gap-2 text-micro">
+          <span className="text-state-hold">✓ {contractRollover.to} active</span>
         </div>
       )}
     </header>

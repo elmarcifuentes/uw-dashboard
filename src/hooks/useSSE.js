@@ -30,6 +30,7 @@ export function useSSE(url) {
   const [sessionRatioLockedAt, setSessionRatioLockedAt] = useState(null)
   const [ratioIsLocked, setRatioIsLocked]     = useState(false)
   const [ratioIsFromToday, setRatioIsFromToday] = useState(false)
+  const [contractRollover, setContractRollover] = useState(null)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
   const priceHistoryRef = useRef([])
@@ -97,7 +98,7 @@ export function useSSE(url) {
           .then(r => r.json())
           .then(data => { if (data?.touches) setLevelTouches(data.touches) })
           .catch(() => {})
-        // Restore ratio lock state
+        // Restore ratio lock state + contract recalibrating flag
         fetch(`${apiBase}/status`)
           .then(r => r.json())
           .then(data => {
@@ -106,6 +107,14 @@ export function useSSE(url) {
               setSessionRatio(data.sessionRatio)
               setSessionRatioLockedAt(data.sessionRatioLockedAt)
               setRatioIsFromToday(data.ratioIsFromToday ?? false)
+            }
+            if (data?.contractRecalibrating) {
+              setContractRollover({
+                from: data.contractRolledFrom,
+                to: data.nqContract,
+                recalibrating: true,
+                message: `NQ rolled ${data.contractRolledFrom}→${data.nqContract} — recalibrating levels`,
+              })
             }
           })
           .catch(() => {})
@@ -251,6 +260,14 @@ export function useSSE(url) {
           setRatioIsFromToday(true)
           return
         }
+        if (data.type === 'contract_rollover') {
+          setContractRollover({ from: data.from, to: data.to, recalibrating: true, message: data.message })
+          return
+        }
+        if (data.type === 'contract_ready') {
+          setContractRollover(prev => prev ? { ...prev, recalibrating: false } : null)
+          return
+        }
       }
 
       es.onerror = () => {
@@ -298,5 +315,6 @@ export function useSSE(url) {
     sessionRatioLockedAt,
     ratioIsLocked,
     ratioIsFromToday,
+    contractRollover,
   }
 }
