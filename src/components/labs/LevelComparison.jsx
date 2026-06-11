@@ -38,18 +38,19 @@ export default function LevelComparison({
           <span>Level</span>
           <span className="text-right">NQ Native</span>
           <span className="text-right">QQQ Equiv</span>
-          <span className="text-right">Manual</span>
+          <span className="text-right">Active</span>
           <span className="text-right">Δ</span>
         </div>
 
         {levelIds.map(id => {
-          const nqAuto    = autoLevels[id]
-          const qqqEquiv  = nqAuto != null ? parseFloat((nqAuto / ratio).toFixed(2)) : null
-          const manualEntry = currentLevels?.find(l => l.id === id)
-          const manualNq  = manualEntry?.nq_price
-          const delta     = manualNq != null && nqAuto != null ? Math.abs(nqAuto - manualNq) : null
-          const matchColor = delta === null ? 'text-text-muted' : delta < 20 ? 'text-green-500' : delta < 60 ? 'text-amber-500' : 'text-red-500'
+          const nqAuto     = autoLevels?.[id]
+          const qqqEquiv   = nqAuto != null ? parseFloat((nqAuto / ratio).toFixed(2)) : null
+          const activeEntry = currentLevels?.find(l => l.id === id)
+          const activeNq   = activeEntry?.nq_price
+          const rawDelta   = nqAuto != null && activeNq != null ? nqAuto - activeNq : null
+          const moved      = rawDelta !== null && Math.abs(rawDelta) > 0.5
           const levelColor = id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
+          const deltaColor = !moved ? 'text-text-disabled' : rawDelta > 0 ? 'text-green-400' : 'text-red-400'
 
           return (
             <div key={id} className="grid grid-cols-5 gap-2 text-xs py-1.5 border-b border-border-subtle/50">
@@ -60,21 +61,24 @@ export default function LevelComparison({
               <span className="text-right text-text-tertiary font-mono">
                 {qqqEquiv != null ? `$${qqqEquiv.toFixed(2)}` : '—'}
               </span>
-              <span className="text-right text-text-tertiary font-mono">
-                {manualNq != null ? manualNq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+              <span className="text-right text-text-secondary font-mono">
+                {activeNq != null ? activeNq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
               </span>
-              <span className={`text-right font-mono ${matchColor}`}>
-                {delta != null ? delta.toFixed(0) : '—'}
+              <span className={`text-right font-mono ${deltaColor}`}>
+                {moved ? `${rawDelta > 0 ? '+' : ''}${rawDelta.toFixed(0)}` : '—'}
               </span>
             </div>
           )
         })}
       </div>
 
-      <div className="mt-3 pt-3 border-t border-border-subtle space-y-1.5">
+      <div className="mt-3 pt-3 border-t border-border-subtle">
         <div className="text-xs text-text-muted">
-          Predictive Ranges · {interval || autoLevels.interval || '5m'} bars · length=200 factor=6.0
-          · NQ · ATR {autoLevels.atr != null ? autoLevels.atr.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}
+          Predictive Ranges · {interval || '5m'} bars · length=200 factor=6.0
+          · NQ · ATR {autoLevels?.atr != null ? autoLevels.atr.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}
+        </div>
+        <div className="text-xs text-text-disabled mt-1">
+          Active = levels currently in scoring · Δ = NQ Native vs Active · green = Labs higher
         </div>
       </div>
     </div>

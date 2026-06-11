@@ -2488,6 +2488,16 @@ async function applyAutoLevelsIfEnabled() {
   )
   console.log(`[levels] auto-applied: mode=${levelSourceMode} R1=${levelData.r1_qqq} MID=${levelData.mid_qqq}`)
 
+  // Sync labsAutoLevels to exactly what was applied so Labs panel shows identical values
+  labsAutoLevels = {
+    ...labsAutoLevels,
+    nq:  { R2: levelData.r2_nq,  R1: levelData.r1_nq,  MID: levelData.mid_nq,  S1: levelData.s1_nq,  S2: levelData.s2_nq  },
+    qqq: { R2: levelData.r2_qqq, R1: levelData.r1_qqq, MID: levelData.mid_qqq, S1: levelData.s1_qqq, S2: levelData.s2_qqq },
+    appliedAt: new Date().toISOString(),
+  }
+  sseEmitter.emit('event', { type: 'labs_levels_update', levels: labsAutoLevels, timestamp: new Date().toISOString() })
+  console.log('[levels] labs display synced to applied levels')
+
   sseEmitter.emit('event', {
     type: 'levels_auto_updated', mode: levelSourceMode,
     levelData, timestamp: new Date().toISOString(),
