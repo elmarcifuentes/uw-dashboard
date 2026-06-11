@@ -2478,10 +2478,7 @@ async function applyAutoLevelsIfEnabled() {
 // Calculate fresh on startup (async, non-blocking)
 calculateLabsLevels(labsSettings.activeInterval).then(() => applyAutoLevelsIfEnabled())
 
-// ─── LABS CRON HELPERS ───────────────────────────────────────────────────────
-
-let labsCron      = null  // cron module instance, set once import resolves
-let labsCronTasks = []    // cancelable task handles
+// ─── SCHEDULER HELPERS ───────────────────────────────────────────────────────
 
 function levelsChanged(oldLevels, newLevels) {
   if (!oldLevels || !newLevels) return false
@@ -2492,77 +2489,96 @@ function levelsChanged(oldLevels, newLevels) {
 
 function handleLabsUpdate(result) {
   if (!result) return
-  const old = labsAutoLevels?.qqq
-  if (levelsChanged(old, result?.qqq)) {
+  const old = labsAutoLevels?.nq
+  if (levelsChanged(old, result?.nq)) {
     console.log('[labs] ⚡ levels shifted')
     sseEmitter.emit('event', { type: 'labs_levels_changed', levels: result, changedAt: new Date().toISOString() })
   } else {
     sseEmitter.emit('event', { type: 'labs_levels_update', levels: result, timestamp: new Date().toISOString() })
   }
-  // Cron-driven updates auto-apply to main levels
   applyAutoLevelsIfEnabled()
 }
 
-function setupLabsCron(cron, interval) {
-  labsCronTasks.forEach(t => { try { t.stop() } catch (e) {} })
-  labsCronTasks = []
-
-  const intraSchedule = interval === '1m'
-    ? '* 9-16 * * 1-5'
-    : interval === '5m'
-    ? '*/5 9-16 * * 1-5'
-    : '*/15 9-16 * * 1-5'
-
-  labsCronTasks.push(cron.schedule(intraSchedule, () => {
-    if (!systemPaused) calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
-  }, { timezone: 'America/New_York' }))
-
-  labsCronTasks.push(cron.schedule('35 16 * * 1-5', () => {
-    console.log('[labs] end of day recalc')
-    calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
-  }, { timezone: 'America/New_York' }))
-
-  console.log(`[labs] crons set: intra=${intraSchedule} + 4:35pm ET`)
+function getETNow() {
+  const d = new Date()
+  const e = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  return {
+    hour: e.getHours(),
+    min:  e.getMinutes(),
+    day:  e.getDay(),
+    date: d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  }
 }
 
-// Schedule via dynamic import (ESM-compatible, graceful if node-cron not installed)
-import('node-cron').then(({ default: cron }) => {
-  labsCron = cron
-  setupLabsCron(cron, labsSettings.activeInterval)
+// Minute-tick scheduler — replaces node-cron, no external package required
+let _ratioLockedToday    = false
+let _contractCheckedToday = false
+let _lastScheduledMinute  = -1
 
-  // Daily NQ contract check at 6am ET — catches rollover before market open
-  cron.schedule('0 6 * * 1-5', () => {
+setInterval(() => {
+  const { hour, min, day, date } = getETNow()
+  if (day < 1 || day > 5) return  // skip weekends
+
+  const currentMinute = hour * 60 + min
+
+  // Reset daily flags at midnight ET
+  if (hour === 0 && min === 0 && _lastScheduledMinute !== 0) {
+    _lastScheduledMinute  = 0
+    _ratioLockedToday     = false
+    _contractCheckedToday = false
+    console.log('[cron] midnight — daily flags reset')
+  }
+
+  // 6:00 AM: NQ contract detection
+  if (hour === 6 && min === 0 && !_contractCheckedToday) {
+    _contractCheckedToday = true
     console.log('[contract] daily check...')
     detectActiveNQContract()
-  }, { timezone: 'America/New_York' })
+  }
 
-  // Lock NQ/QQQ ratio at 9:30 AM ET for consistent session level conversion
-  cron.schedule('30 9 * * 1-5', () => {
+  // 9:30 AM: ratio lock
+  if (hour === 9 && min === 30 && !_ratioLockedToday) {
+    _ratioLockedToday = true
     const liveRatio = latest?.nq_ratio
     if (!liveRatio) { console.warn('[ratio] no live ratio at 9:30 — skipping lock'); return }
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
-    const now   = new Date().toLocaleTimeString('en-US', {
+    sessionRatio         = parseFloat(liveRatio.toFixed(4))
+    sessionRatioLockedAt = new Date().toLocaleTimeString('en-US', {
       timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit'
     })
-    sessionRatio         = parseFloat(liveRatio.toFixed(4))
-    sessionRatioLockedAt = now
-    sessionRatioDate     = today
+    sessionRatioDate = date
     db.prepare(`
       INSERT INTO settings (key, value, updated_at)
       VALUES ('session_ratio', ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-    `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date: today }))
+    `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date }))
     console.log('[ratio] LOCKED at 9:30 AM:', sessionRatio)
     sseEmitter.emit('event', {
       type: 'ratio_locked', ratio: sessionRatio, lockedAt: sessionRatioLockedAt,
       timestamp: new Date().toISOString()
     })
     if (levelSourceMode !== 'manual') applyAutoLevelsIfEnabled()
-  }, { timezone: 'America/New_York' })
+  }
 
-}).catch(e => {
-  console.log('[labs] node-cron not available:', e.message)
-})
+  // Intraday labs recalc: 9:00–16:00 ET
+  if (hour >= 9 && hour < 16) {
+    const intervalMin = labsSettings.activeInterval === '1m' ? 1
+                      : labsSettings.activeInterval === '15m' ? 15 : 5
+    if (currentMinute % intervalMin === 0 && currentMinute !== _lastScheduledMinute) {
+      _lastScheduledMinute = currentMinute
+      if (!systemPaused) calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
+    }
+  }
+
+  // 4:35 PM: end-of-day recalc
+  if (hour === 16 && min === 35 && _lastScheduledMinute !== 16 * 60 + 35) {
+    _lastScheduledMinute = 16 * 60 + 35
+    console.log('[labs] end of day recalc')
+    calculateLabsLevels(labsSettings.activeInterval).then(handleLabsUpdate)
+  }
+
+}, 60 * 1000)
+
+console.log('[cron] minute-tick scheduler started')
 
 // ─── LABS ENDPOINTS ──────────────────────────────────────────────────────────
 
@@ -2611,7 +2627,6 @@ app.post('/labs/active-interval', async (req, res) => {
     VALUES ('labs_settings', ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(JSON.stringify(labsSettings))
-  if (labsCron) setupLabsCron(labsCron, interval)
   console.log('[labs] active interval set:', interval)
   res.json({ success: true, activeInterval: interval })
 })
