@@ -2154,13 +2154,18 @@ function filterOutlierBars(bars) {
   return result
 }
 
-async function fetchFromPolygonFutures(bars, interval) {
+async function fetchFromPolygonFutures(bars, interval, opts = {}) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) throw new Error('no POLYGON_API_KEY')
   const resolution = POLYGON_FUTURES_RESOLUTION[interval] || '1session'
-  // Use explicit date range to guarantee recent bars — sort+limit returns stale historical data
+  // Advance fetches (persisted state present) only need bars newer than lastBarTs —
+  // shrink `from` to lastBarTs minus a 1h buffer. Cold-start keeps the 10-day window.
+  // (Polygon ignores `from` today; this caps transfer if they ever start honoring it.)
+  const fetchMode = opts.sinceTs ? 'advance' : 'cold-start'
   const now  = new Date()
-  const from = new Date(now); from.setDate(from.getDate() - 10)
+  const from = opts.sinceTs
+    ? new Date(opts.sinceTs - 60 * 60 * 1000)           // lastBarTs − 1h
+    : (() => { const d = new Date(now); d.setDate(d.getDate() - 10); return d })()
   const fromStr = from.toISOString().split('T')[0]
   const toStr   = now.toISOString().split('T')[0]
   // Nanosecond timestamps from Polygon futures API → ms
@@ -2178,7 +2183,7 @@ async function fetchFromPolygonFutures(bars, interval) {
       // Sort already asc; take last `bars`. Keep ALL bars including overnight gaps —
       // TradingView's PR ratchets on gap bars, so flattening them desyncs the recurrence.
       const usedBars    = data.results.slice(-bars)
-      console.log(`[labs] Polygon futures ${fticker}: total=${total} used=${usedBars.length} (gap bars kept for PR recurrence)`)
+      console.log(`[labs] fetch mode=${fetchMode} bars=${usedBars.length} (total=${total}, ${fticker})`)
       if (total > bars * 3) console.log(`[labs] Polygon returned ${total} bars — using last ${bars} (date range param ignored by Polygon futures API)`)
       const firstBar = usedBars[0]
       const lastBar  = usedBars[usedBars.length - 1]
@@ -2204,12 +2209,12 @@ async function fetchFromPolygonFutures(bars, interval) {
   throw new Error('all NQ futures candidates returned insufficient bars')
 }
 
-async function fetchOHLC(ticker, bars = 250, interval = '1d') {
+async function fetchOHLC(ticker, bars = 250, interval = '1d', opts = {}) {
   const isNQ = ticker === 'NQ=F' || ticker === '/NQ' || ticker === 'NQ'
 
   let result
   if (isNQ) {
-    try { result = await fetchFromPolygonFutures(bars, interval) }
+    try { result = await fetchFromPolygonFutures(bars, interval, opts) }
     catch (err) { console.warn('[labs] Polygon NQ failed:', err.message, '— falling back to Yahoo') }
     if (!result) result = await fetchFromYahoo('NQ=F', bars, interval)
   } else {
@@ -2468,7 +2473,8 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
     } else {
       // Advance saved state over ONLY newly-closed bars since lastBarTs — identical
       // to the scheduled cycle. No new closed bar → barsAdvanced=0 → no-op.
-      const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval)
+      // sinceTs shrinks the Polygon `from` window to just past lastBarTs.
+      const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval, { sinceTs: state.lastBarTs })
       if (!nqData?.times) { console.warn('[labs] recent fetch missing timestamps — skipping advance'); return null }
       source = nqData.source
       const prevAvg = state.avg
