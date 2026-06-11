@@ -205,7 +205,8 @@ potential non-PR use only.
 ```
 Every 60s, checks ET time:
   6:00 AM  weekdays → detectActiveNQContract()
-  9:30 AM  weekdays → lock sessionRatio from live nq_ratio
+  ≥9:30 ET weekdays → lock sessionRatio from fresh live nq_ratio, once per ET day
+                      (date-aware + catch-up; self-heals after a missed tick / restart)
   9:00–16:00        → calculateLabsLevels() at 1m/5m/15m per activeInterval
   4:35 PM  weekdays → EOD recalculate
 ```
@@ -262,7 +263,7 @@ Every 60s, checks ET time:
 - `server/scorer/scoreLevel.js` — scoring logic is frozen, never modify
 - `server/scorer/fetchData.js` — UW data fetching is frozen, never modify
 - `getActiveRatio()` fallback chain — stable, never modify
-- `sessionRatio` 9:30 AM lock flow — stable, never modify
+- `sessionRatio` daily lock: guard is the persisted ET `date` (one lock per ET day, with catch-up) — keep it date-aware; do NOT revert to an in-memory once-at-9:30 flag
 
 ---
 
@@ -270,7 +271,8 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | **Whole-point level rounding at apply time** — single `roundLevel()`/`LEVEL_ROUNDING` policy; recurrence state stays full precision; QQQ derives from rounded NQ. Every tab now displays the stored canonical NQ (`runScoreWithNq` attaches `nq_price`; frontend `levelNq()` helper) instead of `QQQ × ratio`, killing the one-tick discrepancy. Labs Native keeps raw decimals, Active rounded, Δ = raw vs rounded. See **Level Rounding Policy**. |
+| _next_ | **Daily ratio lock made date-aware with catch-up** — was an exact-9:30 in-memory boolean that a restart-after-9:30, missed tick, or price hiccup (flag set before the price check) burned for the day. Now evaluated every tick during the session: locks once per ET day when `session_ratio.date !== today (ET)` and a FRESH (`≤30min`) live ratio exists; defers + retries on stale prices (`[ratio] lock deferred`); logs `LOCKED {ratio} at {time} (scheduled|catch-up)`. Manual `/ratio/lock` counts as today's lock. On lock, forces a re-apply so QQQ equivalents refresh through the change guard. |
+| `3a90632` | **Whole-point level rounding at apply time** — single `roundLevel()`/`LEVEL_ROUNDING` policy; recurrence state stays full precision; QQQ derives from rounded NQ. Every tab now displays the stored canonical NQ (`runScoreWithNq` attaches `nq_price`; frontend `levelNq()` helper) instead of `QQQ × ratio`, killing the one-tick discrepancy. Labs Native keeps raw decimals, Active rounded, Δ = raw vs rounded. See **Level Rounding Policy**. |
 | `5111048` | **Atomic Apply NQ** — `/labs/apply-to-main` now writes `daily_levels` → syncs `labsAutoLevels` (+SSE) → runs the **same** full rescore as Score Now (via shared `scoreNow()`, incl. narratives) → responds `{appliedAt, scoredAt}`. Button shows "✓ Applied & scored HH:MM:SS"; no separate Score Now needed. `/rescore` refactored onto `scoreNow()`. Labs comparison **Active + Δ restored to live** (reads `/levels` daily_levels, 20s poll) — was reading a nonexistent `/status.levels`. Score Now tooltip documents its standalone-rescore role. |
 | `8883910` | **Deterministic anchored cold-start** — warmup window anchored at a FIXED per-(contract,tf) point (`labs_pr_anchor_{contract}`, persisted, reused on every reset) instead of sliding `now−8d`, which reseeded the path each run. 5m floor 60d, 1m ~10 trading days; spans anchor→now with `next_url` pagination if it exceeds one page. Reset/cold-start reproduce byte-identical levels. Logs `[labs] [tf] cold-start anchor={ts} bars={n} seed={firstClose}`. Rollover clears anchors. |
 | `954ae4e` | **Futures fetch uses correct params** (`window_start.gte/.lte` + `sort=window_start.desc`) — `from`/`to`/`sort` were stocks-v2 params the futures endpoint ignored, returning oldest-from-inception (1m stuck ~25k). **Load-side stale-state discard** (>5d anchor → cold-start, not advance). **Toggle/calc desync fixed** — `activeInterval` is the single source of truth; selection persists before calc and sticks on abort; abort surfaces `no_fresh_data` and the UI shows "No fresh data / Retry" instead of stale levels. |

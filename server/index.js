@@ -2572,6 +2572,15 @@ function getActiveRatio() {
   return sessionRatio || nqOffsets.ratio || latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
 }
 
+// Live NQ/QQQ ratio from the latest score, only if FRESH (≤30 min). null → defer the lock.
+function getFreshLiveRatio() {
+  const r = latest?.nq_ratio
+  if (!r || r <= 0) return null
+  const ts = latest?._received_at ? Date.parse(latest._received_at) : 0
+  if (!ts || (Date.now() - ts) > 30 * 60 * 1000) return null
+  return parseFloat(r.toFixed(4))
+}
+
 // ── Level Rounding Policy ───────────────────────────────────────────────────────
 // Applied/scored NQ levels are rounded to WHOLE points at APPLY TIME ONLY — never the
 // recurrence state. The persisted {avg, halfWidth, atrState} stays full precision;
@@ -2614,7 +2623,7 @@ async function runScoreWithNq(opts) {
 }
 
 // Apply auto levels to daily_levels + trigger rescore when mode is auto_nq
-async function applyAutoLevelsIfEnabled() {
+async function applyAutoLevelsIfEnabled(opts = {}) {
   if (systemPaused) return
   if (levelSourceMode === 'manual') return
   const nq = labsAutoLevels?.nq
@@ -2635,7 +2644,9 @@ async function applyAutoLevelsIfEnabled() {
   const nqChanged  = !existing || Math.abs((existing.mid_nq  || 0) - levelData.mid_nq)  > 20
   const qqqChanged = !existing || Math.abs((existing.mid_qqq || 0) - levelData.mid_qqq) > 0.50
   const changed = nqChanged || qqqChanged
-  if (!changed) return
+  // opts.force bypasses the change guard (e.g. a ratio re-lock changes QQQ via the ratio
+  // even when MID_nq is unchanged) — the guard THRESHOLD itself is untouched.
+  if (!changed && !opts.force) return
 
   db.prepare(`
     INSERT INTO daily_levels
@@ -2816,9 +2827,9 @@ function getETNow() {
 }
 
 // Minute-tick scheduler — replaces node-cron, no external package required
-let _ratioLockedToday    = false
 let _contractCheckedToday = false
 let _lastScheduledMinute  = -1
+let _ratioDeferDate       = null   // ET date we last logged a deferred ratio lock (throttle)
 
 setInterval(() => {
   const { hour, min, day, date } = getETNow()
@@ -2826,10 +2837,9 @@ setInterval(() => {
 
   const currentMinute = hour * 60 + min
 
-  // Reset daily flags at midnight ET
+  // Reset daily flags at midnight ET (ratio lock no longer uses a flag — it is date-aware)
   if (hour === 0 && min === 0 && _lastScheduledMinute !== 0) {
     _lastScheduledMinute  = 0
-    _ratioLockedToday     = false
     _contractCheckedToday = false
     console.log('[cron] midnight — daily flags reset')
   }
@@ -2841,27 +2851,38 @@ setInterval(() => {
     detectActiveNQContract()
   }
 
-  // 9:30 AM: ratio lock
-  if (hour === 9 && min === 30 && !_ratioLockedToday) {
-    _ratioLockedToday = true
-    const liveRatio = latest?.nq_ratio
-    if (!liveRatio) { console.warn('[ratio] no live ratio at 9:30 — skipping lock'); return }
-    sessionRatio         = parseFloat(liveRatio.toFixed(4))
-    sessionRatioLockedAt = new Date().toLocaleTimeString('en-US', {
-      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit'
-    })
-    sessionRatioDate = date
-    db.prepare(`
-      INSERT INTO settings (key, value, updated_at)
-      VALUES ('session_ratio', ?, datetime('now'))
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-    `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date }))
-    console.log('[ratio] LOCKED at 9:30 AM:', sessionRatio)
-    sseEmitter.emit('event', {
-      type: 'ratio_locked', ratio: sessionRatio, lockedAt: sessionRatioLockedAt,
-      timestamp: new Date().toISOString()
-    })
-    if (levelSourceMode !== 'manual') applyAutoLevelsIfEnabled()
+  // Daily ratio lock — DATE-AWARE with CATCH-UP, evaluated every tick during the session.
+  // Locks once per ET day at/after 9:30. A missed 9:30 tick, a restart after 9:30, or a
+  // price hiccup self-heals on a later tick instead of failing for the day. The guard is
+  // the persisted lock's ET date (sessionRatioDate) — never an in-memory "done" flag.
+  if (currentMinute >= 9 * 60 + 30 && currentMinute < 16 * 60) {
+    if (sessionRatioDate !== date) {                      // no lock yet for today (ET)
+      const liveRatio = getFreshLiveRatio()
+      if (liveRatio) {
+        const mode = currentMinute <= 9 * 60 + 35 ? 'scheduled' : 'catch-up'
+        sessionRatio         = liveRatio
+        sessionRatioLockedAt = new Date().toLocaleTimeString('en-US', {
+          timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        })
+        sessionRatioDate = date
+        db.prepare(`
+          INSERT INTO settings (key, value, updated_at)
+          VALUES ('session_ratio', ?, datetime('now'))
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+        `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date }))
+        console.log(`[ratio] LOCKED ${sessionRatio} at ${sessionRatioLockedAt} (${mode})`)
+        sseEmitter.emit('event', {
+          type: 'ratio_locked', ratio: sessionRatio, lockedAt: sessionRatioLockedAt,
+          timestamp: new Date().toISOString()
+        })
+        // Force re-apply so QQQ equivalents (derived via the ratio) refresh even if MID_nq
+        // didn't move enough to trip the >20pt guard.
+        if (levelSourceMode !== 'manual') applyAutoLevelsIfEnabled({ force: true })
+      } else if (_ratioDeferDate !== date) {
+        _ratioDeferDate = date
+        console.warn('[ratio] lock deferred: prices unavailable — will retry on later ticks')
+      }
+    }
   }
 
   // Intraday labs recalc: 9:00–16:00 ET
