@@ -1974,11 +1974,13 @@ async function fetchContractDetails(ticker) {
     // /contracts/:ticker → results is object; /contracts?ticker= → results is array
     const contract = Array.isArray(data?.results) ? data.results[0] : data?.results
     if (contract?.last_trade_date) {
-      activeNQContractExpiry = contract.last_trade_date
-      nqContractDaysToExpiry = contract.days_to_maturity ?? null
-      console.log(`[contract] ${ticker} expires: ${activeNQContractExpiry} days: ${nqContractDaysToExpiry}`)
+      const expiry   = contract.last_trade_date
+      const daysLeft = Math.max(0, Math.ceil((new Date(expiry) - new Date()) / (1000 * 60 * 60 * 24)))
+      activeNQContractExpiry = expiry
+      nqContractDaysToExpiry = daysLeft
+      console.log(`[contract] ${ticker} expires: ${expiry} days: ${daysLeft}`)
       db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
-        .run(JSON.stringify({ ticker, expiry: activeNQContractExpiry, daysLeft: nqContractDaysToExpiry, detectedAt: new Date().toISOString() }))
+        .run(JSON.stringify({ ticker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
     } else {
       console.warn('[contract] direct fetch: no last_trade_date in response')
     }
@@ -1998,26 +2000,28 @@ async function detectActiveNQContract() {
     const text  = await res.text()
     console.log('[contract] response:', text.slice(0, 300))
     const data  = JSON.parse(text)
-    console.log('[contract] response:', JSON.stringify(data).slice(0, 300))
     if (!data.results?.length) {
       console.warn('[contract] no active NQ contracts found — falling back to direct fetch for', activeNQContract)
       await fetchContractDetails(activeNQContract)
       return
     }
-    const frontMonth = data.results
-      .filter(c => (c.days_to_maturity || 0) > 0)
-      .sort((a, b) => (a.days_to_maturity || 999) - (b.days_to_maturity || 999))[0]
+    const now = new Date()
+    const activeContracts = data.results
+      .filter(c => c.last_trade_date && new Date(c.last_trade_date) > now)
+      .sort((a, b) => new Date(a.last_trade_date) - new Date(b.last_trade_date))
+    const frontMonth = activeContracts[0]
     if (!frontMonth) { console.warn('[contract] no valid front month found'); return }
     const newTicker = frontMonth.ticker
-    const daysLeft  = frontMonth.days_to_maturity
     const expiry    = frontMonth.last_trade_date
+    const daysLeft  = Math.max(0, Math.ceil((new Date(expiry) - now) / (1000 * 60 * 60 * 24)))
     nqContractDaysToExpiry = daysLeft
+    activeNQContractExpiry = expiry
+    console.log('[contract] front month:', newTicker, 'expires:', expiry, 'days:', daysLeft)
     if (newTicker !== activeNQContract) {
       const prevTicker = activeNQContract
-      console.log(`[contract] ROLLOVER: ${prevTicker} → ${newTicker} (${daysLeft} days left)`)
-      activeNQContract       = newTicker
-      activeNQContractExpiry = expiry
-      contractRolledFrom     = prevTicker
+      console.log(`[contract] ROLLOVER: ${prevTicker} → ${newTicker}`)
+      activeNQContract   = newTicker
+      contractRolledFrom = prevTicker
       db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
         .run(JSON.stringify({ ticker: newTicker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
       // Clear cached avg on rollover — new contract needs fresh convergence
@@ -2042,10 +2046,7 @@ async function detectActiveNQContract() {
         contractRecalibrating = false
         console.warn('[contract] recalibration failed:', err.message)
       })
-    } else {
-      console.log(`[contract] active: ${activeNQContract} (${daysLeft} days to expiry)`)
     }
-    activeNQContractExpiry = expiry
   } catch (err) {
     console.warn('[contract] detection failed:', err.message, '— keeping', activeNQContract)
   }
@@ -2388,9 +2389,9 @@ async function calculateLabsLevels(interval = labsSettings.interval) {
     const nqResult = predictiveRanges(nqData.closes, nqData.highs, nqData.lows, length, mult, savedAvgNQ)
     if (!nqResult) { console.warn('[labs] NQ predictiveRanges returned null'); return null }
 
-    console.log(`[labs] ATR check: NQ=${nqResult.atr?.toFixed(1)}`)
-    if (nqResult.atr > 500) console.warn('[labs] NQ ATR too large:', nqResult.atr.toFixed(1), '— check bar data')
-    console.log(`[labs] NQ: R1=${nqResult.R1} MID=${nqResult.MID} S1=${nqResult.S1}`)
+    const levelSpacing = labsSettings.mult * nqResult.atr
+    console.log('[labs] NQ:', `MID=${nqResult.MID?.toFixed(1)}`, `R1=${nqResult.R1?.toFixed(1)}`, `S1=${nqResult.S1?.toFixed(1)}`, `rawATR=${nqResult.atr?.toFixed(1)}`, `spacing=${levelSpacing?.toFixed(1)}`)
+    if (nqResult.atr > 150) console.warn('[labs] raw ATR too large:', nqResult.atr.toFixed(1), '— check bar data')
 
     // Persist updated avg
     db.prepare(`
