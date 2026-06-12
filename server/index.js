@@ -1217,6 +1217,7 @@ app.get('/status', (req, res) => {
     activeSymbolPref,
     sessionRatio,
     sessionRatioLockedAt,
+    activeRatio: getActiveRatio(),   // the EXACT ratio used for canonical derivation (locked || live)
     ratioIsLocked: !!sessionRatio,
     ratioIsFromToday: sessionRatioDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
     nqContract: activeNQContract,

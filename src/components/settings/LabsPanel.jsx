@@ -11,7 +11,7 @@ const INTERVALS = [
   { value: '1m', label: '1 min' },
 ]
 
-export default function LabsPanel({ activeSymbol = 'QQQ' }) {
+export default function LabsPanel({ activeSymbol = 'QQQ', sessionRatio, sessionRatioLockedAt }) {
   const [autoLevels, setAutoLevels]     = useState(null)
   const [loading, setLoading]           = useState(true)
   const [applying, setApplying]         = useState(null)
@@ -36,7 +36,9 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
     try {
       const status = await fetch(`${API_URL}/status`).then(r => r.json())
       setCurrentPrice(status.lastPrice)
-      if (status.nq_ratio)         setNqRatio(Number(status.nq_ratio))
+      // QQQ Equiv must divide by the SAME ratio the server uses for canonical derivation
+      // (getActiveRatio = locked || live). status.activeRatio is that value.
+      if (status.activeRatio)      setNqRatio(Number(status.activeRatio))
       if (status.nqContract)       setNqContract(status.nqContract)
       if (status.nqContractExpiry) setNqContractExpiry(status.nqContractExpiry)
     } catch {}
@@ -81,6 +83,14 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
     const poll = setInterval(refreshLive, 20000)
     return () => clearInterval(poll)
   }, [])
+
+  // A ratio lock (manual or scheduled) updates sessionRatio via the app-level SSE. Reflect
+  // it in the QQQ Equiv column IMMEDIATELY (don't wait for the 20s poll): set the locked
+  // ratio now, then refresh so the QQQ levels recompute too.
+  useEffect(() => {
+    if (sessionRatio) setNqRatio(Number(sessionRatio))
+    refreshLive()
+  }, [sessionRatio])
 
   const handleApply = async (source) => {
     setApplying(source)
@@ -188,6 +198,11 @@ export default function LabsPanel({ activeSymbol = 'QQQ' }) {
           <h1 className="text-sm font-bold text-text-primary uppercase tracking-wide">TradesAlgo Labs</h1>
           <p className="text-xs text-text-muted mt-0.5">
             Predictive Ranges · NQ native · length={settings.length} · factor={settings.mult}
+            {' · '}
+            <span className="text-text-tertiary">
+              ratio {Number(nqRatio).toFixed(3)}{' '}
+              {sessionRatioLockedAt ? `🔒 ${sessionRatioLockedAt}` : '· live'}
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-2">

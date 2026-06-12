@@ -62,7 +62,7 @@ export default function SettingsTab({ systemPaused, pausedAt, activeSymbol, sess
       </div>
 
       {activePanel === 'system' && <SystemPanel systemPaused={systemPaused} pausedAt={pausedAt} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} ratioIsLocked={ratioIsLocked} ratioIsFromToday={ratioIsFromToday} nqContract={nqContract} nqContractExpiry={nqContractExpiry} daysToExpiry={daysToExpiry} />}
-      {activePanel === 'labs'   && <LabsPanel activeSymbol={activeSymbol} />}
+      {activePanel === 'labs'   && <LabsPanel activeSymbol={activeSymbol} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} />}
     </div>
   )
 }
