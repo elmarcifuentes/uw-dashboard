@@ -43,15 +43,16 @@ export default function LabsPanel({ activeSymbol = 'QQQ', sessionRatio, sessionR
       if (status.nqContractExpiry) setNqContractExpiry(status.nqContractExpiry)
     } catch {}
     try {
-      // Active = the NQ levels currently in scoring (daily_levels). Δ vs Labs NQ shows the
-      // ≤20pt change-guard drift between auto-applies. Shaped as [{id, nq_price}].
+      // Active = the canonical levels currently in scoring (daily_levels). nq_price drives
+      // Active NQ + Δ; qqq_price is the STORED canonical QQQ every other tab shows (read it,
+      // don't recompute — doubles as a cross-tab consistency check). [{id, nq_price, qqq_price}].
       const row = (await fetch(`${API_URL}/levels`).then(r => r.json()))?.levels
       if (row) setCurrentLevels([
-        { id: 'R2',  nq_price: row.r2_nq },
-        { id: 'R1',  nq_price: row.r1_nq },
-        { id: 'MID', nq_price: row.mid_nq },
-        { id: 'S1',  nq_price: row.s1_nq },
-        { id: 'S2',  nq_price: row.s2_nq },
+        { id: 'R2',  nq_price: row.r2_nq,  qqq_price: row.r2_qqq },
+        { id: 'R1',  nq_price: row.r1_nq,  qqq_price: row.r1_qqq },
+        { id: 'MID', nq_price: row.mid_nq, qqq_price: row.mid_qqq },
+        { id: 'S1',  nq_price: row.s1_nq,  qqq_price: row.s1_qqq },
+        { id: 'S2',  nq_price: row.s2_nq,  qqq_price: row.s2_qqq },
       ])
     } catch {}
     try {

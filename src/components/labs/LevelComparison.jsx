@@ -37,11 +37,12 @@ export default function LevelComparison({
       </div>
 
       <div className="space-y-0">
-        <div className="grid grid-cols-5 gap-2 text-xs text-text-muted pb-2 border-b border-border-subtle">
+        <div className="grid grid-cols-6 gap-1.5 text-xs text-text-muted pb-2 border-b border-border-subtle">
           <span>Level</span>
           <span className="text-right">NQ Native</span>
           <span className="text-right">QQQ Equiv</span>
-          <span className="text-right">Active</span>
+          <span className="text-right">Active NQ</span>
+          <span className="text-right">Active QQQ</span>
           <span className="text-right">Δ</span>
         </div>
 
@@ -50,13 +51,14 @@ export default function LevelComparison({
           const qqqEquiv   = nqAuto != null ? parseFloat((nqAuto / ratio).toFixed(2)) : null
           const activeEntry = currentLevels?.find(l => l.id === id)
           const activeNq   = activeEntry?.nq_price
+          const activeQqq  = activeEntry?.qqq_price   // stored canonical QQQ (same value other tabs show)
           const rawDelta   = nqAuto != null && activeNq != null ? nqAuto - activeNq : null
           const moved      = rawDelta !== null && Math.abs(rawDelta) > 0.5
           const levelColor = id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
           const deltaColor = !moved ? 'text-text-disabled' : rawDelta > 0 ? 'text-green-400' : 'text-red-400'
 
           return (
-            <div key={id} className="grid grid-cols-5 gap-2 text-xs py-1.5 border-b border-border-subtle/50">
+            <div key={id} className="grid grid-cols-6 gap-1.5 text-xs py-1.5 border-b border-border-subtle/50">
               <span className={`font-bold ${levelColor}`}>{id}</span>
               <span className="text-right text-text-primary font-mono">
                 {nqAuto != null ? nqAuto.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
@@ -66,6 +68,9 @@ export default function LevelComparison({
               </span>
               <span className="text-right text-text-secondary font-mono">
                 {activeNq != null ? activeNq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+              </span>
+              <span className="text-right text-text-secondary font-mono">
+                {activeQqq != null ? `$${Number(activeQqq).toFixed(2)}` : '—'}
               </span>
               <span className={`text-right font-mono ${deltaColor}`}>
                 {moved ? `${rawDelta > 0 ? '+' : ''}${rawDelta.toFixed(0)}` : '—'}
@@ -81,7 +86,7 @@ export default function LevelComparison({
           · NQ · ATR {autoLevels?.atr != null ? autoLevels.atr.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}
         </div>
         <div className="text-xs text-text-disabled mt-1">
-          Active = levels currently in scoring · Δ = NQ Native vs Active · green = Labs higher
+          Active = levels currently in scoring (NQ canonical, QQQ derived at lock) · Δ = NQ Native vs Active NQ · green = Labs higher
         </div>
       </div>
     </div>
