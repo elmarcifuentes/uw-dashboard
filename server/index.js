@@ -2639,6 +2639,11 @@ async function applyAutoLevelsIfEnabled() {
         history.unshift(result)
         if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
         provider.setLevels(result.levels)
+        // Raise the LEVELS CHANGED badge atomically with the auto-apply, same as the manual
+        // (scoreNow), ratio-lock, and polling (onRescore / runAutoRescore) paths. Change-gated
+        // via the shared previousResult, which this advances — so a polling rescore arriving
+        // shortly after won't re-badge the same classification change (no duplicate).
+        emitStaleIfChanged(result)
         checkExpansionGex(result)
         updateDpHistory(result)
         const sentiment = computeSentiment(result)
