@@ -65,8 +65,8 @@ function SystemStatus({ systemPaused, pausedAt }) {
   ]
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-6">
+      <div className="flex items-center justify-between lg:shrink-0">
         <div>
           {systemPaused && pausedAt && (
             <div className="text-xs text-amber-400/70">Paused since {formatTime(pausedAt)} ET</div>
@@ -78,7 +78,7 @@ function SystemStatus({ systemPaused, pausedAt }) {
           {systemPaused ? '⏸ PAUSED' : '● RUNNING'}
         </div>
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 lg:space-y-0 lg:flex lg:flex-wrap lg:items-center lg:gap-x-5 lg:gap-y-1 lg:flex-1">
         {services.map(svc => (
           <div key={svc.label} className="flex items-center gap-2.5 text-xs">
             <span className={`w-2 h-2 rounded-full shrink-0 ${svc.ok ? 'bg-green-500' : 'bg-bg-card2'}`} />
@@ -89,7 +89,7 @@ function SystemStatus({ systemPaused, pausedAt }) {
           </div>
         ))}
       </div>
-      <div className="border-t border-border-subtle pt-3">
+      <div className="border-t border-border-subtle pt-3 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-5 lg:shrink-0 lg:w-64">
         {error && <div className="text-xs text-red-400 mb-2">{error}</div>}
         <button
           onClick={handleToggle}
@@ -412,9 +412,9 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
   const allValid = LEVEL_IDS.every(id => levels[id].nq && levels[id].qqq)
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
+    <div className="space-y-4 max-w-2xl lg:max-w-none mx-auto">
 
-      {/* ── SYSTEM STATUS ── */}
+      {/* ── ROW 1: SYSTEM STATUS (full-width status strip) ── */}
       <Section title="System Status">
         <SystemStatus systemPaused={systemPaused} pausedAt={pausedAt} />
       </Section>
@@ -492,6 +492,9 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
           </div>
         </div>
       )}
+
+      {/* ── ROW 2: action cards — three across on desktop (lg), stacked on mobile/medium ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
 
       {/* ── LEVEL SOURCE ── */}
       <Section title="Level Source">
@@ -864,6 +867,7 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
         <Controls compact={false} />
       </Section>
 
+      </div>
     </div>
   )
 }
