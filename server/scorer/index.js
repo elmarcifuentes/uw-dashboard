@@ -70,12 +70,31 @@ export async function runFullScore({ trigger = 'auto', session = null, levelsOve
   const delay = ms => new Promise(r => setTimeout(r, ms))
 
   console.log(`[scorer] Fetching data for ${symbol}…`)
-  const darkPoolData  = await getDarkPool(symbol);     await delay(400)
-  const flowData      = await getOptionsFlow(symbol);  await delay(400)
-  const optionsVolume = await getOptionsVolume(symbol); await delay(400)
-  const gexData       = await getGEXStrikes(symbol);   await delay(400)
-  const etfTideData   = await getEtfTide(symbol)
-  console.log('[scorer] Fetch complete')
+  // Per-source error capture: a peripheral source that throws degrades to null instead of
+  // aborting the whole score. Each null collapses into the SAME neutral path the consumer
+  // already takes for an empty 200 response (flow_zeroed / options→0 / GEX no-context /
+  // tide no-data), so the scoring MATH for available sources is byte-identical. Episode-level
+  // logging is done by the caller (server) from `sources_missing`; safeSource stays quiet.
+  const sourcesMissing = []
+  const safeSource = async (fn, name) => {
+    try { return await fn() }
+    catch (e) { sourcesMissing.push(name); return null }
+  }
+  const darkPoolData  = await safeSource(() => getDarkPool(symbol),     'dark_pool');      await delay(400)
+  const flowData      = await safeSource(() => getOptionsFlow(symbol),  'flow');           await delay(400)
+  const optionsVolume = await safeSource(() => getOptionsVolume(symbol), 'options_volume'); await delay(400)
+  const gexData       = await safeSource(() => getGEXStrikes(symbol),   'gex');            await delay(400)
+  const etfTideData   = await safeSource(() => getEtfTide(symbol),      'etf_tide')
+  console.log(`[scorer] Fetch complete${sourcesMissing.length ? ` (degraded, missing: ${sourcesMissing.join(', ')})` : ''}`)
+
+  // Dark pool is the anchor: it supplies current_price AND the dark-pool axis. Without it a
+  // partial score would be misleading, so this is a HARD ABORT (named so the caller can log
+  // the failing source + mark the tape stale). The other four degrade gracefully above.
+  if (darkPoolData == null) {
+    const e = new Error('dark pool source unavailable — score aborted')
+    e.source = 'dark_pool'
+    throw e
+  }
 
   // ETF tide
   const allTideBars   = etfTideData?.data ?? etfTideData ?? []
@@ -183,5 +202,11 @@ export async function runFullScore({ trigger = 'auto', session = null, levelsOve
     levels: levelPayloads,
     trigger,
     scored_at: new Date().toISOString(),
+    // Degradation metadata (mirrors Catalyst's factorsAvailable/factorsTotal). A score is
+    // `degraded` when ≥1 peripheral source was unavailable; the present sources scored normally.
+    degraded:         sourcesMissing.length > 0,
+    sources_total:    5,
+    sources_available: 5 - sourcesMissing.length,
+    sources_missing:  sourcesMissing,
   }
 }

@@ -4,6 +4,8 @@ export function useSSE(url) {
   const [rescoreData, setRescoreData]         = useState(null)
   const [priceData, setPriceData]             = useState(null)
   const [connected, setConnected]             = useState(false)
+  const [dataStale, setDataStale]             = useState(false)
+  const [dataAgeSec, setDataAgeSec]           = useState(null)
   const [history, setHistory]                 = useState([])
   const [levelAlert, setLevelAlert]           = useState(null)
   const [chartStale, setChartStale]           = useState(false)
@@ -195,6 +197,9 @@ export function useSSE(url) {
         if (data.type === 'price') {
           // Update price only — does NOT trigger rescore re-renders
           setPriceData({ price: data.price, timestamp: data.timestamp, interval: data.interval, isMarketHours: data.isMarketHours })
+          // Evidence freshness rides the price tick (fires every poll, even when scoring is frozen)
+          if (data.dataStale !== undefined) setDataStale(!!data.dataStale)
+          if (data.dataAgeSec !== undefined) setDataAgeSec(data.dataAgeSec)
           // Track velocity
           const ph = priceHistoryRef.current
           ph.push({ price: data.price, ts: Date.now() })
@@ -292,6 +297,8 @@ export function useSSE(url) {
     rescoreData,
     priceData,
     connected,
+    dataStale,
+    dataAgeSec,
     history,
     levelAlert,
     clearLevelAlert: () => setLevelAlert(null),

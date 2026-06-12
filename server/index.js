@@ -119,6 +119,18 @@ let sessionRatio         = null
 let sessionRatioLockedAt = null
 let sessionRatioDate     = null
 
+// Evidence-freshness tracking — turns a silently-frozen tape into a logged, visibly-marked
+// stale state. Two detectors feed the SAME dataStale flag (see getDataFreshness):
+//   • failure counter — N consecutive runFullScore throws (e.g. dark-pool hard abort)
+//   • age threshold   — latest._received_at older than the rescore guarantee (catches stalls
+//                       / gating bugs that don't throw). Market-hours gated (overnight the
+//                       tape legitimately freezes — rescores are off by design).
+const STALE_FAILURE_THRESHOLD = 2   // a lone transient UW blip is single; 2-in-a-row = real outage
+const AGE_STALE_MS = Math.round(1.5 * pollingConfig.triggers.timeBasedInterval)   // ~22.5 min
+let consecutiveScoreFailures = 0
+let dataStaleEpisode         = false   // latched true for the current staleness episode
+let degradedSourcesEpisode   = ''      // serialized sources_missing — log changes once, not per tick
+
 // Auto-score toggle — default ON
 let autoScoreEnabled = true
 try {
@@ -881,6 +893,54 @@ function emitStaleIfChanged(result) {
   previousResult = result
 }
 
+// ── Evidence freshness ────────────────────────────────────────────────────────
+// Pure read — computes age + whether either detector considers the tape stale. Safe to
+// call from /status (no side effects, no logging).
+function getDataFreshness() {
+  const dataAgeSec = latest?._received_at
+    ? Math.round((Date.now() - Date.parse(latest._received_at)) / 1000)
+    : null
+  let isMarketHours = false
+  try { isMarketHours = provider.getStatus().isMarketHours } catch {}
+  const byFailures = consecutiveScoreFailures >= STALE_FAILURE_THRESHOLD
+  const byAge      = isMarketHours && dataAgeSec != null && dataAgeSec * 1000 > AGE_STALE_MS
+  return { dataStale: byFailures || byAge, dataAgeSec, byFailures, byAge }
+}
+
+// Latching evaluator — drives the once-per-episode DATA STALE log on BOTH edges (enter and
+// leave). Called from the price tick (fires every poll, so it catches age-based stalls even
+// while scoring is frozen) and from markScoreFailure.
+function evaluateDataStale() {
+  const f = getDataFreshness()
+  if (f.dataStale && !dataStaleEpisode) {
+    dataStaleEpisode = true
+    const reason = f.byFailures ? `${consecutiveScoreFailures} consecutive failures` : 'age threshold'
+    console.warn(`[scorer] DATA STALE: latest is ${f.dataAgeSec ?? '?'}s old (${reason})`)
+  } else if (!f.dataStale && dataStaleEpisode) {
+    dataStaleEpisode = false
+    console.log(`[scorer] DATA STALE cleared (age=${f.dataAgeSec ?? '?'}s)`)
+  }
+  return f
+}
+
+// A scoring attempt threw (any caller). Bump the counter and re-evaluate staleness.
+function markScoreFailure() {
+  consecutiveScoreFailures++
+  evaluateDataStale()
+}
+
+// A scoring attempt succeeded. Reset the counter (the stale-episode latch is cleared by
+// evaluateDataStale on the next read) and log degraded sources once per change (not per tick).
+function markScoreSuccess(result) {
+  consecutiveScoreFailures = 0
+  const missing = (result?.sources_missing || []).join(',')
+  if (missing !== degradedSourcesEpisode) {
+    degradedSourcesEpisode = missing
+    if (missing) for (const name of result.sources_missing) console.warn(`[scorer] source degraded: ${name}`)
+    else console.log('[scorer] all sources healthy')
+  }
+}
+
 // SSE event bus
 const sseEmitter = new EventEmitter()
 sseEmitter.setMaxListeners(100)
@@ -983,7 +1043,7 @@ provider.onRescore(async ({ price, reason }) => {
       })
       .catch(err => console.warn('[assistant] failed:', err.message))
   } catch (err) {
-    console.error('[server] Auto-rescore failed:', err.message)
+    console.error(`[scorer] rescore failed at source: ${err.source || 'unknown'} (auto-rescore): ${err.message}`)
   }
 })
 
@@ -1034,11 +1094,17 @@ provider.onPriceUpdate((price) => {
   if (priceHistory.length > 50) priceHistory.shift()
   if (latest?.levels) trackLevelTouches(price, latest.levels, db)
 
+  // The price tick is the cheapest live freshness carrier — it keeps flowing every poll even
+  // when scoring is frozen, so the age-based detector latches here.
+  const fresh = evaluateDataStale()
+
   sseEmitter.emit('event', {
     type:         'price',
     price,
     interval:     s.currentInterval,
     isMarketHours: s.isMarketHours,
+    dataStale:    fresh.dataStale,
+    dataAgeSec:   fresh.dataAgeSec,
     cascade: {
       active:         latest?.cascade?.active        || false,
       mid_dp:         latest?.cascade?.mid_dp        ?? null,
@@ -1225,6 +1291,12 @@ app.get('/status', (req, res) => {
     contractRecalibrating,
     contractRolledFrom,
     daysToExpiry: nqContractDaysToExpiry,
+    // Evidence freshness (pull mirror of the price-tick fields; pure read, no logging)
+    ...(() => { const f = getDataFreshness(); return { dataStale: f.dataStale, dataAgeSec: f.dataAgeSec } })(),
+    degraded:          latest?.degraded || false,
+    sourcesAvailable:  latest?.sources_available ?? null,
+    sourcesTotal:      latest?.sources_total ?? null,
+    sourcesMissing:    latest?.sources_missing || [],
   })
 })
 
@@ -1508,7 +1580,7 @@ app.post('/rescore', async (req, res) => {
     const { scoredAt } = await scoreNow('manual — dashboard button')   // same canonical path Apply uses
     res.json({ success: true, scoredAt })
   } catch (err) {
-    console.error('[server] Manual rescore failed:', err.message)
+    console.error(`[scorer] rescore failed at source: ${err.source || 'unknown'} (manual): ${err.message}`)
     res.status(500).json({ error: err.message })
   }
 })
@@ -1744,7 +1816,7 @@ app.post('/webhook/accept', async (req, res) => {
           })
           .catch(err => console.warn('[webhook accept] narrative failed:', err.message))
       } catch (err) {
-        console.error('[webhook accept] rescore failed:', err.message)
+        console.error(`[scorer] rescore failed at source: ${err.source || 'unknown'} (webhook-accept): ${err.message}`)
       }
     }
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -2520,7 +2592,7 @@ async function onRatioLocked(trigger) {
     // 3) Rescore so scored levels + QQQ-denominated narratives reflect the new QQQ columns
     if (runFullScore) {
       try { await scoreNow(`ratio_lock:${trigger}`) }
-      catch (err) { console.error(`[ratio] post-lock rescore failed (${trigger}):`, err.message) }
+      catch (err) { console.error(`[scorer] rescore failed at source: ${err.source || 'unknown'} (ratio-lock:${trigger}): ${err.message}`) }
     }
     console.log(`[ratio] post-lock refresh (${trigger}) — qqq rewritten=${rewrote}`)
   } catch (err) {
@@ -2554,7 +2626,17 @@ function roundAppliedLevels(nqRaw, ratio) {
 // scored level by id, so every tab can show the same whole-point value instead of
 // reconstructing NQ from QQQ × ratio (which drifts by a tick).
 async function runScoreWithNq(opts) {
-  const result = await runFullScore(opts)
+  // All scoring paths funnel through here, so this is the single point to maintain the
+  // freshness counter: every throw bumps it (mark stale within the failure window), every
+  // success resets it + logs degraded sources once per episode.
+  let result
+  try {
+    result = await runFullScore(opts)
+  } catch (err) {
+    markScoreFailure()
+    throw err   // preserve each caller's existing catch behavior (now source-named, see below)
+  }
+  markScoreSuccess(result)
   if (result?.levels?.length) {
     const today = getTodayET()
     const row = db.prepare(`SELECT * FROM daily_levels WHERE date = ?`).get(today)
@@ -2654,7 +2736,7 @@ async function applyAutoLevelsIfEnabled() {
           dpHistory: { ...dpHistory }, sentiment, timestamp: new Date().toISOString(),
         })
       } catch (err) {
-        console.error('[levels] auto rescore failed:', err.message)
+        console.error(`[scorer] rescore failed at source: ${err.source || 'unknown'} (auto-apply): ${err.message}`)
       }
     }, 1000)
   }
@@ -2690,7 +2772,7 @@ async function runAutoRescore(trigger = 'manual') {
     })
     console.log(`[rescore] complete (${trigger}) — ${result.levels.length} levels`)
   } catch (err) {
-    console.error(`[rescore] failed (${trigger}):`, err.message)
+    console.error(`[scorer] rescore failed at source: ${err.source || 'unknown'} (${trigger}): ${err.message}`)
   }
 }
 
@@ -2964,7 +3046,10 @@ app.post('/labs/apply-to-main', async (req, res) => {
   const levels = labsAutoLevels[source]
   if (!levels) return res.status(400).json({ error: `No ${source} levels available` })
 
-  const ratio = latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
+  // Route through getActiveRatio() so a locked sessionRatio / nqOffsets can never be
+  // overridden here — the local chain skipped both and could persist a 41.14-derived QQQ
+  // in the new-day pre-first-score window (db null + latest null) despite a restored lock.
+  const ratio = getActiveRatio()
 
   // Canonical applied levels via the single rounding policy (round NQ, derive QQQ from
   // rounded NQ). NQ source uses the raw recurrence values; qqq source derives raw NQ first.
@@ -3003,7 +3088,7 @@ app.post('/labs/apply-to-main', async (req, res) => {
   let scoredAt = null
   if (runFullScore) {
     try { ({ scoredAt } = await scoreNow('labs_apply')) }
-    catch (err) { console.error('[labs] apply rescore failed:', err.message) }
+    catch (err) { console.error(`[scorer] rescore failed at source: ${err.source || 'unknown'} (labs-apply): ${err.message}`) }
   }
   res.json({ success: true, appliedAt, scoredAt, levelData })
 })
@@ -3357,7 +3442,7 @@ async function fetchCatalystData() {
     score,
     levels:       latest?.levels || [],
     currentPrice: latest?.current_price,
-    nqRatio:      latest?.nq_ratio || 41.14,
+    nqRatio:      getActiveRatio(),   // lock-aware (was latest?.nq_ratio || 41.14, which bypassed the lock)
   }
 
   console.log('[catalyst] fetched:', `bias=${score.direction}`, `confidence=${score.confidence}/10`)

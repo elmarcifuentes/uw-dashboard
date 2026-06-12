@@ -24,6 +24,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
   const {
     rescoreData, priceData, connected,
+    dataStale, dataAgeSec,
     history, levelAlert, clearLevelAlert,
     chartStale, staleChanges,
     expansionGex, pinningSessions,
@@ -257,6 +258,24 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
         )
       })()}
 
+      {/* Evidence freshness — muted amber chip (no pulse; the single pulse is reserved for cascade).
+          DATA STALE = tape frozen (failed/aged); N/5 SOURCES = degraded partial score. */}
+      {(dataStale || result?.degraded) && (
+        <div className="flex items-center gap-2 bg-amber-900/60 border border-amber-600/70 rounded px-3 py-1.5">
+          {dataStale && (
+            <span className="text-amber-400 text-sm font-bold shrink-0">
+              ⚠ DATA STALE{dataAgeSec != null && ` — ${dataAgeSec >= 60 ? `${Math.floor(dataAgeSec / 60)}m ${dataAgeSec % 60}s` : `${dataAgeSec}s`} old`}
+            </span>
+          )}
+          {result?.degraded && (
+            <span className="text-amber-300 text-xs truncate">
+              {result.sources_available}/{result.sources_total} sources
+              {result.sources_missing?.length > 0 && ` — missing ${result.sources_missing.join(', ')}`}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* $2.50 move alert */}
       {levelAlert && (
         <div className="bg-amber-900/80 border border-amber-500 rounded px-3 py-2 flex items-center justify-between gap-3">
@@ -328,10 +347,13 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
 
           {/* Sub-tab content */}
           <div className={compact ? 'min-h-[400px]' : 'min-h-[600px]'}>
-            {subTab === 0 && !focusMode && <>
+            {subTab === 0 && !focusMode && (
+              /* Partial score → subtle dim (never hidden) to signal the evidence is incomplete */
+              <div className={result?.degraded ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
               <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} expansionGex={expansionGex} />
-            </>}
+              </div>
+            )}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
             {subTab === 2 && <EtfTideChart history={history} compact={compact} />}
             {subTab === 3 && <RescoreLog history={history} compact={compact} />}
