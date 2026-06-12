@@ -300,10 +300,15 @@ every `last*` cache + hash and emits `symbol_changed` so reconnecting clients do
 `scoreCatalystBias()`. **Independent of the level scorer — no shared code with `scoreLevel.js`.** It is a
 directional *market-bias* read, not a level read.
 
-**Its own UW endpoints** (hardcoded `QQQ`, `Authorization: Bearer` only — note: no `UW-CLIENT-API-ID`
-header, unlike `fetchData.js`; `safeFetch` swallows errors → null):
-`/api/alerts/options-flow?ticker=QQQ&limit=50`, `/api/stock/QQQ/put-call-ratio`,
-`/api/stock/QQQ/greek-exposure/expiry`, `/api/market/tide`.
+**Its own UW endpoints** (hardcoded `QQQ`; headers now match the level scorer —
+`Authorization: Bearer` + `UW-CLIENT-API-ID: 100001`). The endpoints are intentionally
+Catalyst-specific: `/api/alerts/options-flow?ticker=QQQ&limit=50`, `/api/stock/QQQ/put-call-ratio`,
+`/api/stock/QQQ/greek-exposure/expiry`, `/api/market/tide`. `safeFetch` returns `null` on failure;
+that factor is then marked **`available:false`** (rendered "NO DATA", contributes 0 votes) — never a
+silent NEUTRAL. **Factor 3 (ETF Tide)** sources from scoring's own `sessionFlowBias` (carried as
+`etf_direction` on the levels); `/api/market/tide` is only an explicit **logged** fallback
+(`[catalyst] factor3 fallback: market/tide`). When any factor is unavailable, the score carries
+`degraded:true` + `factorsAvailable/factorsTotal`, and the UI annotates confidence ("N of 5 factors").
 
 **Five factors → weighted up/down votes:**
 
@@ -360,7 +365,8 @@ refreshes). It reuses the level scorer's `latest` only to read MID `dark_pool` a
 | Hosted server returns 503 on `/rescore` | scorer not loaded on Railway (no UW key / import failed) | `[server] Scoring engine failed to load`; run locally which POSTs fresh data |
 | Rescores never fire after hours | overnight rescores disabled | `_shouldRescore` returns `outside market hours`; `pollingConfig.marketHours.overnightRescores=false` |
 | Cascade never/always fires | the three-condition AND (MID ≤ −0.700, S1 dp 0/−1, S2 flow-zeroed+dp 0) | inspect level `dark_pool` and `raw.flow_zeroed` in `/latest` |
-| Catalyst bias looks wrong | different endpoints (hardcoded QQQ) + `safeFetch` swallows errors | `[catalyst] fetched: bias=… confidence=…/10`; a null UW response → factor falls to NEUTRAL silently |
+| Catalyst bias looks degraded / "N of 5 factors" | one Catalyst UW source failed → that factor marked unavailable | `[catalyst] factor {name} unavailable: …`; UI shows the factor as "NO DATA" + confidence annotated |
+| Catalyst Factor 3 unexpected | sourcing scoring's `etf_direction`, or fell back to market/tide | `[catalyst] factor3 fallback: market/tide → …` appears only when scoring's value was absent |
 | QQQ levels right but NQ wrong on a tab | `nq_price` enrichment / `levelNq` (not a scoring issue) | see [PREDICTIVE_RANGES.md §6](PREDICTIVE_RANGES.md) |
 
 Log prefixes to grep: `[server]` (scoring orchestration), `[narrative]` / `[level-narrative]` /
@@ -374,18 +380,18 @@ Log prefixes to grep: `[server]` (scoring orchestration), `[narrative]` / `[leve
   "distance" weight is effectively a fixed offset on every composite.
 - **GEX is computed but never scored** — `gexContext` output is display-only (easy to assume otherwise).
 
-## Flagged oddities (documented, NOT fixed — raise before touching)
+## Flagged oddities
 
-1. **`scoreNow` does not call `emitStaleIfChanged`** while `provider.onRescore` and `runAutoRescore` do —
-   minor inconsistency in the otherwise-canonical path.
-2. **Catalyst Factor 3 (ETF Tide)** reads `latestResult?.etf_tide`, which the scoring result doesn't set
-   (levels carry `etf_direction`); it falls back to `tideData?.data?.direction` from `/api/market/tide`.
-3. **Catalyst uses different UW endpoints and headers** than the level scorer (hardcoded QQQ, no
-   `UW-CLIENT-API-ID`), and `safeFetch` turns any failure into a silent NEUTRAL factor.
+None outstanding. The previously-flagged items have all been resolved:
 
-> Several dead-code items previously flagged here (`TOUCH_PCT`, `distanceWeight()`, the WebSocket provider
-> stub + unused provider data methods, `darkPoolShiftTrigger`/`structureBreakWarning`) were **removed** in
-> the cleanup pass — see [TASKS.md](TASKS.md) "Recently closed".
+- **Catalyst Factor 3** now sources from scoring's `etf_direction` (was reading the never-set
+  `etf_tide`), with a logged `/api/market/tide` fallback.
+- **Catalyst failed factors** are now marked `available:false` ("NO DATA"), with `degraded` +
+  `factorsAvailable/factorsTotal` and a confidence annotation — no more silent NEUTRAL.
+- **Catalyst headers** now match the scorer (`UW-CLIENT-API-ID`); endpoints stay Catalyst-specific by design.
+- **`scoreNow` now calls `emitStaleIfChanged`** — the LEVELS-CHANGED badge fires on manual apply/lock/Score-Now too.
+- Dead code (`TOUCH_PCT`, `distanceWeight()`, the WebSocket provider stub + unused provider data methods,
+  `darkPoolShiftTrigger`/`structureBreakWarning`) was removed — see [TASKS.md](TASKS.md) "Recently closed".
 
 ---
 

@@ -2685,6 +2685,8 @@ async function scoreNow(trigger) {
   history.unshift(result)
   if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
   provider.setLevels(result.levels)
+  emitStaleIfChanged(result)   // align with provider.onRescore / runAutoRescore — raise the
+                               // LEVELS CHANGED badge + advance previousResult on manual paths too
   checkExpansionGex(result)
   updateDpHistory(result)
   if (result.current_price) trackLevelTouches(result.current_price, result.levels, db)
@@ -3172,86 +3174,131 @@ function scoreCatalystBias(flowData, pcData, gexData, tideData, latestResult) {
   let upVotes = 0
   let downVotes = 0
   const factors = []
+  // A failed data source must be VISIBLE (not a silent NEUTRAL). Unavailable factors
+  // contribute 0 votes (same arithmetic as neutral) but are flagged available:false so the
+  // UI and confidence annotation can show a degraded read distinctly.
+  const unavailable = (name, weight, reason) => {
+    console.warn(`[catalyst] factor ${name} unavailable: ${reason}`)
+    factors.push({ name, value: '—', vote: 'NO DATA', weight, note: `source unavailable — ${reason}`, available: false })
+  }
 
   // Factor 1: Put/Call ratio
-  const pc = parseFloat(pcData?.data?.putCallRatio || pcData?.data?.ratio || 0)
-  if (pc > 1.2) {
-    downVotes += 2
-    factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'DOWN', weight: 'HIGH', note: `${pc.toFixed(2)} > 1.2 — bearish positioning` })
-  } else if (pc < 0.8 && pc > 0) {
-    upVotes += 2
-    factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'UP', weight: 'HIGH', note: `${pc.toFixed(2)} < 0.8 — bullish positioning` })
-  } else if (pc > 0) {
-    factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'NEUTRAL', weight: 'MED', note: `${pc.toFixed(2)} — neutral` })
+  if (!pcData) {
+    unavailable('Put/Call Ratio', 'HIGH', 'put-call-ratio fetch failed')
+  } else {
+    const pc = parseFloat(pcData?.data?.putCallRatio || pcData?.data?.ratio || 0)
+    if (pc > 1.2) {
+      downVotes += 2
+      factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'DOWN', weight: 'HIGH', note: `${pc.toFixed(2)} > 1.2 — bearish positioning`, available: true })
+    } else if (pc < 0.8 && pc > 0) {
+      upVotes += 2
+      factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'UP', weight: 'HIGH', note: `${pc.toFixed(2)} < 0.8 — bullish positioning`, available: true })
+    } else if (pc > 0) {
+      factors.push({ name: 'Put/Call Ratio', value: pc.toFixed(2), vote: 'NEUTRAL', weight: 'MED', note: `${pc.toFixed(2)} — neutral`, available: true })
+    } else {
+      unavailable('Put/Call Ratio', 'HIGH', 'no put/call ratio in response')
+    }
   }
 
   // Factor 2: GEX environment
-  const todayGex = gexData?.data?.find(g =>
-    g.expiry === new Date().toISOString().split('T')[0] || g.date === new Date().toISOString().split('T')[0]
-  ) || gexData?.data?.[0]
-  const netGex = parseFloat(todayGex?.net_gex || 0)
-  if (netGex < -50000) {
-    factors.push({ name: '0DTE GEX', value: `${(netGex / 1000).toFixed(0)}k`, vote: 'EXPANSION', weight: 'HIGH', note: 'Negative GEX — move accelerates through levels' })
-  } else if (netGex > 100000) {
-    factors.push({ name: '0DTE GEX', value: `+${(netGex / 1000).toFixed(0)}k`, vote: 'PINNING', weight: 'MED', note: 'Positive GEX — price may pin, smaller move' })
+  let netGex = 0
+  let gexAvailable = false
+  if (!gexData) {
+    unavailable('0DTE GEX', 'HIGH', 'greek-exposure fetch failed')
   } else {
-    factors.push({ name: '0DTE GEX', value: `${(netGex / 1000).toFixed(0)}k`, vote: 'NEUTRAL', weight: 'LOW', note: 'Neutral GEX environment' })
+    const todayGex = gexData?.data?.find(g =>
+      g.expiry === new Date().toISOString().split('T')[0] || g.date === new Date().toISOString().split('T')[0]
+    ) || gexData?.data?.[0]
+    netGex = parseFloat(todayGex?.net_gex || 0)
+    gexAvailable = true
+    if (netGex < -50000) {
+      factors.push({ name: '0DTE GEX', value: `${(netGex / 1000).toFixed(0)}k`, vote: 'EXPANSION', weight: 'HIGH', note: 'Negative GEX — move accelerates through levels', available: true })
+    } else if (netGex > 100000) {
+      factors.push({ name: '0DTE GEX', value: `+${(netGex / 1000).toFixed(0)}k`, vote: 'PINNING', weight: 'MED', note: 'Positive GEX — price may pin, smaller move', available: true })
+    } else {
+      factors.push({ name: '0DTE GEX', value: `${(netGex / 1000).toFixed(0)}k`, vote: 'NEUTRAL', weight: 'LOW', note: 'Neutral GEX environment', available: true })
+    }
   }
 
-  // Factor 3: ETF tide
-  const tide = latestResult?.etf_tide || tideData?.data?.direction
+  // Factor 3: ETF tide — PRIMARY source is scoring's own sessionFlowBias (carried on every
+  // level as etf_direction). /api/market/tide is an EXPLICIT, LOGGED fallback only.
+  let tide       = latestResult?.levels?.find(l => l.etf_direction && l.etf_direction !== 'no data')?.etf_direction
+  let tideSource = 'scoring'
+  if (!tide || tide === 'no data') {
+    const fb = tideData?.data?.direction
+    if (fb) { console.log(`[catalyst] factor3 fallback: market/tide → ${fb}`); tide = fb; tideSource = 'market/tide' }
+  }
   if (tide === 'bullish') {
     upVotes += 1
-    factors.push({ name: 'ETF Tide', value: 'BULLISH', vote: 'UP', weight: 'MED', note: 'Institutions buying calls' })
+    factors.push({ name: 'ETF Tide', value: 'BULLISH', vote: 'UP', weight: 'MED', note: `Institutions buying calls (${tideSource})`, available: true })
   } else if (tide === 'bearish') {
     downVotes += 1
-    factors.push({ name: 'ETF Tide', value: 'BEARISH', vote: 'DOWN', weight: 'MED', note: 'Institutions buying puts' })
+    factors.push({ name: 'ETF Tide', value: 'BEARISH', vote: 'DOWN', weight: 'MED', note: `Institutions buying puts (${tideSource})`, available: true })
+  } else if (tide === 'neutral') {
+    factors.push({ name: 'ETF Tide', value: 'NEUTRAL', vote: 'NEUTRAL', weight: 'LOW', note: `balanced session flow (${tideSource})`, available: true })
+  } else {
+    unavailable('ETF Tide', 'MED', 'no etf_direction from scoring and market/tide unavailable')
   }
 
-  // Factor 4: MID dark pool
+  // Factor 4: MID dark pool (from the level scorer's latest result, not a Catalyst fetch)
   const midLevel = latestResult?.levels?.find(l => l.id === 'MID')
-  const midDp = midLevel?.dark_pool || 0
-  if (midDp <= -0.500) {
-    downVotes += 2
-    factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'DOWN', weight: 'HIGH', note: `${midDp.toFixed(3)} — strong institutional selling at MID` })
-  } else if (midDp >= 0.500) {
-    upVotes += 2
-    factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'UP', weight: 'HIGH', note: `${midDp.toFixed(3)} — strong institutional buying at MID` })
+  if (!midLevel) {
+    unavailable('MID Dark Pool', 'HIGH', 'no scored MID level yet')
   } else {
-    factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'NEUTRAL', weight: 'LOW', note: `${midDp.toFixed(3)} — no strong signal` })
+    const midDp = midLevel.dark_pool || 0
+    if (midDp <= -0.500) {
+      downVotes += 2
+      factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'DOWN', weight: 'HIGH', note: `${midDp.toFixed(3)} — strong institutional selling at MID`, available: true })
+    } else if (midDp >= 0.500) {
+      upVotes += 2
+      factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'UP', weight: 'HIGH', note: `${midDp.toFixed(3)} — strong institutional buying at MID`, available: true })
+    } else {
+      factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'NEUTRAL', weight: 'LOW', note: `${midDp.toFixed(3)} — no strong signal`, available: true })
+    }
   }
 
   // Factor 5: Recent options flow
-  const flows = flowData?.data || []
-  let callFlow = 0
-  let putFlow = 0
-  flows.slice(0, 20).forEach(f => {
-    const premium = parseFloat(f.total_premium || f.premium || 0)
-    if (f.put_call === 'CALL' || f.type === 'call') callFlow += premium
-    else if (f.put_call === 'PUT' || f.type === 'put') putFlow += premium
-  })
-  if (putFlow > callFlow * 1.5) {
-    downVotes += 2
-    factors.push({ name: 'Options Flow', value: `Puts $${(putFlow / 1000).toFixed(0)}k`, vote: 'DOWN', weight: 'HIGH', note: `Put flow ${((putFlow / Math.max(callFlow, 1)) * 100).toFixed(0)}% above calls` })
-  } else if (callFlow > putFlow * 1.5) {
-    upVotes += 2
-    factors.push({ name: 'Options Flow', value: `Calls $${(callFlow / 1000).toFixed(0)}k`, vote: 'UP', weight: 'HIGH', note: `Call flow ${((callFlow / Math.max(putFlow, 1)) * 100).toFixed(0)}% above puts` })
+  if (!flowData) {
+    unavailable('Options Flow', 'HIGH', 'options-flow fetch failed')
   } else {
-    factors.push({ name: 'Options Flow', value: 'Mixed', vote: 'NEUTRAL', weight: 'MED', note: 'No dominant directional flow' })
+    const flows = flowData?.data || []
+    let callFlow = 0
+    let putFlow = 0
+    flows.slice(0, 20).forEach(f => {
+      const premium = parseFloat(f.total_premium || f.premium || 0)
+      if (f.put_call === 'CALL' || f.type === 'call') callFlow += premium
+      else if (f.put_call === 'PUT' || f.type === 'put') putFlow += premium
+    })
+    if (putFlow > callFlow * 1.5) {
+      downVotes += 2
+      factors.push({ name: 'Options Flow', value: `Puts $${(putFlow / 1000).toFixed(0)}k`, vote: 'DOWN', weight: 'HIGH', note: `Put flow ${((putFlow / Math.max(callFlow, 1)) * 100).toFixed(0)}% above calls`, available: true })
+    } else if (callFlow > putFlow * 1.5) {
+      upVotes += 2
+      factors.push({ name: 'Options Flow', value: `Calls $${(callFlow / 1000).toFixed(0)}k`, vote: 'UP', weight: 'HIGH', note: `Call flow ${((callFlow / Math.max(putFlow, 1)) * 100).toFixed(0)}% above puts`, available: true })
+    } else {
+      factors.push({ name: 'Options Flow', value: 'Mixed', vote: 'NEUTRAL', weight: 'MED', note: 'No dominant directional flow', available: true })
+    }
   }
 
   const total = upVotes + downVotes
   const confidence = total === 0 ? 5 : Math.round(Math.max(upVotes, downVotes) / total * 10)
   const direction = upVotes > downVotes ? 'UP' : downVotes > upVotes ? 'DOWN' : 'NEUTRAL'
-  const gexNote = netGex < -50000 ? 'expansion' : 'pinning'
+  // gexNote drives the UI expansion banner; only assert it when GEX data was actually available.
+  const gexNote = !gexAvailable ? 'unknown' : netGex < -50000 ? 'expansion' : 'pinning'
+
+  const factorsTotal     = factors.length            // always 5 (one per factor slot)
+  const factorsAvailable = factors.filter(f => f.available !== false).length
+  const degraded         = factorsAvailable < factorsTotal
+  const degradedNote     = degraded ? ` · ${factorsAvailable} of ${factorsTotal} factors` : ''
 
   return {
     direction, confidence, upVotes, downVotes, factors, gexNote,
-    summary: direction === 'UP'
+    factorsAvailable, factorsTotal, degraded,
+    summary: (direction === 'UP'
       ? `Bullish bias — ${confidence}/10 confidence`
       : direction === 'DOWN'
       ? `Bearish bias — ${confidence}/10 confidence`
-      : 'No clear directional bias',
+      : 'No clear directional bias') + degradedNote,
   }
 }
 
@@ -3259,7 +3306,9 @@ async function fetchCatalystData() {
   console.log('[catalyst] fetching data...')
   const UW_BASE = process.env.UW_API_BASE || 'https://api.unusualwhales.com'
   const UW_KEY  = process.env.UW_API_KEY
-  const headers = { Authorization: `Bearer ${UW_KEY}` }
+  // Match the level scorer's headers (fetchData.js) — adds UW-CLIENT-API-ID. Endpoints stay
+  // Catalyst-specific (put-call-ratio, expiry GEX, /market/tide) by design.
+  const headers = { Authorization: `Bearer ${UW_KEY}`, 'UW-CLIENT-API-ID': '100001' }
 
   const safeFetch = async (url) => {
     try {

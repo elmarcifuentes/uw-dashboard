@@ -266,19 +266,23 @@ export default function CatalystTab({
                 })} ET
               </div>
 
-              {score?.factors?.map((f, i) => (
-                <div key={i} className="flex items-start gap-3 py-2 border-b border-border-subtle">
+              {score?.factors?.map((f, i) => {
+                const noData = f.available === false
+                return (
+                <div key={i} className={`flex items-start gap-3 py-2 border-b border-border-subtle ${noData ? 'opacity-50' : ''}`}>
                   <div className="shrink-0 mt-0.5">
-                    {f.vote === 'UP'        ? <TrendingUp   size={12} className="text-signal-support" />
+                    {noData                  ? <Minus        size={12} className="text-text-disabled" />
+                    : f.vote === 'UP'        ? <TrendingUp   size={12} className="text-signal-support" />
                     : f.vote === 'DOWN'      ? <TrendingDown size={12} className="text-signal-resistance" />
                     : f.vote === 'EXPANSION' ? <Zap          size={12} className="text-state-cascadeWatch" />
                     :                          <Minus        size={12} className="text-text-muted" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm2 text-text-secondary font-medium">{f.name}</span>
+                      <span className={`text-sm2 font-medium ${noData ? 'text-text-disabled' : 'text-text-secondary'}`}>{f.name}</span>
                       <span className={`text-micro font-bold px-1.5 py-0.5 rounded ${
-                        f.vote === 'UP'        ? 'bg-signal-supportSoft text-signal-support'
+                        noData                 ? 'bg-bg-card2 text-text-disabled'
+                        : f.vote === 'UP'        ? 'bg-signal-supportSoft text-signal-support'
                         : f.vote === 'DOWN'    ? 'bg-signal-resistanceSoft text-signal-resistance'
                         : f.vote === 'EXPANSION' ? 'bg-state-cascadeWatchSoft text-state-cascadeWatch'
                         : 'bg-bg-card2 text-text-muted'
@@ -292,7 +296,8 @@ export default function CatalystTab({
                     {f.weight}
                   </span>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -323,7 +328,11 @@ export default function CatalystTab({
                 </div>
                 <div className="text-right">
                   <div className="text-xl2 font-bold font-price text-text-primary">{score.confidence}/10</div>
-                  <div className="text-micro text-text-muted">confidence</div>
+                  <div className={`text-micro ${score.degraded ? 'text-state-cascadeWatch' : 'text-text-muted'}`}>
+                    {score.degraded
+                      ? `confidence · ${score.factorsAvailable} of ${score.factorsTotal} factors`
+                      : 'confidence'}
+                  </div>
                 </div>
               </div>
               <div className="text-sm2 text-text-secondary mt-2">{score.summary}</div>
