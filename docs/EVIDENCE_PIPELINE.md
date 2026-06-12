@@ -179,8 +179,10 @@ is in `server/scorer/index.js`. Every magic number with its location:
 | **`dpHistory`** | timestamped per entry, **capped at 8, no TTL** (index.js:770) | 8 readings, any age | no age shown |
 | **Level touches** | ❌ none | today's DB rows | no |
 
-**The evidence layer has no equivalent of the PR engine's recency guard.** `_received_at` is stamped but
-never read before serving or rendering. When a score fails to refresh (any fetch error, or paused/overnight),
+**The evidence layer now has a recency signal (Batch A).** `dataStale`/`dataAgeSec` are computed from
+`latest._received_at` by a consecutive-failure counter + a market-hours age threshold, surfaced on the
+`price` SSE and `/status`, and rendered as a muted stale chip — closing the gap below. *(Historical context
+before Batch A:)* `_received_at` was stamped but never read before serving or rendering. When a score fails to refresh (any fetch error, or paused/overnight),
 `latest` simply persists and every consumer — narratives, sentiment, Catalyst, the Intraday cards — renders
 the old numbers identically to fresh ones. The only "something changed" signal is `chart_stale`, and it
 only fires when *classification / full_stack / cascade* differ between two results (index.js:843
@@ -291,10 +293,11 @@ way to tell how old `/levels` is).
 
 > Per the audit rule: each item below was re-read in source before flagging. **No code was changed.**
 
-- **FLAG-1 — Stale renders as fresh (systemic).** `_received_at` is stamped but never checked before
-  serving/rendering; on any fetch failure `latest` persists unmarked (index.js:985). No evidence component
-  shows a data-age; `/levels*` carry no timestamp at all. The PR engine's `barsAreFresh` has no evidence-layer
-  equivalent. *Impact: high — a silently-stale tape looks live.*
+- **FLAG-1 — Stale renders as fresh (systemic).** ✅ *Resolved in Batch A.* `dataStale`/`dataAgeSec` now
+  ride the `price` SSE (every poll) + `/status`, driven by a consecutive-failure counter (N=2) and a
+  market-hours age threshold (~1.5× the 15-min rescore guarantee); a muted stale chip renders on Intraday and
+  `[scorer] DATA STALE …` logs once per episode. The five fetches degrade per-source (FLAG below), with dark
+  pool a named hard-abort. *(`/levels*` still carry no timestamp — minor, unaddressed.)*
 - **FLAG-2 — No recency/size filter on dark-pool prints.** `computeDarkPoolStrength` (scoreLevel.js:34) sums
   every print in the ±0.30% window regardless of timestamp or size. (Frozen file — flag only.)
 - **FLAG-3 — Distance weighting is inert.** `distance100 = 50` constant (scoreLevel.js:104); the 10% term is
@@ -311,9 +314,10 @@ way to tell how old `/levels` is).
   is permanently `false` so the `CAUTION` state is unreachable, the narrative "ARMED (condition 1 met)" branch
   never prints, and `/status` falls back to `[false,false,false]`. *Impact: a whole sentiment/narrative tier
   is unreachable.*
-- **FLAG-6 — Two `41.14` fallbacks bypass the ratio lock.** index.js:2967 (`/labs/apply-to-main`) and 3360
-  (Catalyst cache) use `latest?.nq_ratio || … || 41.14` instead of `getActiveRatio()`, so a locked
-  `sessionRatio`/`nqOffsets` is ignored on those paths. (The Intraday render itself uses the live ratio.)
+- **FLAG-6 — Two `41.14` fallbacks bypass the ratio lock.** ✅ *Resolved in Batch A.* Both `/labs/apply-to-main`
+  and the Catalyst cache now call `getActiveRatio()`, so `sessionRatio`/`nqOffsets` always win and `41.14` is
+  reachable only as the genuine final fallback. The live risk was the new-day pre-first-score window (db +
+  latest both null), where a manual morning apply-to-main could persist 41.14-derived QQQ despite a restored lock.
 - **FLAG-7 — Scoring fetches aren't budgeted.** Only `getCurrentPrice` increments the 15 000/day counter
   (RestDataProvider.js:55); the five `runFullScore` fetches don't, so real UW usage exceeds the tracked count
   and the auto-pause guard understates consumption.
