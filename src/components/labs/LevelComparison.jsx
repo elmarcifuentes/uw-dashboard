@@ -3,7 +3,7 @@ export default function LevelComparison({
   activeSymbol = 'QQQ', nqRatio,
 }) {
   const levelIds = ['R2', 'R1', 'MID', 'S1', 'S2']
-  const ratio = nqRatio || 41.14
+  const ratio = nqRatio   // live ratio only; QQQ Equiv shows '—' if absent (no 41.14 fallback)
 
   return (
     <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
@@ -49,7 +49,7 @@ export default function LevelComparison({
 
         {levelIds.map(id => {
           const nqAuto     = autoLevels?.[id]
-          const qqqEquiv   = nqAuto != null ? parseFloat((nqAuto / ratio).toFixed(2)) : null
+          const qqqEquiv   = nqAuto != null && ratio ? parseFloat((nqAuto / ratio).toFixed(2)) : null
           const activeEntry = currentLevels?.find(l => l.id === id)
           const activeNq   = activeEntry?.nq_price
           const activeQqq  = activeEntry?.qqq_price   // stored canonical QQQ (same value other tabs show)

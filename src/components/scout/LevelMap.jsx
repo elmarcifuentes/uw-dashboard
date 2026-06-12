@@ -6,16 +6,17 @@ export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, 
   if (!levels?.length) return null
 
   const sorted = [...levels].sort((a, b) => b.price - a.price)
-  const r = nqRatio || 41.14
+  const r = nqRatio   // live ratio only — no 41.14 fallback; NQ display shows '—' if absent
 
   // nqOverride = canonical stored NQ for a level (pass for level rows; omit for raw prices)
   const fmt = (p, nqOverride) => activeSymbol === 'NQ'
-    ? ((nqOverride != null ? nqOverride : Math.round(p * r * 4) / 4)).toLocaleString('en-US', { minimumFractionDigits: 2 })
+    ? (nqOverride != null ? nqOverride.toLocaleString('en-US', { minimumFractionDigits: 2 })
+       : r ? (Math.round(p * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—')
     : `$${p?.toFixed(2)}`
 
   const fmtCurrent = currentPrice != null
     ? activeSymbol === 'NQ'
-      ? (Math.round(currentPrice * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 })
+      ? (r ? (Math.round(currentPrice * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—')
       : `$${currentPrice.toFixed(2)}`
     : '—'
 

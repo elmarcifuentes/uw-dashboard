@@ -1,6 +1,7 @@
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
 import ClassificationChip from '../ClassificationChip'
+import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 
 export default function ThesisBar({
   sentiment, levels, cascade, assistantRead, currentPrice, nqRatio, activeSymbol = 'NQ'
@@ -11,13 +12,13 @@ export default function ThesisBar({
 
   const mid   = levels?.find(l => l.id === 'MID')
   const midDp = mid?.dark_pool || 0
-  const gap   = Math.abs(-0.700 - midDp)
+  const gap   = Math.abs(CASCADE_TRIGGER - midDp)
 
   const nq = p => nqRatio ? ` (NQ ${Math.round(p * nqRatio).toLocaleString()})` : ''
 
   const riskText = cascade?.active
     ? 'CASCADE ACTIVE'
-    : midDp <= -0.500
+    : midDp <= CASCADE_WATCH
     ? `MID dp ${midDp.toFixed(3)} — ${gap.toFixed(3)} from cascade`
     : 'Structure intact'
 
@@ -70,7 +71,7 @@ export default function ThesisBar({
           <span className={`text-xs font-medium px-2 py-0.5 rounded ${
             cascade?.active
               ? 'bg-state-stopSoft text-state-stop border border-state-stop/40'
-              : midDp <= -0.500
+              : midDp <= CASCADE_WATCH
               ? 'bg-state-cascadeWatchSoft text-state-cascadeWatch border border-state-cascadeWatch/40'
               : 'text-text-tertiary'
           }`}>

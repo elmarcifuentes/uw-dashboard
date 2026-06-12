@@ -1,4 +1,5 @@
 import AlertBadge from '../AlertBadge'
+import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 
 const CONDITIONS = [
   'MID dp ≤ -0.700',
@@ -9,10 +10,10 @@ const CONDITIONS = [
 export default function AlertsCard({ cascade, structureBreak, levels, currentPrice }) {
   const mid   = levels?.find(l => l.id === 'MID')
   const midDp = mid?.dark_pool ?? 0
-  const gap   = Math.abs(-0.700 - midDp).toFixed(3)
+  const gap   = Math.abs(CASCADE_TRIGGER - midDp).toFixed(3)
 
   const isHighRisk = cascade?.active || structureBreak?.active
-  const isCaution  = !isHighRisk && midDp <= -0.500
+  const isCaution  = !isHighRisk && midDp <= CASCADE_WATCH
 
   return (
     <div className={`border rounded-lg p-4 space-y-3 ${
@@ -43,10 +44,11 @@ export default function AlertsCard({ cascade, structureBreak, levels, currentPri
         />
       )}
 
-      {/* Cascade conditions */}
+      {/* Cascade conditions — cascade.conditions (S1/S2) was never emitted (FLAG-5); derive cond 1
+          from live MID dp, 2–3 from active. Trade-aware redesign is TASK-CASCADE-WATCH. */}
       <div className="space-y-1">
         {CONDITIONS.map((label, i) => {
-          const met = cascade?.conditions?.[i]
+          const met = i === 0 ? (cascade?.mid_dp ?? 0) <= CASCADE_TRIGGER : cascade?.active
           return (
             <div key={i} className={`flex items-center gap-2 rounded px-2 py-1 text-xs ${
               met ? 'bg-red-950/50 border border-red-900/50' : 'bg-bg-card2/30'

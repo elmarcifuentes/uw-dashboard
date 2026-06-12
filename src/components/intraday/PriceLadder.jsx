@@ -2,6 +2,7 @@ import { memo, useState, useRef, useEffect, Fragment } from 'react'
 import { levelNq } from '../../utils/levelNq'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
 import { getLevelProximity, getProximityStyles } from '../../utils/proximity'
+import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 import DpSparkline from '../DpSparkline'
 import ClassificationChip from '../ClassificationChip'
 import { stripMarkdown } from '../../utils/stripMarkdown'
@@ -100,7 +101,7 @@ function DpTrend({ levelId, history, compact }) {
         {history.map((h, i) => (
           <span key={i}>
             <span className={
-              h.value <= -0.700 ? 'text-signal-resistance' :
+              h.value <= CASCADE_TRIGGER ? 'text-signal-resistance' :
               h.value <= -0.300 ? 'text-state-cascadeWatch' :
               h.value >= 0.300  ? 'text-signal-support' :
               'text-text-tertiary'
@@ -114,7 +115,7 @@ function DpTrend({ levelId, history, compact }) {
       }`}>
         {trend === 'declining' ? '↓' : trend === 'improving' ? '↑' : '→'}
       </span>
-      {levelId === 'MID' && last <= -0.500 && trend === 'declining' && (
+      {levelId === 'MID' && last <= CASCADE_WATCH && trend === 'declining' && (
         <span className="text-state-cascadeWatch text-xs">⚠ approaching cascade</span>
       )}
     </div>
@@ -135,10 +136,9 @@ function getLevelTier(level) {
   return 3
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel, activeSymbol = 'NQ', expansionGex = [] }) {
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel, activeSymbol = 'NQ' }) {
   const [expandedLevel, setExpandedLevel] = useState(null)
   const [flashLevel, setFlashLevel]       = useState(null)
-  const [showGamma, setShowGamma]         = useState(false)
   const prevPriceRef = useRef(currentPrice)
   const sorted = result ? [...result.levels].sort((a, b) => b.price - a.price) : []
 
@@ -180,21 +180,6 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
       )}
 
       <StructureBreakBar sb={result.structure_break} currentPrice={cp} nqRatio={nqRatio} activeSymbol={activeSymbol} />
-
-      {expansionGex?.length > 0 && (
-        <div className="flex items-center justify-end px-1 pb-0.5">
-          <button
-            onClick={() => setShowGamma(g => !g)}
-            className={`text-xs px-2 py-0.5 rounded border transition-colors ${
-              showGamma
-                ? 'bg-accent-gammaSoft border-accent-gamma/50 text-accent-gamma'
-                : 'bg-bg-card2 border-border-default text-text-tertiary hover:text-text-secondary'
-            }`}
-          >
-            γ
-          </button>
-        </div>
-      )}
 
       {cp != null && !isNaN(cp) && sorted.length > 0 && cp > sorted[0].price && (
         <div className="flex items-center gap-2 px-2 py-1">
@@ -268,11 +253,6 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
             <div className="flex items-center justify-between mt-1 gap-2">
               {/* Scored bias = the action (dominant). Conflict tag rides the chip in neutral. */}
               <ClassificationChip classification={level.classification} confidence={level.confidence} level={level} />
-              {level.net_gex != null && level.net_gex < 0 && (
-                <span className="text-xs font-price px-1 rounded bg-signal-resistanceSoft text-signal-resistance font-bold">
-                  GEX ⚠ {((level.net_gex ?? 0) / 1000).toFixed(0)}K EXP
-                </span>
-              )}
             </div>
 
             {tier !== 3 && (
@@ -485,28 +465,6 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
             </div>
           )}
 
-          {showGamma && nextLevel && (() => {
-            const gexEntry = expansionGex?.find(g => g.level === nextLevel.id)
-            if (!gexEntry) return null
-            const gexVal = gexEntry.net_gex ?? 0
-            const maxGex = 200000
-            const pct    = Math.min(Math.abs(gexVal) / maxGex * 100, 100)
-            const pos    = gexVal > 0
-            return (
-              <div className="flex items-center gap-2 px-3 py-0.5">
-                <span className="text-xs text-text-disabled font-price shrink-0 w-5">γ</span>
-                <div className="flex-1 h-1 bg-bg-card2 rounded overflow-hidden">
-                  <div
-                    className={`h-full rounded transition-all ${pos ? 'bg-signal-support' : 'bg-signal-resistance'}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span className={`text-xs font-price shrink-0 w-8 text-right ${pos ? 'text-signal-support/70' : 'text-signal-resistance/70'}`}>
-                  {pos ? 'PIN' : 'EXP'}
-                </span>
-              </div>
-            )
-          })()}
           </Fragment>
         )
       })}

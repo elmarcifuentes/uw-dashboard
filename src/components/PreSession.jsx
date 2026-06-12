@@ -262,11 +262,11 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
   const cascade    = data.cascade || null
   const structureBreak = data.structure_break || null
 
-  const streak     = magnetStreak ?? providerStatus?.allPinningSessions ?? 0
+  const streak     = magnetStreak ?? 0
   const etfTide    = { direction: etfDir, description: ETF_DESCRIPTION[etfDir] || ETF_DESCRIPTION.neutral }
   const gexRegime  = {
-    label:  providerStatus?.expansionGexActive ? 'EXPANSION' : (data?.gex_regime?.label || 'PINNING'),
-    active: providerStatus?.expansionGexActive ?? false,
+    label:  data?.gex_regime?.label || 'PINNING',
+    active: data?.gex_regime?.active ?? false,
   }
 
   return (
@@ -379,7 +379,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
         <StatCard
           label="GEX Regime"
           value={gexRegime.label}
-          sub={gexRegime.active ? 'no pinning friction' : `${providerStatus?.allPinningSessions ?? '—'} sessions`}
+          sub={gexRegime.active ? 'no pinning friction' : 'pinning friction'}
           color={gexRegime.active ? 'text-red-400' : 'text-green-400'}
         />
       </div>

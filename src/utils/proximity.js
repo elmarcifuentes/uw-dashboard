@@ -1,3 +1,5 @@
+import { CASCADE_TRIGGER, CASCADE_WATCH } from './cascade'
+
 export function getLevelProximity(currentPrice, levelPrice) {
   if (currentPrice == null || levelPrice == null) return null
   const dist    = currentPrice - levelPrice
@@ -76,10 +78,10 @@ export function getProximityStyles(proximity, classification, level) {
   // MID override — replace generic label with cascade context
   if (level?.id === 'MID' && label) {
     const dp  = level.dark_pool || 0
-    const gap = Math.abs(-0.700 - dp)
-    if (dp <= -0.700) {
+    const gap = Math.abs(CASCADE_TRIGGER - dp)
+    if (dp <= CASCADE_TRIGGER) {
       label = label.replace('unconfirmed level', '⚠ cascade threshold — monitor S1/S2')
-    } else if (dp <= -0.500) {
+    } else if (dp <= CASCADE_WATCH) {
       label = label.replace('unconfirmed level', `cascade trigger — ${gap.toFixed(3)} from -0.700`)
     }
   }

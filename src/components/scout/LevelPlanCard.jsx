@@ -11,10 +11,11 @@ export default function LevelPlanCard({
 }) {
   const setup = calculateTradeSetup(level, allLevels, currentPrice, nqRatio)
   const isNQ  = activeSymbol === 'NQ'
-  const r     = nqRatio || 41.14
+  const r     = nqRatio   // live ratio only — no 41.14 fallback
 
   const fmt = (qqq, nq) => isNQ
-    ? '$' + (nq ?? Math.round(qqq * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ? (nq != null ? '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+       : r ? '$' + (Math.round(qqq * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
     : `$${qqq?.toFixed(2)}`
 
   // R/R quality is a trade-management axis → state-* tokens (not the bias signal-* tokens).

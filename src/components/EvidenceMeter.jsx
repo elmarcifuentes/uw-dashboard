@@ -1,4 +1,4 @@
-export default function EvidenceMeter({ levels, etfDirection }) {
+export default function EvidenceMeter({ levels }) {
   if (!levels?.length) return null
 
   const buyCount  = levels.filter(l => l.classification === 'buy_support').length
@@ -6,22 +6,19 @@ export default function EvidenceMeter({ levels, etfDirection }) {
   const avgDp     = levels.reduce((s, l) => s + (l.dark_pool || 0), 0) / levels.length
   const flowBias  = (buyCount - sellCount) / levels.length
 
-  const dpPct  = Math.round(((avgDp + 1) / 2) * 100)
-  const flPct  = Math.round(((flowBias + 1) / 2) * 100)
-  const etfPct = etfDirection === 'bullish' ? 62 : etfDirection === 'bearish' ? 38 : 50
+  const dpPct = Math.round(((avgDp + 1) / 2) * 100)
+  const flPct = Math.round(((flowBias + 1) / 2) * 100)
 
   const flowLabel = buyCount > sellCount ? `↑ ${buyCount} buy`
     : sellCount > buyCount ? `↓ ${sellCount} sell`
     : 'neutral'
 
-  const etfLabel = etfDirection === 'bullish' ? '↑ bull'
-    : etfDirection === 'bearish' ? '↓ bear'
-    : '→ neut'
-
+  // ETF Tide row removed (FLAG-9/10): it rendered a faked 62/38/50 magnitude for a direction
+  // already shown in the adjacent "ETF Tide" stat. Only categorical etf_direction is exposed
+  // (no real magnitude), so there is nothing real to wire here without a server change.
   const meters = [
-    { label: 'Dark Pool', pct: dpPct,  value: avgDp.toFixed(3) },
-    { label: 'Flow',      pct: flPct,  value: flowLabel },
-    { label: 'ETF Tide',  pct: etfPct, value: etfLabel },
+    { label: 'Dark Pool', pct: dpPct, value: avgDp.toFixed(3) },
+    { label: 'Flow',      pct: flPct, value: flowLabel },
   ]
 
   return (
@@ -30,7 +27,7 @@ export default function EvidenceMeter({ levels, etfDirection }) {
       <div className="space-y-2">
         {meters.map(m => {
           const isBull = m.pct > 55, isBear = m.pct < 45
-          const barColor = isBull ? 'bg-green-500' : isBear ? 'bg-red-500' : 'bg-gray-500'
+          const barColor = isBull ? 'bg-signal-support' : isBear ? 'bg-signal-resistance' : 'bg-signal-neutral'
           return (
             <div key={m.label} className="flex items-center gap-3">
               <span style={{ minWidth: '80px', flexShrink: 0 }}
@@ -54,8 +51,8 @@ export default function EvidenceMeter({ levels, etfDirection }) {
         })}
       </div>
       <div className="flex justify-between mt-2">
-        <span className="text-xs text-red-600">← Bearish</span>
-        <span className="text-xs text-green-600">Bullish →</span>
+        <span className="text-xs text-signal-resistance/80">← Bearish</span>
+        <span className="text-xs text-signal-support/80">Bullish →</span>
       </div>
     </div>
   )

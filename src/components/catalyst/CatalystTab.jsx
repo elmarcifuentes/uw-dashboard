@@ -18,11 +18,14 @@ export default function CatalystTab({
   const [instrument, setInstrument] = useState(activeSymbol === 'NQ' ? 'MNQ' : 'QQQ')
 
   const isNQ = activeSymbol === 'NQ'
-  const ratio = nqRatio || 41.14
+  // Lock-aware ratio comes from the server (getActiveRatio). No 41.14 fallback: if it's somehow
+  // absent, NQ-denominated values render '—' rather than silently using a stale constant.
+  const ratio = nqRatio
 
   const fmt = (p) => {
     if (p == null) return '—'
     if (isNQ) {
+      if (!ratio) return '—'
       const nq = Math.round(p * ratio * 4) / 4
       return '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }
@@ -31,6 +34,7 @@ export default function CatalystTab({
 
   const fmtDist = (d) => {
     if (d == null || isNaN(d)) return '—'
+    if (isNQ && !ratio) return '—'
     const v = isNQ ? Math.round(Math.abs(d) * ratio * 4) / 4 : Math.abs(d)
     return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }

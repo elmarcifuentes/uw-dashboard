@@ -1,6 +1,7 @@
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
 import ClassificationChip from '../ClassificationChip'
+import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 import { CircleCheck, TriangleAlert, Zap, DoorOpen } from 'lucide-react'
 
 function VelocityIndicator({ velocity }) {
@@ -48,7 +49,7 @@ export default function FocusMode({
 }) {
   const mid   = levels?.find(l => l.id === 'MID')
   const midDp = mid?.dark_pool || 0
-  const gap   = Math.abs(-0.700 - midDp)
+  const gap   = Math.abs(CASCADE_TRIGGER - midDp)
 
   const resistance = levels
     ?.filter(l => l.price > (currentPrice || 0) && l.classification === 'sell_resistance')
@@ -99,7 +100,7 @@ export default function FocusMode({
 
   const cascadeBg = cascade?.active
     ? 'bg-state-stopSoft border-state-stop'
-    : midDp <= -0.500
+    : midDp <= CASCADE_WATCH
     ? 'bg-state-cascadeWatchSoft border-state-cascadeWatch/50'
     : 'bg-bg-card border-border-subtle'
 
@@ -163,18 +164,18 @@ export default function FocusMode({
         <div className="flex items-center gap-3">
           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
             cascade?.active ? 'bg-state-stop animate-pulse'
-              : midDp <= -0.500 ? 'bg-state-cascadeWatch'
+              : midDp <= CASCADE_WATCH ? 'bg-state-cascadeWatch'
               : 'bg-state-hold'
           }`} />
           <span className={`text-sm font-bold ${
             cascade?.active ? 'text-state-stop'
-              : midDp <= -0.500 ? 'text-state-cascadeWatch'
+              : midDp <= CASCADE_WATCH ? 'text-state-cascadeWatch'
               : 'text-state-hold'
           }`}>
-            {cascade?.active ? 'CASCADE ACTIVE' : midDp <= -0.500 ? 'APPROACHING CASCADE' : 'CASCADE SAFE'}
+            {cascade?.active ? 'CASCADE ACTIVE' : midDp <= CASCADE_WATCH ? 'APPROACHING CASCADE' : 'CASCADE SAFE'}
           </span>
           <span className="text-xs text-text-muted font-price">MID dp {midDp.toFixed(3)}</span>
-          <span className={`text-xs font-price hidden sm:inline ${midDp <= -0.500 ? 'text-state-cascadeWatch/80' : 'text-text-disabled'}`}>
+          <span className={`text-xs font-price hidden sm:inline ${midDp <= CASCADE_WATCH ? 'text-state-cascadeWatch/80' : 'text-text-disabled'}`}>
             {gap.toFixed(3)} from -0.700
           </span>
           <div className="flex-1" />
@@ -193,7 +194,7 @@ export default function FocusMode({
             className="absolute inset-y-0 left-0 rounded transition-all duration-500"
             style={{
               width: `${Math.max(0, Math.min(100, ((midDp + 1) / 1.5) * 100))}%`,
-              backgroundColor: cascade?.active ? '#ff4d5e' : midDp <= -0.500 ? '#ffb020' : '#20c997',
+              backgroundColor: cascade?.active ? '#ff4d5e' : midDp <= CASCADE_WATCH ? '#ffb020' : '#20c997',
             }}
           />
           <div className="absolute inset-y-0 w-0.5 bg-state-stop"

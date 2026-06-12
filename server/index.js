@@ -73,10 +73,6 @@ let systemPaused = false
 // Active trades — per symbol
 let activeTrades = { NQ: null, QQQ: null, ES: null, SPY: null }
 
-// Expansion GEX tracking
-let expansionGexHistory  = []
-let allPinningSessions   = 0
-
 // Narrative mode: 'template' | 'claude' | 'off'
 let narrativeMode       = process.env.NARRATIVE_MODE || 'template'
 let narrativeModeSource = process.env.NARRATIVE_MODE ? 'env' : 'default'
@@ -125,6 +121,11 @@ let sessionRatioDate     = null
 //   • age threshold   — latest._received_at older than the rescore guarantee (catches stalls
 //                       / gating bugs that don't throw). Market-hours gated (overnight the
 //                       tape legitimately freezes — rescores are off by design).
+// Cascade thresholds — single source (C1 dedup). Values unchanged from prior literals; mirror
+// the scorer's FROZEN cascade cond1 (MID dp ≤ CASCADE_TRIGGER). Keep in sync with src/utils/cascade.js.
+const CASCADE_TRIGGER = -0.700  // MID dp ≤ this → cascade fire
+const CASCADE_WATCH   = -0.500  // MID dp ≤ this → approaching / pre-warning
+const SCORING_FETCH_COUNT = 5   // runFullScore makes 5 UW fetches per score (budget accounting)
 const STALE_FAILURE_THRESHOLD = 2   // a lone transient UW blip is single; 2-in-a-row = real outage
 const AGE_STALE_MS = Math.round(1.5 * pollingConfig.triggers.timeBasedInterval)   // ~22.5 min
 let consecutiveScoreFailures = 0
@@ -216,13 +217,11 @@ function hashSessionState(result) {
   if (!result) return null
   const key = {
     cascade_active:         result.cascade?.active,
-    cascade_armed:          result.cascade?.conditions?.[0],
     structure_break:        result.structure_break?.active,
     structure_break_dir:    result.structure_break?.direction,
     etf_direction:          result.etf_tide?.direction,
     dominant_classification: result.levels?.map(l => l.classification).join(','),
     full_stack_levels:       result.levels?.filter(l => l.full_stack).map(l => l.id).join(','),
-    expansion_gex_levels:    result.levels?.filter(l => (l.net_gex || 0) < 0).map(l => l.id).join(','),
     mid_dp:                  result.levels?.find(l => l.id === 'MID')?.dark_pool?.toFixed(2),
   }
   return crypto.createHash('md5').update(JSON.stringify(key)).digest('hex')
@@ -248,16 +247,13 @@ async function generateSessionBrief(result) {
   const levelSummary = levels.map(l =>
     `${l.id}: ${fmtForSymbol(l.price, nqRatio)} — ` +
     `${l.classification} | DP ${l.dark_pool?.toFixed(3)} | score ${l.score} | conf ${l.confidence}` +
-    `${l.full_stack ? ' | FULL STACK ★' : ''}` +
-    `${(l.net_gex || 0) < 0 ? ' | EXPANSION GEX ⚠' : ''}`
+    `${l.full_stack ? ' | FULL STACK ★' : ''}`
   ).join('\n')
 
   const currentStr = fmtForSymbol(currentPrice, nqRatio)
 
   const cascadeStr = cascade?.active
     ? 'CASCADE ACTIVE ⚠ — no institutional floor below MID'
-    : cascade?.conditions?.[0]
-    ? `Cascade armed — MID DP ${mid?.dark_pool?.toFixed(3)}, ${Math.abs(-0.700 - (mid?.dark_pool || 0)).toFixed(3)} from trigger`
     : 'Cascade inactive'
 
   const sessionPrompt = `You are a professional ${activeSymbolPref} trading analyst preparing a pre-session brief.
@@ -337,7 +333,6 @@ function hashLevel(level) {
     full_stack:     level.full_stack,
     confidence:     level.confidence,
     etf_direction:  level.etf_direction,
-    expansion_gex:  (level.net_gex || 0) < 0,
     dp_condition:   level.dp_condition,
   }
   return crypto.createHash('md5').update(JSON.stringify(key)).digest('hex')
@@ -408,14 +403,13 @@ CURRENT LEVEL — ${level.id}:
   Dark Pool: ${level.dark_pool?.toFixed(4)}
   Full Stack: ${level.full_stack ? 'YES ★' : 'no'}
   ETF Direction: ${level.etf_direction || 'none'}
-  ${(level.net_gex || 0) < 0 ? '⚠ EXPANSION GEX — no mechanical friction' : 'GEX pinning active'}
 
 CURRENT PRICE: ${fmtForSymbol(currentPrice, nqRatio)} ${distStr}
 
 OTHER LEVELS:
 ${otherLevels}
 
-CASCADE: ${cascade?.active ? 'ACTIVE ⚠' : cascade?.conditions?.[0] ? 'ARMED (condition 1 met)' : 'inactive'}
+CASCADE: ${cascade?.active ? 'ACTIVE ⚠' : 'inactive'}
 STRUCTURE BREAK: ${result?.structure_break?.active ? 'ACTIVE — ' + result.structure_break.direction : 'intact'}
 
 Write 3-4 sentences: what the classification/DP means, what to watch for, retest scenario, target on confirmation.
@@ -458,7 +452,7 @@ function generateTemplateAssistantRead(result) {
   const nearest  = levels.reduce((n, l) => Math.abs(price - l.price) < Math.abs(price - n.price) ? l : n)
   const sellLvls = levels.filter(l => l.classification === 'sell_resistance')
   const buyLvls  = levels.filter(l => l.classification === 'buy_support')
-  const gap      = mid?.dark_pool != null ? Math.abs(-0.700 - mid.dark_pool).toFixed(3) : null
+  const gap      = mid?.dark_pool != null ? Math.abs(CASCADE_TRIGGER - mid.dark_pool).toFixed(3) : null
 
   return {
     now: `Price $${price.toFixed(2)}${nq(price)} ${price > nearest.price ? 'above' : 'below'} ${nearest.id} $${nearest.price.toFixed(2)}${nq(nearest.price)}.`,
@@ -469,7 +463,7 @@ function generateTemplateAssistantRead(result) {
       : 'No classified levels — monitor for development.',
     risk: cascade?.active
       ? 'CASCADE ACTIVE — no institutional floor below MID.'
-      : gap && mid?.dark_pool <= -0.500
+      : gap && mid?.dark_pool <= CASCADE_WATCH
       ? `MID dark pool ${mid.dark_pool.toFixed(3)} — ${gap} from cascade trigger.`
       : result?.structure_break?.active
       ? `Structure break ${result.structure_break.direction} — GEX extension active.`
@@ -506,7 +500,7 @@ async function generateAssistantRead(result) {
     `${l.id} ${fmtForSymbol(l.price, nqRatio)} — ${l.classification} DP ${l.dark_pool?.toFixed(3)}${l.full_stack ? ' FULL STACK ★' : ''}`
   ).join('\n')
 
-  const cascadeStr = cascade?.active ? 'ACTIVE' : mid?.dark_pool <= -0.700 ? 'threshold met' : `${Math.abs(-0.700 - (mid?.dark_pool || 0)).toFixed(3)} from trigger`
+  const cascadeStr = cascade?.active ? 'ACTIVE' : mid?.dark_pool <= CASCADE_TRIGGER ? 'threshold met' : `${Math.abs(CASCADE_TRIGGER - (mid?.dark_pool || 0)).toFixed(3)} from trigger`
 
   const prompt = `Analyze this ${activeSymbolPref} scoring result.
 
@@ -547,7 +541,6 @@ function hashScoringResult(result) {
   if (!result) return null
   const key = {
     cascade:             result.cascade?.active,
-    cascade_armed:       result.cascade?.conditions?.[0],
     structure_break:     result.structure_break?.active,
     structure_break_dir: result.structure_break?.direction,
     levels:              result.levels?.map(l => ({
@@ -602,7 +595,6 @@ Rules:
 - Mention dark pool values when significant (±0.500+)
 - Flag cascade if MID dark pool approaching -0.700
 - Flag FULL STACK ★ if any level shows it
-- Flag expansion GEX if net_gex negative on any level
 - Plain English — no bullet points — flowing prose only
 - Maximum 4 sentences
 
@@ -696,9 +688,9 @@ function generateNarrative(result, dpHist) {
   // 3. Cascade status
   if (cascade?.active) {
     lines.push(`⚠ CASCADE ACTIVE — no institutional floor below MID.`)
-  } else if (mid && mid.dark_pool != null && mid.dark_pool <= -0.500) {
+  } else if (mid && mid.dark_pool != null && mid.dark_pool <= CASCADE_WATCH) {
     const gap = -0.700 - mid.dark_pool
-    if (mid.dark_pool > -0.700) {
+    if (mid.dark_pool > CASCADE_TRIGGER) {
       lines.push(
         `MID dark pool at ${mid.dark_pool.toFixed(3)} — ${Math.abs(gap).toFixed(3)} from cascade trigger at -0.700.`
       )
@@ -755,16 +747,15 @@ function computeSentiment(result) {
   const total     = signals.length || 1
 
   const cascadeActive = cascade?.active || false
-  const cascadeArmed  = cascade?.conditions?.[0] || false
   const hasFullStack  = levels.some(l => l.full_stack)
 
+  // CAUTION/ARMED state removed (FLAG-5): it gated on cascade.conditions[0], which runFullScore
+  // never emits ({active, mid_dp} only) — so the branch was permanently unreachable. The cascade
+  // pre-warning is being redesigned trade-aware; see TASK-CASCADE-WATCH in docs/TASKS.md.
   let state, label, color, description
   if (cascadeActive) {
     state = 'HIGH_RISK'; label = 'HIGH RISK'; color = 'red'
     description = 'Cascade active — no institutional floor below MID'
-  } else if (cascadeArmed && bearCount > bullCount) {
-    state = 'CAUTION'; label = 'CAUTION'; color = 'amber'
-    description = 'Cascade armed + bearish signals — elevated risk'
   } else if (bullCount >= Math.ceil(total * 0.67)) {
     state = 'BULLISH'; label = 'BULLISH'; color = 'green'
     description = `${bullCount}/${total} signals bullish — setups confirmed`
@@ -776,7 +767,7 @@ function computeSentiment(result) {
     description = 'Signals conflicting — trade with reduced size'
   }
 
-  return { state, label, color, description, bullCount, bearCount, total, signals, cascadeActive, cascadeArmed, hasFullStack }
+  return { state, label, color, description, bullCount, bearCount, total, signals, cascadeActive, hasFullStack }
 }
 
 function updateDpHistory(result) {
@@ -816,41 +807,9 @@ function trackLevelTouches(currentPrice, levels, dbInstance) {
   lastTrackedPrice = currentPrice
 }
 
-function detectExpansionGex(result) {
-  if (!result?.levels) return []
-  return result.levels
-    .filter(l => (l.net_gex ?? l.gex?.net_gex) < 0)
-    .map(l => ({
-      level:          l.id,
-      net_gex:        l.net_gex ?? l.gex?.net_gex,
-      price:          l.price,
-      classification: l.classification,
-      gex_bias:       l.gex_bias ?? l.gex?.gex_bias ?? 'expansion',
-    }))
-}
-
-function checkExpansionGex(result) {
-  const expansionLevels = detectExpansionGex(result)
-  if (expansionLevels.length === 0) {
-    allPinningSessions++
-    expansionGexHistory = []
-  } else {
-    const sessionCount = allPinningSessions
-    allPinningSessions   = 0
-    expansionGexHistory  = expansionLevels
-    const message = expansionLevels.map(l =>
-      `${l.level} GEX ${l.net_gex.toLocaleString()} — EXPANSION`
-    ).join(' · ')
-    console.log(`[server] Expansion GEX: ${message} (after ${sessionCount} pinning sessions)`)
-    sseEmitter.emit('event', {
-      type:                     'expansion_gex',
-      levels:                   expansionLevels,
-      consecutivePinningSessions: sessionCount,
-      message,
-      timestamp:                new Date().toISOString(),
-    })
-  }
-}
+// Expansion-GEX signalling removed (FLAG-4): level payloads never carried net_gex, so this
+// detection always returned empty and the expansion_gex SSE/badge never fired. GEX *context*
+// display (gexContext → level.gex) is a separate, retained role. See docs/TASKS.md.
 
 function detectChanges(prev, next) {
   if (!prev || !next) return []
@@ -989,7 +948,6 @@ provider.onRescore(async ({ price, reason }) => {
     provider.setLevels(result.levels)
     console.log(`[server] Auto-rescore complete — ${result.levels.length} levels scored`)
     emitStaleIfChanged(result)
-    checkExpansionGex(result)
     updateDpHistory(result)
     if (result.current_price) trackLevelTouches(result.current_price, result.levels, db)
     const sentiment = computeSentiment(result)
@@ -1000,7 +958,6 @@ provider.onRescore(async ({ price, reason }) => {
       result,
       trigger:     reason,
       price,
-      expansionGex: detectExpansionGex(result),
       dpHistory:   { ...dpHistory },
       sentiment,
       timestamp:   new Date().toISOString(),
@@ -1106,10 +1063,8 @@ provider.onPriceUpdate((price) => {
     dataStale:    fresh.dataStale,
     dataAgeSec:   fresh.dataAgeSec,
     cascade: {
-      active:         latest?.cascade?.active        || false,
-      mid_dp:         latest?.cascade?.mid_dp        ?? null,
-      gap_to_trigger: latest?.cascade?.gap_to_trigger ?? null,
-      conditions:     latest?.cascade?.conditions    || [false, false, false],
+      active:         latest?.cascade?.active  || false,
+      mid_dp:         latest?.cascade?.mid_dp  ?? null,
     },
     timestamp:    new Date().toISOString(),
   })
@@ -1183,7 +1138,6 @@ app.post("/update", async (req, res) => {
   if (result.current_price) provider.rest.lastPrice = Number(result.current_price)
   console.log(`[update] session=${result.session} run_type=${result.run_type}`)
   emitStaleIfChanged(result)
-  checkExpansionGex(result)
   updateDpHistory(result)
   const _sentiment = computeSentiment(result)
   result._sentiment = _sentiment
@@ -1192,7 +1146,6 @@ app.post("/update", async (req, res) => {
     result,
     trigger:     result.run_type || 'update',
     price:       result.current_price,
-    expansionGex: detectExpansionGex(result),
     dpHistory:    { ...dpHistory },
     sentiment:    _sentiment,
     timestamp:    new Date().toISOString(),
@@ -1267,9 +1220,6 @@ app.get('/status', (req, res) => {
     moveFromOpen: sessionOpenPrice && s.lastPrice
       ? (s.lastPrice - sessionOpenPrice).toFixed(2)
       : null,
-    expansionGexActive: expansionGexHistory.length > 0,
-    expansionGexLevels: expansionGexHistory,
-    allPinningSessions,
     dpHistory: { ...dpHistory },
     narrativeMode,
     narrativeModeSource,
@@ -1799,13 +1749,12 @@ app.post('/webhook/accept', async (req, res) => {
         history.unshift(result)
         if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
         provider.setLevels(result.levels)
-        checkExpansionGex(result)
         updateDpHistory(result)
         const sent = computeSentiment(result)
         result._sentiment = sent
         sseEmitter.emit('event', {
           type: 'rescore', result, trigger: 'webhook levels accepted',
-          price: result.current_price, expansionGex: detectExpansionGex(result),
+          price: result.current_price,
           dpHistory: { ...dpHistory }, sentiment: sent,
           timestamp: new Date().toISOString(),
         })
@@ -2634,9 +2583,14 @@ async function runScoreWithNq(opts) {
     result = await runFullScore(opts)
   } catch (err) {
     markScoreFailure()
+    // The 5 scoring fetches still hit UW before a dark-pool hard-abort (err.source set) — count
+    // them too so the budget panel/guard isn't understated (FLAG-7). Pre-fetch errors (no levels)
+    // carry no source and are not counted.
+    if (err?.source) provider.recordExternalCalls?.(SCORING_FETCH_COUNT)
     throw err   // preserve each caller's existing catch behavior (now source-named, see below)
   }
   markScoreSuccess(result)
+  provider.recordExternalCalls?.(SCORING_FETCH_COUNT)   // 5 UW fetches per completed score (FLAG-7)
   if (result?.levels?.length) {
     const today = getTodayET()
     const row = db.prepare(`SELECT * FROM daily_levels WHERE date = ?`).get(today)
@@ -2726,13 +2680,12 @@ async function applyAutoLevelsIfEnabled() {
         // via the shared previousResult, which this advances — so a polling rescore arriving
         // shortly after won't re-badge the same classification change (no duplicate).
         emitStaleIfChanged(result)
-        checkExpansionGex(result)
         updateDpHistory(result)
         const sentiment = computeSentiment(result)
         result._sentiment = sentiment
         sseEmitter.emit('event', {
           type: 'rescore', result, trigger: 'auto_level_update',
-          price: result.current_price, expansionGex: detectExpansionGex(result),
+          price: result.current_price,
           dpHistory: { ...dpHistory }, sentiment, timestamp: new Date().toISOString(),
         })
       } catch (err) {
@@ -2760,14 +2713,13 @@ async function runAutoRescore(trigger = 'manual') {
     if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
     provider.setLevels(result.levels)
     emitStaleIfChanged(result)
-    checkExpansionGex(result)
     updateDpHistory(result)
     if (result.current_price) trackLevelTouches(result.current_price, result.levels, db)
     const sentiment = computeSentiment(result)
     result._sentiment = sentiment
     sseEmitter.emit('event', {
       type: 'rescore', result, trigger,
-      price: result.current_price, expansionGex: detectExpansionGex(result),
+      price: result.current_price,
       dpHistory: { ...dpHistory }, sentiment, timestamp: new Date().toISOString(),
     })
     console.log(`[rescore] complete (${trigger}) — ${result.levels.length} levels`)
@@ -2791,7 +2743,6 @@ async function scoreNow(trigger) {
   provider.setLevels(result.levels)
   emitStaleIfChanged(result)   // align with provider.onRescore / runAutoRescore — raise the
                                // LEVELS CHANGED badge + advance previousResult on manual paths too
-  checkExpansionGex(result)
   updateDpHistory(result)
   if (result.current_price) trackLevelTouches(result.current_price, result.levels, db)
   const sentiment = computeSentiment(result)
@@ -2799,7 +2750,7 @@ async function scoreNow(trigger) {
   const scoredAt = new Date().toISOString()
   sseEmitter.emit('event', {
     type: 'rescore', result, trigger,
-    price: result.current_price, expansionGex: detectExpansionGex(result),
+    price: result.current_price,
     dpHistory: { ...dpHistory }, sentiment, timestamp: scoredAt,
   })
   // Background narrative regeneration (slow) — identical set to the /rescore path
@@ -3353,7 +3304,7 @@ function scoreCatalystBias(flowData, pcData, gexData, tideData, latestResult) {
     unavailable('MID Dark Pool', 'HIGH', 'no scored MID level yet')
   } else {
     const midDp = midLevel.dark_pool || 0
-    if (midDp <= -0.500) {
+    if (midDp <= CASCADE_WATCH) {
       downVotes += 2
       factors.push({ name: 'MID Dark Pool', value: midDp.toFixed(3), vote: 'DOWN', weight: 'HIGH', note: `${midDp.toFixed(3)} — strong institutional selling at MID`, available: true })
     } else if (midDp >= 0.500) {

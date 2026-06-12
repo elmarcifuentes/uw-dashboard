@@ -11,6 +11,7 @@ import HoldExitGuide from '../trade/HoldExitGuide'
 import TradeEntryForm from '../trade/TradeEntryForm'
 import InstrumentSelector from '../trade/InstrumentSelector'
 import ClassificationChip from '../ClassificationChip'
+import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -87,7 +88,7 @@ export default function RightRail({
 
   const mid    = levels?.find(l => l.id === 'MID')
   const midDp  = mid?.dark_pool ?? 0
-  const gap    = Math.abs(-0.700 - midDp)
+  const gap    = Math.abs(CASCADE_TRIGGER - midDp)
   const activeLevelData = activeLevel ? levels?.find(l => l.id === activeLevel) : null
 
   const handleEnterTrade = async (tradeData) => {
@@ -155,21 +156,21 @@ export default function RightRail({
           <div className={`border rounded-lg p-3 ${
             cascade?.active
               ? 'border-state-stop bg-state-stopSoft'
-              : midDp <= -0.500
+              : midDp <= CASCADE_WATCH
               ? 'border-state-cascadeWatch/50 bg-state-cascadeWatchSoft'
               : 'border-border-subtle bg-bg-card'
           }`}>
             <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">Cascade Monitor</div>
             <div className={`text-sm font-bold mb-1 ${
               cascade?.active ? 'text-state-stop'
-                : midDp <= -0.500 ? 'text-state-cascadeWatch'
+                : midDp <= CASCADE_WATCH ? 'text-state-cascadeWatch'
                 : 'text-state-hold'
             }`}>
-              {cascade?.active ? '⚠ ACTIVE' : midDp <= -0.500 ? '⚡ APPROACHING' : '✓ SAFE'}
+              {cascade?.active ? '⚠ ACTIVE' : midDp <= CASCADE_WATCH ? '⚡ APPROACHING' : '✓ SAFE'}
             </div>
             <div className="text-xs text-text-secondary font-price">MID dp {midDp.toFixed(3)}</div>
             {!cascade?.active && (
-              <div className={`text-xs font-price mt-0.5 ${midDp <= -0.500 ? 'text-state-cascadeWatch' : 'text-text-muted'}`}>
+              <div className={`text-xs font-price mt-0.5 ${midDp <= CASCADE_WATCH ? 'text-state-cascadeWatch' : 'text-text-muted'}`}>
                 {gap.toFixed(3)} from trigger
               </div>
             )}

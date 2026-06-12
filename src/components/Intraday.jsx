@@ -9,7 +9,6 @@ import PriceSparkline from './intraday/PriceSparkline'
 import DarkPoolChart from './intraday/DarkPoolChart'
 import EtfTideChart from './intraday/EtfTideChart'
 import RescoreLog from './intraday/RescoreLog'
-import ExpansionGexAlert from './intraday/ExpansionGexAlert'
 import CascadeProximityGauge from './intraday/CascadeProximityGauge'
 import NarrativeBlock from './intraday/NarrativeBlock'
 import LiveHeader from './intraday/LiveHeader'
@@ -27,7 +26,6 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
     dataStale, dataAgeSec,
     history, levelAlert, clearLevelAlert,
     chartStale, staleChanges,
-    expansionGex, pinningSessions,
     midDpHistory, dpHistory, narrative, narrativeMode, levelNarratives, tacticalBrief,
     assistantRead, priceVelocity, priceHistory, levelTouches,
   } = useSSE(`${API_URL}/stream`)
@@ -292,8 +290,6 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
         </div>
       )}
 
-      <ExpansionGexAlert expansionGex={expansionGex} pinningSessions={pinningSessions} />
-
       {/* 12-col grid: left 8-col main content, right 4-col rail */}
       <div className="grid grid-cols-12 gap-3">
 
@@ -351,7 +347,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
               /* Partial score → subtle dim (never hidden) to signal the evidence is incomplete */
               <div className={result?.degraded ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} expansionGex={expansionGex} />
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} />
               </div>
             )}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}

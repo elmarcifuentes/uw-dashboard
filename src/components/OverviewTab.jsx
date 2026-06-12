@@ -63,7 +63,6 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
     : null
 
   const etfDir   = levels[0]?.etf_direction || 'neutral'
-  const streak   = status?.allPinningSessions ?? '—'
   const apiCalls = budget?.callsToday ?? '—'
 
   return (
@@ -166,14 +165,13 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
       </div>
 
       {/* Evidence meter */}
-      <EvidenceMeter levels={levels} etfDirection={etfDir} />
+      <EvidenceMeter levels={levels} />
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Streak"     value={streak}          sub="consecutive sessions" color="text-text-primary" />
-        <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} color={etfDir === 'bullish' ? 'text-green-400' : etfDir === 'bearish' ? 'text-red-400' : 'text-text-secondary'} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatCard label="ETF Tide"   value={etfDir.toUpperCase()} sub={etfDir === 'bullish' ? 'institutions buying calls' : etfDir === 'bearish' ? 'institutions selling' : 'mixed flow'} color={etfDir === 'bullish' ? 'text-signal-support' : etfDir === 'bearish' ? 'text-signal-resistance' : 'text-text-secondary'} />
         <StatCard label="API Budget" value={apiCalls}        sub={`/ 14,000 (${typeof apiCalls === 'number' ? ((apiCalls / 14000) * 100).toFixed(1) : '—'}%)`} color="text-text-primary" />
-        <StatCard label="GEX Regime" value={status?.expansionGexActive ? 'EXPANSION' : 'PINNING'} sub={`${status?.allPinningSessions ?? '—'} sessions`} color={status?.expansionGexActive ? 'text-red-400' : 'text-green-400'} />
+        <StatCard label="Levels"     value={levels.length || '—'} sub="scored R2–S2" color="text-text-primary" />
       </div>
 
       {/* Lower row — Top Movers + Sector Flow */}

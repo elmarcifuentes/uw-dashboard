@@ -1,3 +1,5 @@
+import { CASCADE_TRIGGER, CASCADE_WATCH } from './cascade'
+
 // Dark-pool condition labels. DP is the supply/demand axis (its own labeled channel, subordinate
 // to the scored-bias chip): absorption/buying → signal-support, supply/selling → signal-resistance,
 // cascade warnings → state-cascade*, indeterminate → neutral. No raw Tailwind colors.
@@ -76,7 +78,7 @@ export function dpConditionLabel(darkPool, levelType, classification) {
 }
 
 export function midDpWarning(darkPool) {
-  if (darkPool <= -0.700) return { show: true, text: 'Past cascade threshold', color: 'text-state-cascadeActive' }
-  if (darkPool <= -0.500) return { show: true, text: 'Approaching cascade threshold', color: 'text-state-cascadeWatch' }
+  if (darkPool <= CASCADE_TRIGGER) return { show: true, text: 'Past cascade threshold', color: 'text-state-cascadeActive' }
+  if (darkPool <= CASCADE_WATCH)   return { show: true, text: 'Approaching cascade threshold', color: 'text-state-cascadeWatch' }
   return { show: false }
 }

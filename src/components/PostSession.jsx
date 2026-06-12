@@ -39,7 +39,6 @@ function getEventStyle(eventType) {
     'cascade_fired':     { color: 'bg-red-800',    label: '⚠ CASCADE',  text: 'text-red-300' },
     'cascade_resolved':  { color: 'bg-green-900',  label: '✓ Resolved', text: 'text-green-400' },
     'structure_break':   { color: 'bg-amber-900',  label: '⚠ BREAK',   text: 'text-amber-400' },
-    'expansion_gex':     { color: 'bg-red-900',    label: '⚡ GEX EXP', text: 'text-red-400' },
     'level_cross':       { color: 'bg-yellow-900', label: '⚡ CROSS',   text: 'text-yellow-400' },
     'level_touch':       { color: 'bg-indigo-900', label: '· touch',    text: 'text-indigo-400' },
     'narrative':         { color: 'bg-purple-900', label: '🤖 AI',      text: 'text-purple-400' },
@@ -47,7 +46,7 @@ function getEventStyle(eventType) {
   return map[eventType] || { color: 'bg-bg-elevated', label: eventType || '—', text: 'text-text-tertiary' }
 }
 
-const KEY_EVENTS = new Set(['cascade_fired', 'cascade_resolved', 'structure_break', 'expansion_gex', 'level_cross'])
+const KEY_EVENTS = new Set(['cascade_fired', 'cascade_resolved', 'structure_break', 'level_cross'])
 
 function SessionTimeline({ events, activeSymbol, nqRatio }) {
   const [selected, setSelected] = useState(null)
@@ -281,9 +280,6 @@ export default function PostSession({ activeSymbol = 'QQQ', nqRatio = null }) {
 
               {story.session.structure_break_fired && (
                 <div className="text-amber-400 text-sm font-bold mb-1">⚠ Structure Break</div>
-              )}
-              {story.session_notes?.expansion_gex_fired && (
-                <div className="text-red-400 text-xs font-bold mb-1">⚠ Expansion GEX fired</div>
               )}
               <div className="text-text-tertiary text-xs mt-2">
                 Magnet streak: <span className="text-text-primary">{story.session.magnet_streak ?? '—'}</span>

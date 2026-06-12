@@ -51,9 +51,6 @@ export default function SentimentBadge({ sentiment, compact = false }) {
           ⚠ Cascade active — no floor below MID
         </p>
       )}
-      {sentiment.cascadeArmed && !sentiment.cascadeActive && (
-        <p className="text-xs text-amber-400">⚡ Cascade condition 1 met — monitor S1</p>
-      )}
     </div>
   )
 }

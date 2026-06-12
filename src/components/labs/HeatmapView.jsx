@@ -5,7 +5,8 @@ export default function HeatmapView({ levels, currentPrice, nqRatio, activeSourc
   const p = (v) => {
     if (v == null) return '—'
     if (showNQ) {
-      const val = activeSource === 'nq' ? v : Math.round(v * (nqRatio || 41.14) * 4) / 4
+      if (activeSource !== 'nq' && !nqRatio) return '—'   // no 41.14 fallback
+      const val = activeSource === 'nq' ? v : Math.round(v * nqRatio * 4) / 4
       return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }
     return `$${v.toFixed(2)}`

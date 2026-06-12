@@ -141,14 +141,9 @@ export default function LevelCard({
           </div>
         )}
 
-        {(level.full_stack || (level.net_gex || 0) < 0) && (
+        {level.full_stack && (
           <div className="flex gap-1.5 mt-1.5">
-            {level.full_stack && (
-              <span className="text-xs text-accent-price font-bold">★ FULL STACK</span>
-            )}
-            {(level.net_gex || 0) < 0 && (
-              <span className="text-xs text-signal-resistance">⚡ EXP</span>
-            )}
+            <span className="text-xs text-accent-price font-bold">★ FULL STACK</span>
           </div>
         )}
       </div>
@@ -218,13 +213,6 @@ export default function LevelCard({
               {levelTouches.crosses > 0 && (
                 <span className="text-state-cascadeWatch/60">crossed {levelTouches.crosses}×</span>
               )}
-            </div>
-          )}
-
-          {level.net_gex != null && (
-            <div className="text-xs text-text-muted">
-              GEX {level.net_gex?.toLocaleString()}
-              {(level.net_gex || 0) < 0 ? ' — expansion' : ' — pinning'}
             </div>
           )}
 

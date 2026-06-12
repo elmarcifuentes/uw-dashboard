@@ -1,12 +1,13 @@
 import AlertBadge from './AlertBadge'
 import { TriangleAlert } from 'lucide-react'
+import { CASCADE_TRIGGER, CASCADE_WATCH } from '../utils/cascade'
 
 export default function ImmediateRiskCard({ cascade, levels, structureBreak }) {
   const mid    = levels?.find(l => l.id === 'MID')
   const midDp  = mid?.dark_pool ?? 0
-  const gap    = Math.abs(-0.700 - midDp)
+  const gap    = Math.abs(CASCADE_TRIGGER - midDp)
   const isHigh = cascade?.active || structureBreak?.active
-  const isMed  = !isHigh && midDp <= -0.500
+  const isMed  = !isHigh && midDp <= CASCADE_WATCH
 
   const border = isHigh ? 'border-state-stop' : isMed ? 'border-state-cascadeWatch' : 'border-border-subtle'
   const bg     = isHigh ? 'bg-state-stopSoft'  : isMed ? 'bg-state-cascadeWatchSoft'  : 'bg-bg-card'
@@ -27,25 +28,9 @@ export default function ImmediateRiskCard({ cascade, levels, structureBreak }) {
         )}
       </div>
 
-      <div className="space-y-1.5 mt-3">
-        {[
-          { label: 'MID dp ≤ -0.700', met: cascade?.conditions?.[0] },
-          { label: 'S1 zero/artifact', met: cascade?.conditions?.[1] },
-          { label: 'S2 structural void', met: cascade?.conditions?.[2] },
-        ].map((c, i) => (
-          <div key={i} className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 ${
-            c.met ? 'bg-state-stopSoft border border-state-stop/40' : 'bg-bg-card2/40 border border-border-subtle/40'
-          }`}>
-            <span className={`text-sm font-bold leading-none ${c.met ? 'text-state-stop' : 'text-text-disabled'}`}>
-              {c.met ? '✓' : '○'}
-            </span>
-            <span className={`text-xs ${c.met ? 'text-state-stop/80 font-medium' : 'text-text-muted'}`}>
-              {c.label}
-            </span>
-            {c.met && <span className="ml-auto text-xs text-state-stop font-bold">MET</span>}
-          </div>
-        ))}
-      </div>
+      {/* The 3-condition checklist was removed (FLAG-5): cascade.conditions for S1/S2 was never
+          emitted, so conditions 2–3 had no data. The AlertBadge above is the live read
+          (cascade.active + MID dp). Trade-aware cascade-watch is TASK-CASCADE-WATCH. */}
 
       {structureBreak?.active && (
         <div className="mt-2 text-xs text-state-cascadeWatch flex items-center gap-1">

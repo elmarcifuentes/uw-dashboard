@@ -5,7 +5,6 @@ export default function SessionScoreboard({ session }) {
   const accuracy      = session.accuracy || {}
   const cascadeFired  = session.session?.cascade_fired
   const cascadeEvent  = session.cascade_events?.[0]
-  const expansionGex  = session.session_notes?.expansion_gex_fired
   const accuracyPct   = accuracy.accuracy_pct
 
   const classified = outcomes.filter(o => o.classification !== 'no_edge')
@@ -105,11 +104,6 @@ export default function SessionScoreboard({ session }) {
             {session.session?.date} · {session.session?.session_type || 'Session'}
           </div>
         </div>
-        {expansionGex && (
-          <span className="text-xs text-red-400 bg-red-950/50 border border-red-900/50 px-2 py-1 rounded">
-            ⚡ Expansion GEX fired
-          </span>
-        )}
       </div>
 
       {/* Score cards */}

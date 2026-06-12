@@ -1,14 +1,15 @@
 import { memo } from 'react'
 import AlertBadge from '../AlertBadge'
+import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 
 function CascadeThermometer({ midDp }) {
   const clamped       = Math.max(-1.0, Math.min(0.5, midDp ?? 0))
   const H = 60, W = 12
   const pct           = ((clamped - (-1.0)) / 1.5) * 100
-  const thresholdPct  = ((-0.700 - (-1.0)) / 1.5) * 100
+  const thresholdPct  = ((CASCADE_TRIGGER - (-1.0)) / 1.5) * 100
   const fillH         = (pct / 100) * H
   const thresholdY    = H - (thresholdPct / 100) * H
-  const color = midDp <= -0.700 ? '#ff4d5e' : midDp <= -0.500 ? '#ffb020' : '#20c997'
+  const color = midDp <= CASCADE_TRIGGER ? '#ff4d5e' : midDp <= CASCADE_WATCH ? '#ffb020' : '#20c997'
   return (
     <div className="flex flex-col items-center gap-1 shrink-0">
       <span className="text-xs text-text-muted">dp</span>
@@ -28,24 +29,23 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
 
   const midDp        = cascade.mid_dp
   const active       = cascade.active
-  const CASCADE_THRESHOLD = -0.700
 
   const pct          = Math.min(100, Math.max(0, ((1.0 - midDp) / 2.0) * 100))
-  const thresholdPct = ((1.0 - CASCADE_THRESHOLD) / 2.0) * 100
+  const thresholdPct = ((1.0 - CASCADE_TRIGGER) / 2.0) * 100
 
-  const gap = midDp > CASCADE_THRESHOLD
-    ? Math.abs(CASCADE_THRESHOLD - midDp)
+  const gap = midDp > CASCADE_TRIGGER
+    ? Math.abs(CASCADE_TRIGGER - midDp)
     : null
 
-  const barColor = midDp <= CASCADE_THRESHOLD
+  const barColor = midDp <= CASCADE_TRIGGER
     ? 'bg-state-stop'
-    : midDp <= -0.500
+    : midDp <= CASCADE_WATCH
     ? 'bg-state-cascadeWatch'
     : 'bg-state-hold'
 
   const valueColor = active
     ? 'text-state-stop'
-    : midDp <= -0.500 ? 'text-state-cascadeWatch'
+    : midDp <= CASCADE_WATCH ? 'text-state-cascadeWatch'
     : midDp <= -0.300 ? 'text-state-cascadeWatch/70'
     : 'text-text-secondary'
 
@@ -102,7 +102,9 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
 
       <div className="flex flex-col gap-1.5 mt-2">
         {['MID dp ≤ −0.700', 'S1 zero/artifact', 'S2 structural void'].map((label, i) => {
-          const met = cascade.conditions?.[i]
+          // cascade.conditions (S1/S2 states) was never emitted (FLAG-5). Derive condition 1 from
+          // the live MID dp; 2–3 only resolve when the full cascade is active. TASK-CASCADE-WATCH.
+          const met = i === 0 ? (cascade.mid_dp ?? 0) <= CASCADE_TRIGGER: cascade.active
           return (
           <div key={i} className="flex items-center gap-2">
             <span className={`w-3 h-3 rounded-full shrink-0 ${
@@ -125,7 +127,7 @@ export default memo(function CascadeProximityGauge({ cascade, midDpHistory }) {
           {midDpHistory.slice(-3).map((reading, i, arr) => (
             <span key={i}>
               <span className={
-                reading.value <= -0.700 ? 'text-state-stop' :
+                reading.value <= CASCADE_TRIGGER? 'text-state-stop' :
                 reading.value <= -0.300 ? 'text-state-cascadeWatch' :
                 reading.value >= 0.300  ? 'text-state-hold' :
                 'text-text-secondary'

@@ -10,8 +10,6 @@ export function useSSE(url) {
   const [levelAlert, setLevelAlert]           = useState(null)
   const [chartStale, setChartStale]           = useState(false)
   const [staleChanges, setStaleChanges]       = useState([])
-  const [expansionGex, setExpansionGex]       = useState([])
-  const [pinningSessions, setPinningSessions] = useState(0)
   const [midDpHistory, setMidDpHistory]       = useState([])
   const [dpHistory, setDpHistory]             = useState({})
   const [narrative, setNarrative]             = useState([])
@@ -166,7 +164,6 @@ export function useSSE(url) {
           console.log('[SSE] rescore levels:', data.result?.levels?.length, '| S1:', data.result?.levels?.find(l => l.id === 'S1')?.classification, 'dp:', data.result?.levels?.find(l => l.id === 'S1')?.dark_pool)
           setRescoreData(data)
           setHistory(prev => [data, ...prev].slice(0, 50))
-          if (data.expansionGex !== undefined) setExpansionGex(data.expansionGex || [])
           if (data.dpHistory)  setDpHistory(data.dpHistory)
           if (data.narrative)  setNarrative(data.narrative)
           if (data.sentiment)  setSentiment(data.sentiment)
@@ -220,11 +217,6 @@ export function useSSE(url) {
           console.log('[SSE] narrative_update received:', data.narrative?.length, 'lines')
           console.log('[SSE] line 1:', data.narrative?.[0])
           setNarrative(data.narrative || [])
-          return
-        }
-        if (data.type === 'expansion_gex') {
-          setExpansionGex(data.levels || [])
-          setPinningSessions(data.consecutivePinningSessions ?? 0)
           return
         }
         if (data.type === 'assistant_read_update') {
@@ -304,8 +296,6 @@ export function useSSE(url) {
     clearLevelAlert: () => setLevelAlert(null),
     chartStale,
     staleChanges,
-    expansionGex,
-    pinningSessions,
     midDpHistory,
     dpHistory,
     narrative,

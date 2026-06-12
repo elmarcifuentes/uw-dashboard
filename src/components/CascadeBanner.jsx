@@ -3,7 +3,6 @@ export default function CascadeBanner({ cascade, midPrice, nqRatio }) {
 
   const active     = cascade.active
   const midDp      = cascade.mid_dp ?? null
-  const conditions = cascade.conditions ?? [false, false, false]
   const midNq      = nqRatio && midPrice ? Math.round(midPrice * nqRatio).toLocaleString() : null
 
   if (!active) {
@@ -32,18 +31,15 @@ export default function CascadeBanner({ cascade, midPrice, nqRatio }) {
         Do not hold longs through a MID break in this configuration.
       </p>
       <div className="space-y-1">
+        {/* When ACTIVE, all three cascade conditions hold by definition (active = cond1∧cond2∧cond3). */}
         {[
           'MID dark pool below -0.700 threshold' + (midDp !== null ? ` (${midDp.toFixed(3)})` : ''),
           'S1 has no institutional prints',
           'S2 is a structural void',
         ].map((label, i) => (
           <div key={i} className="flex items-center gap-2 text-xs">
-            <span className={conditions[i] ? 'text-state-stop' : 'text-text-muted'}>
-              {conditions[i] ? '●' : '○'}
-            </span>
-            <span className={conditions[i] ? 'text-state-stop/80' : 'text-text-muted'}>
-              {label}
-            </span>
+            <span className="text-state-stop">●</span>
+            <span className="text-state-stop/80">{label}</span>
           </div>
         ))}
       </div>

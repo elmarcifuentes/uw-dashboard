@@ -1,3 +1,5 @@
+import { CASCADE_TRIGGER, CASCADE_WATCH } from './cascade'
+
 export function evaluateHoldExit(trade, levels, currentPrice, cascade, dpHistory) {
   if (!trade || !currentPrice) return null
 
@@ -36,12 +38,12 @@ export function evaluateHoldExit(trade, levels, currentPrice, cascade, dpHistory
   // 4 — Cascade health
   const mid    = levels?.find(l => l.id === 'MID')
   const midDp  = mid?.dark_pool || 0
-  const cascadeGap = Math.abs(-0.700 - midDp)
+  const cascadeGap = Math.abs(CASCADE_TRIGGER - midDp)
 
   if (isShort) {
     if (cascade?.active) {
       convictionSignals.push('⚡ CASCADE ACTIVE — maximum conviction')
-    } else if (midDp <= -0.500) {
+    } else if (midDp <= CASCADE_WATCH) {
       convictionSignals.push(`Cascade building (${midDp.toFixed(3)}) — ${cascadeGap.toFixed(3)} from trigger`)
     } else if (midDp > -0.300) {
       exitSignals.push(`DP recovering (${midDp.toFixed(3)}) — short thesis weakening`)

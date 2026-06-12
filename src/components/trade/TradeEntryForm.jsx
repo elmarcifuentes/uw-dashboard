@@ -67,7 +67,7 @@ export default function TradeEntryForm({
   // Quick-fill from level list
   const levelOptions = (levels || []).sort((a, b) => b.price - a.price)
   const toDisplay = (p) => isNQ
-    ? (Math.round(p * (nqRatio || 41.14) * 4) / 4).toFixed(2)
+    ? (nqRatio ? (Math.round(p * nqRatio * 4) / 4).toFixed(2) : '—')   // no 41.14 fallback
     : p.toFixed(2)
 
   return (

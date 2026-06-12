@@ -15,6 +15,7 @@ export default class SmartDataProvider {
   onLevelCross(cb)           { this.active.onLevelCross(cb) }
   onRescore(cb)              { this.active.onRescore(cb) }
   setLevels(levels)          { this.rest.setLevels(levels) }
+  recordExternalCalls(n)     { this.rest.recordExternalCalls(n) }
 
   start() {
     console.log('[SmartDataProvider] Starting in REST mode')

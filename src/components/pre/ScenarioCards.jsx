@@ -1,4 +1,5 @@
 import { levelNq } from '../../utils/levelNq'
+import { CASCADE_TRIGGER } from '../../utils/cascade'
 
 export default function ScenarioCards({
   assistantRead, levels, cascade, currentPrice, nqRatio, activeSymbol = 'NQ'
@@ -23,7 +24,8 @@ export default function ScenarioCards({
     ? `Break and hold above ${sellLevels[0].id} ${fmtLvl(sellLevels[0])} opens path to next resistance.`
     : assistantRead.next
 
-  const bearishTrigger = cascade?.conditions?.[0]
+  // cascade.conditions was never emitted (FLAG-5); derive the cond-1 trigger from live MID dp.
+  const bearishTrigger = (cascade?.mid_dp != null && cascade.mid_dp <= CASCADE_TRIGGER)
     ? 'Cascade threshold met — MID dark pool past -0.700. S1 and S2 conditions determine floor.'
     : buyLevels?.[0]
     ? `Failure at ${buyLevels[0].id} ${fmtLvl(buyLevels[0])} opens downside. Watch for structural void.`

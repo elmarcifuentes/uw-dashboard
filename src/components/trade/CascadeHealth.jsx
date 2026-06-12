@@ -1,23 +1,24 @@
+import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
+
 export default function CascadeHealth({ cascade, levels, trade }) {
   const mid    = levels?.find(l => l.id === 'MID')
   const midDp  = mid?.dark_pool || 0
-  const gap    = Math.abs(-0.700 - midDp)
+  const gap    = Math.abs(CASCADE_TRIGGER - midDp)
   const isShort = trade?.direction === 'short'
 
   const statusColor = cascade?.active
     ? (isShort ? 'text-state-hold' : 'text-state-stop')
-    : midDp <= -0.500
+    : midDp <= CASCADE_WATCH
     ? 'text-state-cascadeWatch'
     : 'text-text-tertiary'
 
   const statusLabel = cascade?.active
     ? (isShort ? '⚡ CASCADE — adds conviction' : '⚡ CASCADE — against trade')
-    : midDp <= -0.500
+    : midDp <= CASCADE_WATCH
     ? `Approaching — ${gap.toFixed(3)} from trigger`
     : 'Cascade safe'
 
-  const THRESHOLD = -0.700
-  const thresholdPct = ((THRESHOLD + 1) / 2) * 100
+  const thresholdPct = ((CASCADE_TRIGGER + 1) / 2) * 100
   const currentPct   = ((midDp + 1) / 2) * 100
 
   return (
@@ -31,7 +32,7 @@ export default function CascadeHealth({ cascade, levels, trade }) {
         <div style={{ flex: 1, minWidth: 0 }} className="h-2 bg-bg-elevated rounded relative overflow-hidden">
           <div
             className={`absolute inset-y-0 left-0 ${
-              midDp <= -0.700 ? 'bg-state-stop' : midDp <= -0.500 ? 'bg-state-cascadeWatch' : 'bg-state-hold'
+              midDp <= CASCADE_TRIGGER ?'bg-state-stop' : midDp <= CASCADE_WATCH ?'bg-state-cascadeWatch' : 'bg-state-hold'
             }`}
             style={{ width: `${currentPct}%` }}
           />
@@ -43,7 +44,7 @@ export default function CascadeHealth({ cascade, levels, trade }) {
         <span
           style={{ minWidth: '44px', flexShrink: 0, textAlign: 'right' }}
           className={`text-xs font-price ${
-            midDp <= -0.700 ? 'text-state-stop' : midDp <= -0.500 ? 'text-state-cascadeWatch' : 'text-text-secondary'
+            midDp <= CASCADE_TRIGGER ?'text-state-stop' : midDp <= CASCADE_WATCH ?'text-state-cascadeWatch' : 'text-text-secondary'
           }`}
         >
           {midDp.toFixed(3)}
@@ -51,10 +52,12 @@ export default function CascadeHealth({ cascade, levels, trade }) {
       </div>
 
       <div className="flex flex-wrap gap-2 mt-2">
+        {/* cascade.conditions (S1/S2) was never emitted (FLAG-5); derive cond 1 from live MID dp,
+            2–3 from active. TASK-CASCADE-WATCH. */}
         {[
-          { label: 'MID ≤ -0.700', met: cascade?.conditions?.[0] || midDp <= -0.700 },
-          { label: 'S1 art',       met: cascade?.conditions?.[1] },
-          { label: 'S2 void',      met: cascade?.conditions?.[2] },
+          { label: 'MID ≤ -0.700', met: midDp <= CASCADE_TRIGGER },
+          { label: 'S1 art',       met: cascade?.active },
+          { label: 'S2 void',      met: cascade?.active },
         ].map((c, i) => (
           <span
             key={i}

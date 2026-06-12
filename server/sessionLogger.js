@@ -366,16 +366,6 @@ export class SessionLogger {
       .filter(d => d != null && d > 0)
       .sort((a, b) => b - a)[0] ?? null
 
-    const expansionGexFired = levelOutcomes.some(l => {
-      try {
-        const lastEvent = events.filter(e => e.data_json).pop()
-        if (!lastEvent) return false
-        const data = JSON.parse(lastEvent.data_json)
-        const lvl = data.levels?.find(x => x.id === l.level_id)
-        return (lvl?.net_gex ?? 0) < 0
-      } catch { return false }
-    })
-
     return {
       session: {
         date:                  session.date,
@@ -426,7 +416,6 @@ export class SessionLogger {
       session_notes: {
         cascade_count:         enrichedCascade.length,
         cascade_max_drawdown:  maxDrawdown,
-        expansion_gex_fired:   expansionGexFired,
       },
     }
   }

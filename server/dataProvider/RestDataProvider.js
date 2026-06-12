@@ -111,6 +111,13 @@ export default class RestDataProvider extends DataProvider {
     return { trigger: false }
   }
 
+  // Count UW calls made OUTSIDE the price poll (the 5 scoring fetches in runFullScore) so the
+  // budget panel + guard reflect TRUE usage (FLAG-7). Routes through the same counter/guard —
+  // no new throttling, just accurate input.
+  recordExternalCalls(n) {
+    if (n > 0) this._incrementBudget(n)
+  }
+
   _incrementBudget(calls) {
     this._checkDailyReset()
     this.callsToday += calls
