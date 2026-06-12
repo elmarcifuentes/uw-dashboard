@@ -90,6 +90,7 @@ startCommand: node server/index.js
 - **[CLAUDE.md](CLAUDE.md)** — frozen constraints, loaded every session (invariants, protected systems, design system, conventions).
 - **[docs/PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md)** — the level engine (LuxAlgo recurrence, persisted state, cold-start, feed, ratio, rounding).
 - **[docs/SCORING.md](docs/SCORING.md)** — the UW scoring pipeline (algorithm, weights/thresholds, rescore triggers, polling/budget, narratives, Catalyst).
+- **[docs/EVIDENCE_PIPELINE.md](docs/EVIDENCE_PIPELINE.md)** — the live data/evidence layer the Intraday tab renders (every UW fetch + failure behavior, DP/flow/GEX filtering, staleness, SSE → render, troubleshooting).
 - **[docs/TASKS.md](docs/TASKS.md)** — open tasks (TASK-PINE replaces the removed draw feature; TASK-WEBHOOK-AUTH; carried-over items).
 
 ---

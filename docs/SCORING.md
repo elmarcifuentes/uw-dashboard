@@ -11,6 +11,11 @@ below was checked against source. Line numbers drift; search by symbol name.
 > weights, thresholds, or classification logic requires a deliberate decision — see [CLAUDE.md](../CLAUDE.md).
 > Level math lives in [PREDICTIVE_RANGES.md](PREDICTIVE_RANGES.md); this doc is everything *downstream* of the levels.
 
+> **Sibling:** [EVIDENCE_PIPELINE.md](EVIDENCE_PIPELINE.md) traces the *data/evidence flow* around this
+> algorithm — every UW fetch and its failure behavior, how prints/flow/GEX become per-level evidence,
+> staleness/freshness, and the SSE → Intraday render path. This doc is the scoring *math*; that one is the
+> *plumbing* (and flags the dead `net_gex`/`cascade.conditions` paths that originate here).
+
 ---
 
 ## 1. What scoring is
