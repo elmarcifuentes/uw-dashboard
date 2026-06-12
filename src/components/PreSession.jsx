@@ -89,7 +89,6 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
   const [lastPolled, setLastPolled] = useState(null)
   const [providerStatus, setProviderStatus] = useState(null)
   const [budget, setBudget]         = useState(null)
-  const [mode, setMode]             = useState('REST')
   const [magnetStreak, setMagnetStreak]     = useState(null)
   const [lastRescoreAt, setLastRescoreAt]   = useState(null)
   const [levelNarratives, setLevelNarratives] = useState({})
@@ -119,7 +118,6 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
     try {
       const res = await axios.get(`${API}/status`)
       setProviderStatus(res.data)
-      setMode(res.data.activeMode || 'REST')
     } catch { /* status endpoint optional */ }
   }, [])
 
@@ -129,16 +127,6 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
       setBudget(res.data)
     } catch { /* budget endpoint optional */ }
   }, [])
-
-  const toggleMode = useCallback(async () => {
-    const useWebSocket = mode === 'REST'
-    try {
-      await axios.post(`${API}/mode`, { useWebSocket })
-      setMode(useWebSocket ? 'WebSocket' : 'REST')
-    } catch (err) {
-      console.warn('[mode toggle]', err.message)
-    }
-  }, [mode])
 
   useEffect(() => {
     fetchLatest()
@@ -344,8 +332,6 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
           nqRatio={nqRatio}
           lastFetch={lastFetch}
           budget={budget}
-          mode={mode}
-          onToggleMode={toggleMode}
           onRefresh={fetchLatest}
           providerStatus={providerStatus}
           lastPolled={lastPolled}

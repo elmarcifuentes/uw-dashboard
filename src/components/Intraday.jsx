@@ -4,7 +4,6 @@ import { evaluateHoldExit } from '../utils/holdExit'
 import { calcPnL } from '../utils/pnl'
 import { formatNarrative } from '../utils/formatNarrative'
 import { useLayout } from '../context/LayoutContext'
-import { useAuth } from '../context/AuthContext'
 import PriceLadder from './intraday/PriceLadder'
 import PriceSparkline from './intraday/PriceSparkline'
 import DarkPoolChart from './intraday/DarkPoolChart'
@@ -33,7 +32,6 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
   } = useSSE(`${API_URL}/stream`)
 
   const { compact, toggle } = useLayout()
-  const { unlocked, authPost } = useAuth()
   const sentiment     = rescoreData?.sentiment ?? rescoreData?.result?._sentiment ?? null
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundEnabled') === 'true')
   const soundCooldownRef      = useRef({})
@@ -47,8 +45,6 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
   }, [])
 
   const [subTab, setSubTab]       = useState(0)
-  const [drawing, setDrawing]     = useState(null)
-  const [drawResult, setDrawResult] = useState(null)
   const [focusMode, setFocusMode] = useState(false)
   const [selectedLevel, setSelectedLevel] = useState(null)
   const [bottomSheetOpen, setBottomSheetOpen]   = useState(false)
@@ -64,21 +60,6 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
     }
   }
 
-  const triggerDraw = async (type) => {
-    if (!unlocked || drawing) return
-    setDrawing(type)
-    setDrawResult(null)
-    try {
-      const endpoint = type === 'both' ? '/draw' : '/draw-qqq'
-      await authPost(`${API_URL}${endpoint}`)
-      setDrawResult('success')
-    } catch {
-      setDrawResult('error')
-    } finally {
-      setDrawing(null)
-      setTimeout(() => setDrawResult(null), 5000)
-    }
-  }
 
   const result     = useMemo(() => rescoreData?.result ?? null, [rescoreData])
   const nqRatio    = useMemo(() => result?.nq_ratio ? Number(result.nq_ratio) : null, [result])
@@ -245,11 +226,6 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
         nqPrice={nqPrice}
         velocity={priceVelocity}
         sentiment={sentiment}
-        drawing={drawing}
-        drawResult={drawResult}
-        unlocked={unlocked}
-        onDrawQqq={() => triggerDraw('qqq')}
-        onDrawBoth={() => triggerDraw('both')}
         onCompact={toggle}
         compact={compact}
         onFocus={() => setFocusMode(true)}
@@ -277,7 +253,6 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
                 </span>
               ))}
             </span>
-            <span className={`text-xs ml-1 shrink-0 ${isCritical ? 'text-red-600' : 'text-amber-600'}`}>— run /draw</span>
           </div>
         )
       })()}

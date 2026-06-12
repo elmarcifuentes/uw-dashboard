@@ -3,8 +3,7 @@ import { RefreshCw, Minimize2, Maximize2, Target } from 'lucide-react'
 
 export default function LiveHeader({
   connected, price, nqPrice, velocity,
-  sentiment, drawing, drawResult, unlocked,
-  onDrawQqq, onDrawBoth, onCompact, compact, onFocus, cascadeActive,
+  sentiment, onCompact, compact, onFocus, cascadeActive,
   activeSymbol = 'NQ',
 }) {
   const [showOverflow, setShowOverflow] = useState(false)
@@ -16,22 +15,6 @@ export default function LiveHeader({
     : abs > 0.02 ? (up ? 'text-signal-support' : 'text-signal-resistance')
     : abs > 0.005 ? (up ? 'text-signal-support/60' : 'text-signal-resistance/60')
     : 'text-text-muted'
-
-  const btnBase = 'px-2 py-1 rounded text-xs font-medium transition-colors'
-  const drawBtnClass = (type) => {
-    if (!unlocked)                return `${btnBase} bg-bg-elevated text-text-muted cursor-not-allowed`
-    if (drawing === type)         return `${btnBase} bg-bg-elevated text-text-secondary cursor-wait`
-    if (drawResult === 'success') return `${btnBase} bg-state-holdSoft text-state-hold`
-    if (drawResult === 'error')   return `${btnBase} bg-state-stopSoft text-state-stop`
-    return `${btnBase} bg-bg-elevated text-text-secondary hover:bg-bg-card2`
-  }
-  const drawLabel = (type) => {
-    if (!unlocked)                return type === 'qqq' ? '🔒 Draw QQQ' : '🔒 Draw Both'
-    if (drawing === type)         return '⟳ Drawing…'
-    if (drawResult === 'success') return '✓ Done'
-    if (drawResult === 'error')   return '✗ Failed'
-    return type === 'qqq' ? '📊 Draw QQQ' : '📊 Draw Both'
-  }
 
   return (
     <div className="bg-bg-card border border-border-subtle rounded-lg px-4 py-2.5 flex items-center gap-4 flex-wrap relative">
@@ -72,12 +55,6 @@ export default function LiveHeader({
       <div className="flex-1" />
 
       <div className="hidden lg:flex items-center gap-2 shrink-0">
-        <button onClick={onDrawQqq} disabled={!unlocked || !!drawing} className={drawBtnClass('qqq')}>
-          {drawLabel('qqq')}
-        </button>
-        <button onClick={onDrawBoth} disabled={!unlocked || !!drawing} className={drawBtnClass('both')}>
-          {drawLabel('both')}
-        </button>
         {onFocus && (
           <button onClick={onFocus} className="text-xs text-text-tertiary hover:text-text-primary px-2 py-1 border border-border-default rounded transition-colors flex items-center gap-1">
             <Target className="w-3 h-3" /> Focus
@@ -101,12 +78,6 @@ export default function LiveHeader({
         </button>
         {showOverflow && (
           <div className="absolute top-full mt-1 right-0 z-50 bg-bg-card border border-border-subtle rounded-lg p-2 space-y-1 shadow-elevated">
-            <button onClick={() => { onDrawQqq(); setShowOverflow(false) }} disabled={!unlocked || !!drawing} className="block w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-elevated rounded disabled:opacity-50">
-              {drawLabel('qqq')}
-            </button>
-            <button onClick={() => { onDrawBoth(); setShowOverflow(false) }} disabled={!unlocked || !!drawing} className="block w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-elevated rounded disabled:opacity-50">
-              {drawLabel('both')}
-            </button>
             {onFocus && (
               <button onClick={() => { onFocus(); setShowOverflow(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-elevated rounded">
                 ⊡ Focus Mode

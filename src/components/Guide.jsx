@@ -12,7 +12,7 @@ const GUIDE_SECTIONS = [
   {
     icon: '🔄',
     title: 'How Data Updates',
-    content: `The dashboard updates automatically. A polling engine checks the current price every 2–60 seconds depending on how close price is to a key level. When price approaches a level, it checks every 2 seconds. When price is far from all levels, it checks every 60 seconds. When a meaningful condition changes (like a level classification flipping), the dashboard updates instantly and shows a CHART STALE badge indicating your TradingView chart labels should be refreshed.`,
+    content: `The dashboard updates automatically. A polling engine checks the current price every 2–60 seconds depending on how close price is to a key level. When price approaches a level, it checks every 2 seconds. When price is far from all levels, it checks every 60 seconds. When a meaningful condition changes (like a level classification flipping), the dashboard updates instantly and shows a LEVELS CHANGED badge highlighting what shifted.`,
   },
   {
     icon: '⚠',

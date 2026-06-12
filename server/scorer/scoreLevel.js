@@ -5,7 +5,6 @@ const W3 = 0.20; // flow_bias
 const W4 = 0.10; // distance_weighting
 
 // Window sizes as fraction of level price
-const TOUCH_PCT   = 0.0010; // ±0.10%
 const WINDOW_PCT  = 0.0030; //  0.30%
 
 function clamp(val, min = -100, max = 100) {
@@ -87,15 +86,6 @@ function computeFlowBias(level, flowData) {
   return { bias, matchCount }; // -1..1 + diagnostic count
 }
 
-// ─── Distance weighting ─────────────────────────────────────────────────────
-// Returns a 0..1 multiplier; closer to level = closer to 1
-function distanceWeight(level, referenceSignal) {
-  // Here we use the level's own price as the reference point.
-  // For now we return a neutral 1.0 (no distance reduction at exact level).
-  // In live use you'd pass in the actual traded price. We include it as w4
-  // contribution as a flat 50 (neutral) baseline since we have no live price.
-  return 0; // contributes 0 raw signal until a live price is fed in
-}
 
 // ─── Main scoring function ──────────────────────────────────────────────────
 export function scoreLevel(level, { darkPoolData, flowData, optionsVolume }) {

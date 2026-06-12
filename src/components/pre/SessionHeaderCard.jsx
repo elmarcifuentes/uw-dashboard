@@ -6,7 +6,7 @@ function msToLabel(ms) {
 
 export default function SessionHeaderCard({
   date, sessionType, price, nqPrice, nqRatio,
-  lastFetch, budget, mode, onToggleMode, onRefresh,
+  lastFetch, budget, onRefresh,
   providerStatus, lastPolled, activeSymbol = 'NQ',
 }) {
   return (
@@ -21,16 +21,6 @@ export default function SessionHeaderCard({
           }`}>
             {sessionType}
           </span>
-          <button
-            onClick={onToggleMode}
-            className={`px-2 py-0.5 rounded text-xs font-price font-bold transition-colors ${
-              mode === 'REST'
-                ? 'bg-state-holdSoft text-state-hold border border-state-hold/50'
-                : 'bg-signal-continuationSoft text-signal-continuation border border-signal-continuation/50'
-            }`}
-          >
-            {mode === 'REST' ? '● REST' : '○ WS'}
-          </button>
           <button
             onClick={onRefresh}
             className="px-2 py-0.5 text-xs bg-bg-elevated hover:bg-bg-elevated rounded border border-border-default text-text-secondary transition-colors"

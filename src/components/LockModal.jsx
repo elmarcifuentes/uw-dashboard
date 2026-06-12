@@ -26,9 +26,6 @@ export default function LockModal({ onClose }) {
           <>
             <p className="text-green-400 text-sm mb-3">Dashboard actions are unlocked for this session.</p>
             <div className="text-xs text-text-secondary space-y-1 mb-4">
-              <div>✓ Draw QQQ (fast path)</div>
-              <div>✓ Draw both charts</div>
-              <div>✓ REST / WebSocket toggle</div>
               <div>✓ Force Rescore</div>
             </div>
             <button
@@ -59,8 +56,6 @@ export default function LockModal({ onClose }) {
             </button>
             <div className="mt-4 text-xs text-text-muted space-y-0.5">
               <div>Protected actions:</div>
-              <div>• Draw QQQ / Both charts</div>
-              <div>• REST / WebSocket toggle</div>
               <div>• Force Rescore</div>
             </div>
           </>

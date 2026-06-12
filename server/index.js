@@ -1254,23 +1254,6 @@ app.post('/system/resume', (req, res) => {
   res.json({ success: true, paused: false, resumedAt: now })
 })
 
-app.post('/mode', (req, res) => {
-  const { useWebSocket, pin } = req.body
-  if (typeof useWebSocket !== 'boolean') {
-    return res.status(400).json({ error: 'useWebSocket must be boolean' })
-  }
-  const validPin = process.env.DASHBOARD_PIN
-  if (validPin) {
-    if (!pin) return res.status(401).json({ error: 'PIN required' })
-    try {
-      if (!crypto.timingSafeEqual(Buffer.from(pin), Buffer.from(validPin))) {
-        return res.status(401).json({ error: 'Invalid PIN' })
-      }
-    } catch { return res.status(401).json({ error: 'Invalid PIN' }) }
-  }
-  provider.switchMode(useWebSocket)
-  res.json({ mode: useWebSocket ? 'WebSocket' : 'REST' })
-})
 
 app.post('/narrative-mode', async (req, res) => {
   const { mode } = req.body
@@ -1528,41 +1511,6 @@ app.post('/rescore', async (req, res) => {
     console.error('[server] Manual rescore failed:', err.message)
     res.status(500).json({ error: err.message })
   }
-})
-
-// ── Draw relay forwarding ─────────────────────────────────────────────────────
-function signRelayRequest(action) {
-  const timestamp = Date.now().toString()
-  const signature = crypto
-    .createHmac('sha256', process.env.ACTION_SECRET || '')
-    .update(`${action}:${timestamp}`)
-    .digest('hex')
-  return { timestamp, signature }
-}
-
-async function forwardToRelay(action, pin, res) {
-  const relayUrl = process.env.DRAW_RELAY_URL
-  if (!relayUrl) return res.status(503).json({ error: 'Draw relay not configured (DRAW_RELAY_URL missing)' })
-  const { timestamp, signature } = signRelayRequest(action)
-  try {
-    const r = await fetch(`${relayUrl}/${action}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, pin, timestamp, signature }),
-      signal: AbortSignal.timeout(10000),  // relay returns immediately (async)
-    })
-    res.status(r.status).json(await r.json())
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-}
-
-app.post('/draw-qqq', async (req, res) => {
-  await forwardToRelay('draw-qqq', req.body?.pin, res)
-})
-
-app.post('/draw', async (req, res) => {
-  await forwardToRelay('draw', req.body?.pin, res)
 })
 
 // ── UW API proxy endpoints (avoids exposing key to frontend) ─────────────────

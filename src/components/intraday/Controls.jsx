@@ -3,10 +3,9 @@ import { useAuth } from '../../context/AuthContext'
 
 export default function Controls({ compact }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-  const { unlocked, authPost } = useAuth()
+  const { unlocked } = useAuth()
   const [status, setStatus]           = useState(null)
   const [budget, setBudget]           = useState(null)
-  const [mode, setMode]               = useState('REST')
   const [rescoring, setRescoring]     = useState(false)
   const [rescoreMsg, setRescoreMsg]   = useState(null)
   const [narrativeMode, setNarrativeMode] = useState('template')
@@ -20,7 +19,6 @@ export default function Controls({ compact }) {
       ])
       setStatus(s)
       setBudget(b)
-      setMode(s.activeMode === 'WebSocket' ? 'WebSocket' : 'REST')
       if (s.narrativeMode) setNarrativeMode(s.narrativeMode)
     } catch { /* server may be down */ }
   }
@@ -57,15 +55,6 @@ export default function Controls({ compact }) {
     setTimeout(() => setRescoring(false), 2000)
   }
 
-  const toggleMode = async () => {
-    if (!unlocked) return
-    const useWS = mode === 'REST'
-    try {
-      await authPost(`${API_URL}/mode`, { useWebSocket: useWS })
-      setMode(useWS ? 'WebSocket' : 'REST')
-    } catch { /* ignore */ }
-  }
-
   const budgetPct   = budget ? parseFloat(budget.percentUsed) : 0
   const budgetColor = budgetPct > 80 ? 'bg-red-500' : budgetPct > 50 ? 'bg-amber-500' : 'bg-green-500'
 
@@ -84,16 +73,6 @@ export default function Controls({ compact }) {
             }`}
           >
             {!unlocked ? '🔒 Rescore' : rescoreMsg ? rescoreMsg : rescoring ? '⟳ Rescoring…' : '⟳ Force Rescore Now'}
-          </button>
-          <button
-            onClick={toggleMode}
-            disabled={!unlocked}
-            className={`px-3 py-2 text-text-primary text-sm rounded transition-colors ${
-              !unlocked ? 'bg-bg-elevated text-text-muted cursor-not-allowed' :
-              mode === 'REST' ? 'bg-green-800 hover:bg-green-700' : 'bg-blue-800 hover:bg-blue-700'
-            }`}
-          >
-            {!unlocked ? '🔒 Mode' : mode === 'REST' ? '● REST POLLING' : '○ WEBSOCKET'}
           </button>
         </div>
       </div>

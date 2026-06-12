@@ -74,6 +74,11 @@ commitment. SCAN (where is price vs this level) → DECISION (why: dark pool, sc
 
 ## Conventions
 
+- **No local-machine integrations.** Everything runs on Railway (backend) + Vercel (frontend). There is no
+  draw-relay, MCP client, or local agent. App-internal endpoints (`/levels`, `/status`, the `/stream` SSE,
+  `/labs/*`, `/catalyst/*`, etc.) exist to serve the app's own frontend only — never assume an external
+  consumer. (TradingView draw was removed; its replacement is TASK-PINE, a native TV indicator — see
+  [docs/TASKS.md](docs/TASKS.md).)
 - **Log prefixes** bracketed by subsystem: `[server]`, `[labs]` (with `[labs] [5m]`/`[1m]`), `[ratio]`, `[levels]`,
   `[narrative]`, `[DataProvider]`. Keep them.
 - **SSE emit pattern** is always: `sseEmitter.emit('event', { type: '<name>', ...payload, timestamp: new Date().toISOString() })`.

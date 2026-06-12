@@ -154,7 +154,6 @@ function GuideOverview() {
               steps: [
                 'Settings tab → PIN → ⚙ System → review TradingView webhook banner → Accept',
                 'OR: choose Level Source mode → enter 5 NQ + 5 QQQ prices manually → Save Levels',
-                'Optional: /draw in Claude Code to update TradingView chart lines',
               ]},
             { time: 'During Session',
               steps: [
@@ -561,8 +560,6 @@ function GuideInterface() {
         <div className="space-y-1.5">
           <Row label="Webhook (recommended)" value="TradingView alert → Railway"      sub="Auto-populates Levels tab with pending banner" />
           <Row label="Manual entry"          value="Levels tab → NQ + QQQ prices"    sub="Ratio auto-calculated from entries" />
-          <Row label="/draw command"         value="Claude Code + MCP"               sub="Local only — draws lines on TradingView chart" />
-          <Row label="Draw buttons"          value="Settings → System → Controls"     sub="Requires draw-relay + ngrok running locally" />
         </div>
       </GuideCard>
     </div>

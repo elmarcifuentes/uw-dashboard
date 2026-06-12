@@ -60,31 +60,6 @@ export default class RestDataProvider extends DataProvider {
     return price
   }
 
-  async getDarkPoolPrints(symbol = 'QQQ') {
-    this._incrementBudget(1)
-    return this._uwGet(`/api/darkpool/${symbol}`)
-  }
-
-  async getFlowAlerts(symbol = 'QQQ') {
-    this._incrementBudget(1)
-    return this._uwGet('/api/option-trades/flow-alerts', { ticker_symbol: symbol })
-  }
-
-  async getOptionsVolume(symbol = 'QQQ') {
-    this._incrementBudget(1)
-    return this._uwGet(`/api/stock/${symbol}/options-volume`)
-  }
-
-  async getGexByStrike(symbol = 'QQQ') {
-    this._incrementBudget(1)
-    return this._uwGet(`/api/stock/${symbol}/greek-exposure/strike`)
-  }
-
-  async getEtfTide(symbol = 'QQQ') {
-    this._incrementBudget(1)
-    return this._uwGet(`/api/market/${symbol}/etf-tide`)
-  }
-
   _isMarketHours() {
     const now = new Date()
     const et  = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))

@@ -11,8 +11,6 @@ export default {
   triggers: {
     levelCrossThreshold:   0.15,
     priceMoveTrigger:      1.00,
-    darkPoolShiftTrigger:  0.200,
-    structureBreakWarning: 0.25,
     timeBasedInterval:     15 * 60 * 1000,
   },
 

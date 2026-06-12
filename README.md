@@ -72,8 +72,6 @@ startCommand: node server/index.js
 | `POLYGON_API_KEY` | Polygon.io — NQ futures OHLC + contract detection |
 | `ANTHROPIC_API_KEY` | Claude API for narrative generation |
 | `DASHBOARD_PIN` | PIN to unlock Settings tab |
-| `ACTION_SECRET` | HMAC secret for TradingView webhook level pushes |
-| `DRAW_RELAY_URL` | URL of local draw-relay server |
 | `NARRATIVE_MODE` | `template` (default) or `claude` |
 | `POLLING_ENABLED` | `true` / `false` |
 | `PORT` | Set by Railway |
@@ -92,6 +90,7 @@ startCommand: node server/index.js
 - **[CLAUDE.md](CLAUDE.md)** — frozen constraints, loaded every session (invariants, protected systems, design system, conventions).
 - **[docs/PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md)** — the level engine (LuxAlgo recurrence, persisted state, cold-start, feed, ratio, rounding).
 - **[docs/SCORING.md](docs/SCORING.md)** — the UW scoring pipeline (algorithm, weights/thresholds, rescore triggers, polling/budget, narratives, Catalyst).
+- **[docs/TASKS.md](docs/TASKS.md)** — open tasks (TASK-PINE replaces the removed draw feature; TASK-WEBHOOK-AUTH; carried-over items).
 
 ---
 
@@ -273,9 +272,12 @@ Every 60s, checks ET time:
 | POST | `/labs/active-interval` | Set active PR timeframe (`5m` / `1m`) — loads that tf's state |
 | POST | `/labs/reset-avg` | Clear ratcheting avg |
 | POST | `/ratio/lock` | Manually lock a ratio value |
-| POST | `/webhook/accept` | Accept pending TradingView level push |
+| POST | `/webhook/levels` | Inbound TradingView alert → saves levels as **pending** (see auth note) |
+| POST | `/webhook/accept` | Accept pending TradingView levels → `daily_levels` + rescore |
 | POST | `/system/pause` | Pause UW polling + auto-rescore |
 | POST | `/system/resume` | Resume |
+
+> **Webhook auth:** `/webhook/levels` is currently **unauthenticated** (the old `ACTION_SECRET` HMAC belonged to the removed draw-relay, not the webhook). Inbound levels land as **pending** and require an explicit **Accept** in the Levels tab before reaching scoring — that human accept-gate is today's only protection. Adding a real shared-secret/HMAC check is tracked as **TASK-WEBHOOK-AUTH** in [docs/TASKS.md](docs/TASKS.md).
 
 ---
 
@@ -292,7 +294,8 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | **Docs:** added [CLAUDE.md](CLAUDE.md) (frozen constraints) and [docs/SCORING.md](docs/SCORING.md) (UW scoring deep reference); moved PREDICTIVE_RANGES.md → `docs/`; cross-linked from README. Documentation only. |
+| _next_ | **Removed legacy/dead systems** (deletion only): TradingView **draw** feature (`/draw`, `/draw-qqq`, draw-relay forwarding, UI draw buttons, `DRAW_RELAY_URL`/`ACTION_SECRET`) → replaced by **TASK-PINE**; the **WebSocket** provider stub + REST/WS `/mode` toggle (`USE_WEBSOCKET`); and SCORING.md-flagged dead code (`TOUCH_PCT`, `distanceWeight()`, provider `getDarkPool…`/`getFlowAlerts` methods, `darkPoolShiftTrigger`/`structureBreakWarning`). The "CHART STALE" badge is now a generic "LEVELS CHANGED" indicator. Scoring output byte-identical (`distance100=50` preserved). Added [docs/TASKS.md](docs/TASKS.md). No local-machine integrations remain. |
+| `a2dc6b1` | **Docs:** added [CLAUDE.md](CLAUDE.md) (frozen constraints) and [docs/SCORING.md](docs/SCORING.md) (UW scoring deep reference); moved PREDICTIVE_RANGES.md → `docs/`; cross-linked from README. Documentation only. |
 | `2cbd19f` | **Removed Weekly avg mode** (UI + server) — was built on the wrong data source (NQM6 weekly bars) and not being pursued; dead branch deleted (`calcWeeklyAvg`, the `avgMode === 'weekly'` calc branch, the now-orphaned `calcATR`, the Daily/Weekly toggle). Daily path **untouched** (deletion only, no recurrence/state/anchor change → no cold-start on deploy). Stale `avgMode:'weekly'` coerces to `daily` on load/settings with a one-time log; `avgMode` kept as a vestigial always-`'daily'` field. |
 | `b14bbd7` | **Docs:** added [PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md) (definitive PR reference); refreshed README Labs/Known-Issues sections and cross-linked. |
 | `2bcfc95` | **Labs PR table → six columns** — `Level · NQ Native · QQQ Equiv · Active NQ · Active QQQ · Δ`. New **Active QQQ** reads the STORED canonical `daily_levels` QQQ (`/levels` poll now carries `qqq_price`), not recomputed — doubles as a cross-tab consistency check vs Intraday/Overview. "Active" renamed "Active NQ"; Δ unchanged (rightmost). Expected QQQ Equiv vs Active QQQ residual ~$0.01–0.02 (raw vs rounded NQ basis). |
