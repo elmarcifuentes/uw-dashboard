@@ -2310,7 +2310,22 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
 
   try {
     // ── DAILY PERSISTENT AVG MODE — faithful LuxAlgo PR with persisted recurrence state ──
-    const dropForming = arr => (arr && arr.length ? arr.slice(0, -1) : arr)   // drop last (in-progress) bar
+    // Forming-bar detection is TIMESTAMP-based, not positional. A bar is "forming" only while
+    // its window is still open: now < window_start + interval (+10s clock-skew margin). A bar
+    // that has already closed but happens to be last in Polygon's response is consumed on this
+    // tick — not deferred a full cycle (the old positional slice(0,-1) cost up to one interval
+    // of ratchet latency right after a bar closed but before its successor appeared).
+    const intervalMs = (interval === '1m') ? 60000 : 300000
+    const FORMING_SKEW_MS = 10000
+    const formingTrim = (times) => {
+      if (!times || !times.length) return 0
+      const lastStart = times[times.length - 1]
+      const open = Date.now() < lastStart + intervalMs + FORMING_SKEW_MS
+      if (!open) console.log(`[labs] last bar window closed (${new Date(lastStart).toISOString()}) — consuming`)
+      return open ? 1 : 0   // 1 → drop trailing forming bar; 0 → keep (already closed)
+    }
+    // Drop `trim` trailing bars uniformly across the parallel OHLC arrays.
+    const trimForming = (arr, trim) => (arr && arr.length ? arr.slice(0, arr.length - trim) : arr)
 
     const persistState = (s) => db.prepare(`
       INSERT INTO settings (key, value, updated_at)
@@ -2323,7 +2338,8 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
       const anchorMs = getColdStartAnchor(activeNQContract, interval)
       const init = await fetchOHLC('NQ=F', INIT_BARS, interval, { anchorMs })
       if (!init?.times) { console.warn('[labs] init fetch missing timestamps — cannot run recurrence'); return null }
-      const closes = dropForming(init.closes), highs = dropForming(init.highs), lows = dropForming(init.lows), times = dropForming(init.times)
+      const trim = formingTrim(init.times)
+      const closes = trimForming(init.closes, trim), highs = trimForming(init.highs, trim), lows = trimForming(init.lows, trim), times = trimForming(init.times, trim)
       const lastFedTs = times[times.length - 1]
       console.log(`[labs] [${interval}] cold-start anchor=${new Date(anchorMs).toISOString()} bars=${times.length} seed=${closes[0]} (first=${new Date(times[0]).toISOString()} last=${new Date(lastFedTs).toISOString()})`)
       if (!barsAreFresh(lastFedTs, interval)) return null   // stale feed → abort, do not write state
@@ -2375,7 +2391,8 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
       const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval, { sinceTs: state.lastBarTs })
       if (!nqData?.times) { console.warn('[labs] recent fetch missing timestamps — skipping advance'); return null }
       source = nqData.source
-      const aCloses = dropForming(nqData.closes), aHighs = dropForming(nqData.highs), aLows = dropForming(nqData.lows), aTimes = dropForming(nqData.times)
+      const trim = formingTrim(nqData.times)
+      const aCloses = trimForming(nqData.closes, trim), aHighs = trimForming(nqData.highs, trim), aLows = trimForming(nqData.lows, trim), aTimes = trimForming(nqData.times, trim)
       const lastFedTs = aTimes[aTimes.length - 1]
       if (!barsAreFresh(lastFedTs, interval)) return null   // stale feed → abort, keep prior state untouched
       const prevAvg = state.avg
