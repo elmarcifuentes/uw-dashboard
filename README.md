@@ -171,9 +171,6 @@ recurrence is advanced one closed bar at a time, never re-run over a sliding win
 (which previously caused uniform intraday band drift). Bars are ETH/Globex.
 
 ```js
-calcATR(highs, lows, closes, length)
-// Wilder-smoothed ATR (used by weekly mode only)
-
 trueRange(high, low, prevClose)            // max(h-l, |h-prevC|, |l-prevC|)
 
 initRecurrence(closes, highs, lows, times, length, mult)
@@ -212,9 +209,10 @@ saveNQLevels / applyAutoLevelsIfEnabled  — persist + SSE + rescore (apply-time
 gap bars, so flattening them desynced the recurrence. Function is kept (unused) for
 potential non-PR use only.
 
-### Avg modes
-- **Daily** — ratcheting recurrence state persisted per timeframe in `labs_pr_avg_{tf}`; advanced one closed bar at a time, never recomputed from a window (see [PREDICTIVE_RANGES.md §2–§3](PREDICTIVE_RANGES.md))
-- **Weekly** — anchors MID to last week's close (Yahoo `1wk`); uses 5m ATR for band spacing
+### Avg mode
+- **Daily** (the only mode) — ratcheting recurrence state persisted per timeframe in `labs_pr_avg_{tf}`; advanced one closed bar at a time, never recomputed from a window (see [PREDICTIVE_RANGES.md §2–§3](PREDICTIVE_RANGES.md))
+
+> A short-lived **Weekly** avg mode (NQM6 weekly bars) existed briefly and was **removed** — it was built on the wrong data source and is not being pursued. See git history if revisiting. `avgMode` is retained as a vestigial always-`'daily'` settings field; any stale `'weekly'` value is coerced to `'daily'` on load.
 
 ### Scheduler (pure `setInterval`, no external packages)
 ```
@@ -263,7 +261,7 @@ Every 60s, checks ET time:
 | POST | `/rescore` | Force immediate rescore |
 | GET | `/labs/auto-levels` | Current Labs NQ levels |
 | POST | `/labs/recalculate` | Trigger Labs recalculation |
-| POST | `/labs/settings` | Update length / mult / avgMode (preview interval) |
+| POST | `/labs/settings` | Update length / mult (preview interval); `avgMode` coerced to `daily` |
 | POST | `/labs/active-interval` | Set active PR timeframe (`5m` / `1m`) — loads that tf's state |
 | POST | `/labs/reset-avg` | Clear ratcheting avg |
 | POST | `/ratio/lock` | Manually lock a ratio value |
@@ -286,7 +284,8 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | **Docs:** added [PREDICTIVE_RANGES.md](PREDICTIVE_RANGES.md) (definitive PR reference); refreshed README Labs/Known-Issues sections and cross-linked. |
+| _next_ | **Removed Weekly avg mode** (UI + server) — was built on the wrong data source (NQM6 weekly bars) and not being pursued; dead branch deleted (`calcWeeklyAvg`, the `avgMode === 'weekly'` calc branch, the now-orphaned `calcATR`, the Daily/Weekly toggle). Daily path **untouched** (deletion only, no recurrence/state/anchor change → no cold-start on deploy). Stale `avgMode:'weekly'` coerces to `daily` on load/settings with a one-time log; `avgMode` kept as a vestigial always-`'daily'` field. |
+| `b14bbd7` | **Docs:** added [PREDICTIVE_RANGES.md](PREDICTIVE_RANGES.md) (definitive PR reference); refreshed README Labs/Known-Issues sections and cross-linked. |
 | `2bcfc95` | **Labs PR table → six columns** — `Level · NQ Native · QQQ Equiv · Active NQ · Active QQQ · Δ`. New **Active QQQ** reads the STORED canonical `daily_levels` QQQ (`/levels` poll now carries `qqq_price`), not recomputed — doubles as a cross-tab consistency check vs Intraday/Overview. "Active" renamed "Active NQ"; Δ unchanged (rightmost). Expected QQQ Equiv vs Active QQQ residual ~$0.01–0.02 (raw vs rounded NQ basis). |
 | `03affee` | **Labs QQQ Equiv column ratio fix** — column divided by a hardcoded `41.14` (LabsPanel read `status.nq_ratio`, which `/status` never returned). Now `/status` exposes `activeRatio` (= `getActiveRatio()`); LabsPanel uses it and recomputes immediately on the `ratio_locked` SSE (via the `sessionRatio` prop), not just the 20s poll. In-use ratio shown in the header (`ratio 41.117 🔒 09:30`). Display-only; residual vs Active QQQ (~$0.01–0.02 from rounded-NQ derivation) is expected and unchanged. |
 | `77b4cba` | **Shared post-lock refresh `onRatioLocked(trigger)`** — manual `/ratio/lock` previously didn't recompute stored QQQ, so tabs showed old-ratio QQQ while NQ was correct. Now scheduled, catch-up, AND manual locks all call one function: `rewriteQqqFromRatio()` rewrites ONLY the `daily_levels` QQQ columns from canonical NQ ÷ ratio (NQ untouched; mode/pause/market-hours agnostic) → emit `ratio_locked`/`labs_levels_update` SSE → `scoreNow()` rescore so scored levels + narratives reflect new QQQ. Works after-hours. |

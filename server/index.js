@@ -2176,7 +2176,7 @@ async function fetchOHLC(ticker, bars = 250, interval = '1d', opts = {}) {
     result = await fetchFromYahoo(ticker, bars, interval)
   }
 
-  // Hard cap — never pass more bars than requested to calcATR.
+  // Hard cap — never pass more bars than requested to the recurrence.
   // EXCEPT cold-start (opts.anchorMs): the anchored warmup must span anchor→now intact.
   if (!opts.anchorMs && result?.closes?.length > bars) {
     console.warn(`[labs] fetchOHLC ${ticker}: got ${result.closes.length} bars, slicing to ${bars}`)
@@ -2193,30 +2193,6 @@ async function fetchOHLC(ticker, bars = 250, interval = '1d', opts = {}) {
   return result
 }
 
-// Raw Wilder-smoothed ATR (no mult applied)
-function calcATR(highs, lows, closes, length) {
-  if (!highs?.length || highs.length < 2) return 0
-  // Build TR series (index 1..n-1)
-  const trValues = []
-  for (let i = 1; i < highs.length; i++) {
-    if (!closes[i] || !highs[i] || !lows[i] || !closes[i-1]) continue
-    trValues.push(Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i-1]),
-      Math.abs(lows[i]  - closes[i-1])
-    ))
-  }
-  if (trValues.length < length) {
-    return trValues.reduce((a, b) => a + b, 0) / trValues.length
-  }
-  // Seed: simple average of first `length` TR values
-  let atr = trValues.slice(0, length).reduce((a, b) => a + b, 0) / length
-  // Wilder smoothing over remaining bars
-  for (let i = length; i < trValues.length; i++) {
-    atr = (atr * (length - 1) + trValues[i]) / length
-  }
-  return atr
-}
 
 // ── Faithful LuxAlgo Predictive Ranges, ported with persistable recurrence state ──
 // Reference (per CLOSED bar):
@@ -2311,27 +2287,6 @@ function levelsFromState(state, mult) {
   }
 }
 
-// Weekly-anchored average via ratcheting on 52 weekly bars
-async function calcWeeklyAvg(ticker, length, mult) {
-  try {
-    const weekly = await fetchFromYahoo(ticker, 52, '1wk')
-    if (!weekly?.closes?.length) return null
-    const len     = Math.min(length, weekly.closes.length - 1)
-    const atr     = calcATR(weekly.highs, weekly.lows, weekly.closes, len) * mult
-    const holdAtr = atr / 2
-    let avg = weekly.closes[0]
-    for (let i = 1; i < weekly.closes.length; i++) {
-      if (!weekly.closes[i]) continue
-      if (weekly.closes[i] > avg + holdAtr)      avg = weekly.closes[i] - holdAtr
-      else if (weekly.closes[i] < avg - holdAtr) avg = weekly.closes[i] + holdAtr
-    }
-    return avg
-  } catch (e) {
-    console.warn(`[labs] calcWeeklyAvg failed for ${ticker}:`, e.message)
-    return null
-  }
-}
-
 function saveNQLevels(nqResult, interval) {
   labsAutoLevels = {
     nq: nqResult,
@@ -2406,28 +2361,6 @@ async function calculateLabsLevels(interval = labsSettings.interval, opts = {}) 
   console.log(`[labs] calculating: mode=${avgMode} interval=${interval}`)
 
   try {
-    // ── WEEKLY AVG MODE ────────────────────────────────────────────────────────
-    if (avgMode === 'weekly') {
-      const weeklyAvgNQ = await calcWeeklyAvg('NQ=F', length, mult)
-      if (!weeklyAvgNQ) { console.warn('[labs] weekly NQ avg unavailable'); return null }
-
-      const nqData = await fetchOHLC('NQ=F', LEVEL_BARS, interval)
-      const atr5mNQ = calcATR(nqData.highs, nqData.lows, nqData.closes, length) * mult
-      const nqResult = {
-        R2:      parseFloat((weeklyAvgNQ + atr5mNQ * 2).toFixed(2)),
-        R1:      parseFloat((weeklyAvgNQ + atr5mNQ).toFixed(2)),
-        MID:     parseFloat(weeklyAvgNQ.toFixed(2)),
-        S1:      parseFloat((weeklyAvgNQ - atr5mNQ).toFixed(2)),
-        S2:      parseFloat((weeklyAvgNQ - atr5mNQ * 2).toFixed(2)),
-        avg:     parseFloat(weeklyAvgNQ.toFixed(4)),
-        atr:     parseFloat(atr5mNQ.toFixed(4)),
-        holdAtr: parseFloat((atr5mNQ / 2).toFixed(4)),
-        mode: 'weekly', source: nqData.source, interval,
-      }
-      console.log(`[labs] weekly NQ: avg=${weeklyAvgNQ.toFixed(1)} atr=${atr5mNQ.toFixed(1)} MID=${nqResult.MID}`)
-      return saveNQLevels(nqResult, interval)
-    }
-
     // ── DAILY PERSISTENT AVG MODE — faithful LuxAlgo PR with persisted recurrence state ──
     const dropForming = arr => (arr && arr.length ? arr.slice(0, -1) : arr)   // drop last (in-progress) bar
 
@@ -2530,6 +2463,12 @@ try {
   const savedSettings = db.prepare(`SELECT value FROM settings WHERE key = 'labs_settings'`).get()
   if (savedSettings?.value) {
     labsSettings = { ...labsSettings, ...JSON.parse(savedSettings.value) }
+    // Weekly avg mode was removed — coerce any stale persisted value so it can't route
+    // into a deleted branch. (avgMode kept as a vestigial always-'daily' field.)
+    if (labsSettings.avgMode && labsSettings.avgMode !== 'daily') {
+      console.log(`[labs] avgMode '${labsSettings.avgMode}' no longer supported → daily`)
+      labsSettings.avgMode = 'daily'
+    }
     console.log('[labs] settings restored:', JSON.stringify(labsSettings))
   }
 } catch (e) {}
@@ -2982,7 +2921,9 @@ app.post('/labs/settings', async (req, res) => {
   if (interval) labsSettings.interval = interval  // preview only — does NOT affect active cron
   labsSettings.length = newLength
   labsSettings.mult   = newMult
-  if (avgMode && ['daily', 'weekly'].includes(avgMode)) labsSettings.avgMode = avgMode
+  // Weekly avg mode was removed — only 'daily' is supported; ignore/coerce anything else.
+  if (avgMode && avgMode !== 'daily') console.log(`[labs] avgMode '${avgMode}' no longer supported → daily`)
+  labsSettings.avgMode = 'daily'
   db.prepare(`
     INSERT INTO settings (key, value, updated_at)
     VALUES ('labs_settings', ?, datetime('now'))
