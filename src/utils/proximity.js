@@ -20,26 +20,28 @@ export function getProximityStyles(proximity, classification, level) {
 
   const { zone, absDist, fromBelow } = proximity
 
+  // Proximity glow/border tracks scored bias (the action) → signal-* tokens, zone = intensity.
+  // no_edge is neutral (no action color). Glow rgba match the token hexes.
   const colorMap = {
     sell_resistance: {
-      critical: { border: 'border-2 border-red-400',   glow: 'shadow-[0_0_20px_rgba(248,113,113,0.5)]',  labelColor: 'text-red-400'   },
-      near:     { border: 'border border-red-500',      glow: 'shadow-[0_0_12px_rgba(248,113,113,0.3)]',  labelColor: 'text-red-500'   },
-      watching: { border: 'border border-red-800',      glow: 'shadow-[0_0_6px_rgba(248,113,113,0.15)]',  labelColor: 'text-red-700'   },
+      critical: { border: 'border-2 border-signal-resistance',    glow: 'shadow-[0_0_20px_rgba(255,107,107,0.5)]',  labelColor: 'text-signal-resistance'    },
+      near:     { border: 'border border-signal-resistance/70',   glow: 'shadow-[0_0_12px_rgba(255,107,107,0.3)]',  labelColor: 'text-signal-resistance'    },
+      watching: { border: 'border border-signal-resistance/40',   glow: 'shadow-[0_0_6px_rgba(255,107,107,0.15)]',  labelColor: 'text-signal-resistance/80' },
     },
     buy_support: {
-      critical: { border: 'border-2 border-green-400',  glow: 'shadow-[0_0_20px_rgba(74,222,128,0.5)]',   labelColor: 'text-green-400' },
-      near:     { border: 'border border-green-500',    glow: 'shadow-[0_0_12px_rgba(74,222,128,0.3)]',   labelColor: 'text-green-500' },
-      watching: { border: 'border border-green-800',    glow: 'shadow-[0_0_6px_rgba(74,222,128,0.15)]',   labelColor: 'text-green-700' },
+      critical: { border: 'border-2 border-signal-support',       glow: 'shadow-[0_0_20px_rgba(47,212,122,0.5)]',   labelColor: 'text-signal-support'    },
+      near:     { border: 'border border-signal-support/70',      glow: 'shadow-[0_0_12px_rgba(47,212,122,0.3)]',   labelColor: 'text-signal-support'    },
+      watching: { border: 'border border-signal-support/40',      glow: 'shadow-[0_0_6px_rgba(47,212,122,0.15)]',   labelColor: 'text-signal-support/80' },
     },
     no_edge: {
-      critical: { border: 'border-2 border-amber-400',  glow: 'shadow-[0_0_20px_rgba(251,191,36,0.4)]',   labelColor: 'text-amber-400' },
-      near:     { border: 'border border-amber-600',    glow: 'shadow-[0_0_10px_rgba(251,191,36,0.2)]',   labelColor: 'text-amber-500' },
-      watching: { border: 'border border-amber-900',    glow: 'shadow-[0_0_4px_rgba(251,191,36,0.1)]',    labelColor: 'text-amber-700' },
+      critical: { border: 'border-2 border-border-strong',        glow: '',  labelColor: 'text-text-tertiary' },
+      near:     { border: 'border border-border-default',         glow: '',  labelColor: 'text-text-tertiary' },
+      watching: { border: 'border border-border-subtle',          glow: '',  labelColor: 'text-text-muted'    },
     },
     continuation: {
-      critical: { border: 'border-2 border-blue-400',   glow: 'shadow-[0_0_20px_rgba(96,165,250,0.4)]',   labelColor: 'text-blue-400'  },
-      near:     { border: 'border border-blue-500',     glow: 'shadow-[0_0_10px_rgba(96,165,250,0.2)]',   labelColor: 'text-blue-500'  },
-      watching: { border: 'border border-blue-800',     glow: 'shadow-[0_0_4px_rgba(96,165,250,0.1)]',    labelColor: 'text-blue-700'  },
+      critical: { border: 'border-2 border-signal-continuation',  glow: 'shadow-[0_0_20px_rgba(91,167,255,0.4)]',   labelColor: 'text-signal-continuation'    },
+      near:     { border: 'border border-signal-continuation/70', glow: 'shadow-[0_0_10px_rgba(91,167,255,0.2)]',   labelColor: 'text-signal-continuation'    },
+      watching: { border: 'border border-signal-continuation/40', glow: 'shadow-[0_0_4px_rgba(91,167,255,0.1)]',    labelColor: 'text-signal-continuation/80' },
     },
   }
 

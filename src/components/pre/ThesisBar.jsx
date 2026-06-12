@@ -1,5 +1,6 @@
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
+import ClassificationChip from '../ClassificationChip'
 
 export default function ThesisBar({
   sentiment, levels, cascade, assistantRead, currentPrice, nqRatio, activeSymbol = 'NQ'
@@ -20,15 +21,10 @@ export default function ThesisBar({
     ? `MID dp ${midDp.toFixed(3)} — ${gap.toFixed(3)} from cascade`
     : 'Structure intact'
 
-  const riskColor = cascade?.active
-    ? 'text-red-400'
-    : midDp <= -0.500
-    ? 'text-amber-400'
-    : 'text-green-400'
-
-  const sentimentColor = sentiment?.color === 'green' ? 'text-green-400'
-    : sentiment?.color === 'red' ? 'text-red-400'
-    : 'text-amber-400'
+  // Sentiment is a market-state axis → state-* tokens (not the bias signal-* tokens).
+  const sentimentColor = sentiment?.color === 'green' ? 'text-state-hold'
+    : sentiment?.color === 'red' ? 'text-state-stop'
+    : 'text-state-cascadeWatch'
 
   return (
     <div className="bg-bg-card border border-border-subtle rounded-lg px-4 py-3">
@@ -37,9 +33,9 @@ export default function ThesisBar({
         {/* Sentiment */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={`w-2 h-2 rounded-full ${
-            sentiment?.color === 'green' ? 'bg-green-500'
-              : sentiment?.color === 'red' ? 'bg-red-500'
-              : 'bg-amber-500'
+            sentiment?.color === 'green' ? 'bg-state-hold'
+              : sentiment?.color === 'red' ? 'bg-state-stop'
+              : 'bg-state-cascadeWatch'
           } ${sentiment?.state === 'HIGH_RISK' && !cascade?.active ? 'animate-pulse' : ''}`} />
           <span className={`text-sm font-bold ${sentimentColor}`}>
             {sentiment?.state || 'MIXED'}
@@ -53,20 +49,15 @@ export default function ThesisBar({
           <>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-xs text-text-tertiary">Key level</span>
-              <span className={`text-sm font-bold ${
-                dominant.classification === 'sell_resistance' ? 'text-red-400'
-                  : dominant.classification === 'buy_support' ? 'text-green-400'
-                  : 'text-text-secondary'
-              }`}>
-                {dominant.id}
-              </span>
+              <span className="text-sm font-bold text-text-tertiary">{dominant.id}</span>
+              <ClassificationChip classification={dominant.classification} confidence={dominant.confidence} level={dominant} size="xs" showConflict={false} />
               <span className="text-xs text-text-primary font-mono">
                 {activeSymbol === 'NQ' && nqRatio
                   ? '$' + (levelNq(dominant, nqRatio)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : '$' + (dominant.price?.toFixed(2) ?? '—')}
               </span>
               {dominant.full_stack && (
-                <span className="text-xs text-yellow-400 font-bold">★</span>
+                <span className="text-xs text-accent-price font-bold">★</span>
               )}
             </div>
             <span className="text-text-disabled shrink-0">|</span>
@@ -78,9 +69,9 @@ export default function ThesisBar({
           <span className="text-xs text-text-tertiary">Risk</span>
           <span className={`text-xs font-medium px-2 py-0.5 rounded ${
             cascade?.active
-              ? 'bg-red-950 text-red-400 border border-red-800'
+              ? 'bg-state-stopSoft text-state-stop border border-state-stop/40'
               : midDp <= -0.500
-              ? 'bg-amber-950 text-amber-400 border border-amber-800'
+              ? 'bg-state-cascadeWatchSoft text-state-cascadeWatch border border-state-cascadeWatch/40'
               : 'text-text-tertiary'
           }`}>
             {riskText}

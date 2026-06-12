@@ -37,6 +37,7 @@ export default function LevelComparison({
       </div>
 
       <div className="space-y-0">
+        <div className="text-micro text-text-muted mb-1">structure — not scored bias</div>
         <div className="grid grid-cols-6 gap-1.5 text-xs text-text-muted pb-2 border-b border-border-subtle">
           <span>Level</span>
           <span className="text-right">NQ Native</span>
@@ -54,8 +55,10 @@ export default function LevelComparison({
           const activeQqq  = activeEntry?.qqq_price   // stored canonical QQQ (same value other tabs show)
           const rawDelta   = nqAuto != null && activeNq != null ? nqAuto - activeNq : null
           const moved      = rawDelta !== null && Math.abs(rawDelta) > 0.5
-          const levelColor = id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
-          const deltaColor = !moved ? 'text-text-disabled' : rawDelta > 0 ? 'text-green-400' : 'text-red-400'
+          // Unscored structure → neutral (MID keeps continuation anchor). Δ is a drift magnitude,
+          // not scored bias, so it stays neutral too — never a red/green action read.
+          const levelColor = id === 'MID' ? 'text-signal-continuation' : 'text-text-secondary'
+          const deltaColor = !moved ? 'text-text-disabled' : 'text-text-secondary'
 
           return (
             <div key={id} className="grid grid-cols-6 gap-1.5 text-xs py-1.5 border-b border-border-subtle/50">

@@ -8,8 +8,9 @@ const LEVEL_IDS = ['R2', 'R1', 'MID', 'S1', 'S2']
 const calcNQ = (qqqPrice, ratio, offset = 0) => Math.round(qqqPrice * ratio * 4) / 4 + offset
 
 const LEVEL_COLORS = {
-  R2: 'text-red-400', R1: 'text-orange-400', MID: 'text-yellow-400',
-  S1: 'text-blue-400', S2: 'text-indigo-400',
+  // Structural identity = neutral (MID keeps the continuation anchor); never action colors.
+  R2: 'text-text-secondary', R1: 'text-text-secondary', MID: 'text-signal-continuation',
+  S1: 'text-text-secondary', S2: 'text-text-secondary',
 }
 
 const emptyLevels = () => ({
@@ -48,7 +49,7 @@ function LevelPreviewTable({ qqq, nq, ratio }) {
       {LEVEL_IDS.map(id => (
         <div key={id} className="flex items-center justify-between text-xs">
           <span className={`font-bold w-8 ${
-            id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
+            id === 'MID' ? 'text-signal-continuation' : 'text-text-secondary'
           }`}>{id}</span>
           <span className="text-text-primary font-mono">${qqq[id]?.toFixed(2)}</span>
           <span className="text-text-tertiary font-mono">
@@ -512,7 +513,7 @@ export default function LevelsTab() {
                   {LEVEL_IDS.map(id => (
                     <div key={id} className="flex items-center gap-2">
                       <span className={`text-xs font-bold w-8 shrink-0 ${
-                        id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
+                        id === 'MID' ? 'text-signal-continuation' : 'text-text-secondary'
                       }`}>{id}</span>
                       <input
                         type="number"
@@ -540,7 +541,7 @@ export default function LevelsTab() {
                   {LEVEL_IDS.map(id => (
                     <div key={id} className="flex justify-between text-xs">
                       <span className={`font-bold w-8 ${
-                        id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
+                        id === 'MID' ? 'text-signal-continuation' : 'text-text-secondary'
                       }`}>{id}</span>
                       <span className="text-text-primary font-mono">${nqPreview[id]?.qqq?.toFixed(2)}</span>
                       <span className="text-blue-300 font-mono">NQ {nqPreview[id]?.nq?.toFixed(2)}</span>

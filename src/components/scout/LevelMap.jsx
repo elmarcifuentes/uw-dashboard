@@ -1,5 +1,6 @@
 import { getLevelProximity } from '../../utils/proximity'
 import { levelNq } from '../../utils/levelNq'
+import ClassificationChip from '../ClassificationChip'
 
 export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, onLevelSelect, selectedLevel }) {
   if (!levels?.length) return null
@@ -18,21 +19,16 @@ export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, 
       : `$${currentPrice.toFixed(2)}`
     : '—'
 
+  // Score bar tracks scored bias (the action). Structural id renders neutral; bias on the chip.
   const barColor = (level) => ({
-    sell_resistance: 'bg-red-500',
-    buy_support:     'bg-green-500',
-    continuation:    'bg-blue-500',
+    sell_resistance: 'bg-signal-resistance',
+    buy_support:     'bg-signal-support',
+    continuation:    'bg-signal-continuation',
     no_edge:         'bg-bg-elevated',
   }[level.classification] || 'bg-bg-elevated')
 
   const barWidth = (level) =>
     level.classification === 'no_edge' ? 15 : Math.max(20, Math.min(100, level.score || 0))
-
-  const idColor = (level) => ({
-    sell_resistance: 'text-red-400',
-    buy_support:     'text-green-400',
-    no_edge:         'text-text-tertiary',
-  }[level.classification] || (level.id === 'MID' ? 'text-blue-400' : 'text-text-tertiary'))
 
   return (
     <div className="space-y-1 font-mono text-xs">
@@ -54,7 +50,8 @@ export default function LevelMap({ levels, currentPrice, nqRatio, activeSymbol, 
                   : 'hover:bg-bg-elevated/50'
               }`}
             >
-              <span className={`w-8 shrink-0 font-bold ${idColor(level)}`}>{level.id}</span>
+              <span className="w-8 shrink-0 font-bold text-text-tertiary">{level.id}</span>
+              <span className="shrink-0"><ClassificationChip classification={level.classification} confidence={level.confidence} level={level} size="xs" showConflict={false} /></span>
               <span className="w-24 shrink-0 text-text-primary">{fmt(level.price, levelNq(level, r))}</span>
               <div className="flex-1 h-3 bg-bg-card2 rounded overflow-hidden">
                 <div

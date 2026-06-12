@@ -2,6 +2,7 @@ import { calculateTradeSetup } from '../../utils/tradeSetup'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
+import ClassificationChip from '../ClassificationChip'
 
 export default function LevelPlanCard({
   level, allLevels, currentPrice, nqRatio,
@@ -16,18 +17,12 @@ export default function LevelPlanCard({
     ? '$' + (nq ?? Math.round(qqq * r * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : `$${qqq?.toFixed(2)}`
 
-  const classColor = {
-    sell_resistance: 'text-red-400',
-    buy_support:     'text-green-400',
-    no_edge:         'text-text-tertiary',
-    continuation:    'text-blue-400',
-  }[level.classification] || 'text-text-tertiary'
-
+  // R/R quality is a trade-management axis → state-* tokens (not the bias signal-* tokens).
   const rrColor = !setup ? 'text-text-tertiary'
-    : setup.quality === 'excellent' ? 'text-green-400'
-    : setup.quality === 'good'      ? 'text-green-500'
-    : setup.quality === 'acceptable' ? 'text-amber-400'
-    : 'text-red-400'
+    : setup.quality === 'excellent' ? 'text-state-hold'
+    : setup.quality === 'good'      ? 'text-state-hold'
+    : setup.quality === 'acceptable' ? 'text-state-exit'
+    : 'text-state-stop'
 
   const levelNqVal = levelNq(level, r)
 
@@ -36,14 +31,13 @@ export default function LevelPlanCard({
       {/* Level header */}
       <div>
         <div className="flex items-baseline gap-2">
-          <span className={`text-xl font-bold ${classColor}`}>{level.id}</span>
+          {/* Structural name = neutral; bias on the chip below */}
+          <span className="text-xl font-bold text-text-tertiary">{level.id}</span>
           <span className="text-text-primary font-mono text-lg">{fmt(level.price, levelNqVal)}</span>
         </div>
-        <div className={`text-xs font-bold mt-0.5 ${classColor}`}>
-          {level.classification?.replace('_', ' ').toUpperCase()}
-          <span className="text-text-tertiary font-normal ml-2">
-            · {level.confidence?.toLowerCase()} · score {level.score}
-          </span>
+        <div className="flex items-center gap-2 mt-0.5">
+          <ClassificationChip classification={level.classification} confidence={level.confidence} level={level} />
+          <span className="text-text-tertiary text-xs font-normal">· score {level.score}</span>
         </div>
       </div>
 
@@ -56,9 +50,9 @@ export default function LevelPlanCard({
             const dp  = level.dark_pool || 0
             const pct = ((dp + 1) / 2) * 100
             return pct >= 50 ? (
-              <div className="absolute inset-y-0 left-1/2 bg-green-500" style={{ width: `${(pct - 50) * 2}%` }} />
+              <div className="absolute inset-y-0 left-1/2 bg-signal-support" style={{ width: `${(pct - 50) * 2}%` }} />
             ) : (
-              <div className="absolute inset-y-0 right-1/2 bg-red-500" style={{ width: `${(50 - pct) * 2}%` }} />
+              <div className="absolute inset-y-0 right-1/2 bg-signal-resistance" style={{ width: `${(50 - pct) * 2}%` }} />
             )
           })()}
         </div>
@@ -82,17 +76,17 @@ export default function LevelPlanCard({
                 {fmt(setup.entry.qqq, setup.entry.nq)}
               </span>
             </div>
-            <div className="flex items-center justify-between bg-green-950/30 rounded px-2 py-1">
+            <div className="flex items-center justify-between bg-state-holdSoft rounded px-2 py-1">
               <span className="text-xs text-text-tertiary">
                 Target <span className="text-text-muted ml-1">← {setup.target.level}</span>
               </span>
-              <span className="text-xs text-green-400 font-mono font-bold">
+              <span className="text-xs text-state-hold font-mono font-bold">
                 {fmt(setup.target.qqq, setup.target.nq)}
               </span>
             </div>
-            <div className="flex items-center justify-between bg-red-950/30 rounded px-2 py-1">
+            <div className="flex items-center justify-between bg-state-stopSoft rounded px-2 py-1">
               <span className="text-xs text-text-tertiary">Stop</span>
-              <span className="text-xs text-red-400 font-mono font-bold">
+              <span className="text-xs text-state-stop font-mono font-bold">
                 {fmt(setup.stop.qqq, setup.stop.nq)}
               </span>
             </div>

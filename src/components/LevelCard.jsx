@@ -5,6 +5,7 @@ import { stripMarkdown } from '../utils/stripMarkdown'
 import { calculateTradeSetup } from '../utils/tradeSetup'
 import { formatNarrative } from '../utils/formatNarrative'
 import { levelNq } from '../utils/levelNq'
+import ClassificationChip from './ClassificationChip'
 
 const CLASS_COLOR = {
   sell_resistance: 'text-signal-resistance',
@@ -68,7 +69,8 @@ export default function LevelCard({
       {/* LAYER 1 — SCAN */}
       <div className="px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2 min-w-0">
-          <span className={`text-base font-bold shrink-0 ${classColor}`}>{level.id}</span>
+          {/* Structural name = informational → neutral, never an action color */}
+          <span className="text-base font-bold shrink-0 text-text-tertiary">{level.id}</span>
           <span className="text-text-primary font-price font-semibold text-sm tabular-nums">
             {activeSymbol === 'NQ'
               ? (nq != null ? '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
@@ -76,14 +78,8 @@ export default function LevelCard({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className={`text-xs font-bold ${classColor}`}>
-            {level.classification?.replace('_', ' ').toUpperCase()}
-          </span>
-          {level.confidence && level.confidence.toLowerCase() !== 'none' && (
-            <span className="text-xs text-text-muted">· {level.confidence.toLowerCase()}</span>
-          )}
-        </div>
+        {/* Scored bias = the action (dominant), with confidence + conflict tag */}
+        <ClassificationChip classification={level.classification} confidence={level.confidence} level={level} />
 
         <div className="text-right shrink-0">
           {(() => {

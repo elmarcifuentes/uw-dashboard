@@ -2,6 +2,7 @@ import DpSparkline from '../DpSparkline'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
+import ClassificationChip from '../ClassificationChip'
 
 export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRatio, dpHistory, levelNarrative, onClose, activeSymbol = 'NQ' }) {
   const level = levels?.find(l => l.id === levelId)
@@ -13,12 +14,9 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
   const dp   = level.dark_pool ?? 0
   const dpPct = ((dp + 1) / 2) * 100
 
-  const classColor = level.classification === 'sell_resistance' ? 'text-red-400'
-    : level.classification === 'buy_support' ? 'text-green-400'
-    : 'text-text-secondary'
-
-  const barColor = level.classification === 'sell_resistance' ? 'bg-red-500'
-    : level.classification === 'buy_support' ? 'bg-green-500'
+  // Score bar tracks scored bias (action). Structural name renders neutral; bias on the chip.
+  const barColor = level.classification === 'sell_resistance' ? 'bg-signal-resistance'
+    : level.classification === 'buy_support' ? 'bg-signal-support'
     : 'bg-bg-card2'
 
   return (
@@ -28,7 +26,8 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-baseline gap-2">
-            <span className={`text-2xl font-bold ${classColor}`}>{level.id}</span>
+            {/* Structural name = neutral; scored bias is the chip below */}
+            <span className="text-2xl font-bold text-text-tertiary">{level.id}</span>
             <span className="text-text-primary font-mono text-xl">${level.price?.toFixed(2)}</span>
           </div>
           {nq && <div className="text-xs text-text-tertiary font-mono mt-0.5">NQ {nq}</div>}
@@ -36,14 +35,9 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
         <button onClick={onClose} className="text-text-tertiary hover:text-text-primary text-lg px-2 py-0.5 -mr-1">✕</button>
       </div>
 
-      {/* Classification + Distance */}
-      <div className="flex items-center justify-between">
-        <span className={`text-sm font-bold ${classColor}`}>
-          {level.classification?.replace('_', ' ').toUpperCase() || 'NO EDGE'}
-          {level.confidence && level.confidence !== 'NONE' && (
-            <span className="text-text-muted font-normal text-xs ml-2">{level.confidence}</span>
-          )}
-        </span>
+      {/* Classification (the action) + Distance */}
+      <div className="flex items-center justify-between gap-2">
+        <ClassificationChip classification={level.classification} confidence={level.confidence} level={level} />
         {dist != null && (
           <span className="text-sm font-mono text-text-secondary">
             {parseFloat(dist) > 0 ? '+' : ''}{dist} from price
@@ -60,10 +54,10 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
         <div className="h-2 bg-bg-elevated rounded relative overflow-hidden">
           <div className="absolute inset-y-0 left-1/2 w-px bg-bg-card2" />
           {dpPct >= 50 ? (
-            <div className="absolute inset-y-0 left-1/2 bg-green-500 opacity-80"
+            <div className="absolute inset-y-0 left-1/2 bg-signal-support opacity-80"
                  style={{ width: `${(dpPct - 50) * 2}%` }} />
           ) : (
-            <div className="absolute inset-y-0 right-1/2 bg-red-500 opacity-80"
+            <div className="absolute inset-y-0 right-1/2 bg-signal-resistance opacity-80"
                  style={{ width: `${(50 - dpPct) * 2}%` }} />
           )}
         </div>

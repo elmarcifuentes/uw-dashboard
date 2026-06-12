@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Zap, RefreshCw, TrendingUp, TrendingDown, Minus, Target, Shield } from 'lucide-react'
 import { INSTRUMENTS } from '../../utils/pnl'
+import ClassificationChip from '../ClassificationChip'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://uw-dashboard-api-production.up.railway.app'
 
@@ -197,14 +198,11 @@ export default function CatalystTab({
                     ? 'border-signal-support/30 bg-signal-supportSoft'
                     : 'border-border-subtle bg-bg-card2'
                 }`}>
-                  <span className={`text-sm2 font-bold ${
-                    level.classification === 'sell_resistance' ? 'text-signal-resistance'
-                    : level.classification === 'buy_support'  ? 'text-signal-support'
-                    : level.id === 'MID' ? 'text-signal-continuation'
-                    : 'text-text-tertiary'
-                  }`}>
-                    {level.id}
-                  </span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {/* Structural name neutral; bias on the chip */}
+                    <span className="text-sm2 font-bold text-text-tertiary shrink-0">{level.id}</span>
+                    <ClassificationChip classification={level.classification} confidence={level.confidence} level={level} size="xs" showConflict={false} />
+                  </div>
                   <span className="text-sm2 text-text-primary">{fmt(level.price)}</span>
                   {isCurrent ? (
                     <span className="text-micro text-accent-price font-bold">▶ NOW</span>

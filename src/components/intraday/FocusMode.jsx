@@ -1,5 +1,6 @@
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
+import ClassificationChip from '../ClassificationChip'
 import { CircleCheck, TriangleAlert, Zap, DoorOpen } from 'lucide-react'
 
 function VelocityIndicator({ velocity }) {
@@ -56,6 +57,14 @@ export default function FocusMode({
   const support = levels
     ?.filter(l => l.price < (currentPrice || 0) && l.classification === 'buy_support')
     .sort((a, b) => b.price - a.price)[0]
+
+  // Bias-contradicts-position: a buy_support sitting ABOVE price (buy bias overhead) or a
+  // sell_resistance BELOW price (sell bias underneath). These match neither card's filter, so
+  // they used to vanish — surface the nearest one as a flagged card instead of dropping it.
+  const conflicted = levels
+    ?.filter(l => (l.classification === 'buy_support'     && l.price > (currentPrice || 0)) ||
+                  (l.classification === 'sell_resistance' && l.price < (currentPrice || 0)))
+    .sort((a, b) => Math.abs((currentPrice || 0) - a.price) - Math.abs((currentPrice || 0) - b.price))[0]
 
   const nearest = levels?.reduce((n, l) => {
     if (!n) return l
@@ -195,13 +204,38 @@ export default function FocusMode({
       {/* Row 4 — Price between levels */}
       <div className="flex-1 min-h-0 flex flex-col justify-center gap-3 px-4 py-4 overflow-hidden max-w-2xl mx-auto w-full">
 
+        {/* Flagged card — bias contradicts position. Never dropped. */}
+        {conflicted && (
+          <div className="border border-state-cascadeWatch/50 bg-state-cascadeWatchSoft rounded-lg px-4 py-3 shadow-card">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <TriangleAlert size={14} className="text-state-cascadeWatch shrink-0" />
+                <span className="text-text-tertiary font-bold">{conflicted.id}</span>
+                <ClassificationChip classification={conflicted.classification} confidence={conflicted.confidence} level={conflicted} size="xs" />
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-micro text-text-tertiary uppercase">{conflicted.price > (currentPrice || 0) ? 'above by' : 'below by'}</div>
+                <div className="text-lg2 font-price font-bold text-text-secondary">
+                  {conflicted.price > (currentPrice || 0) ? '+' : '-'}{fmtAbsDist(Math.abs(conflicted.price - (currentPrice || 0)))}
+                </div>
+              </div>
+            </div>
+            <div className="text-micro text-state-cascadeWatch mt-1">
+              {conflicted.classification === 'buy_support' ? 'buy bias overhead — buying into resistance' : 'sell bias below — selling into support'}
+            </div>
+            <DpBar value={conflicted.dark_pool} />
+          </div>
+        )}
+
         {resistance ? (
           <div className="border border-signal-resistance/30 bg-signal-resistanceSoft rounded-lg px-4 py-3 shadow-card">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-micro text-signal-resistance font-bold uppercase tracking-wider">
-                  {resistance.id} — Resistance
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-text-tertiary font-bold">{resistance.id}</span>
+                  <ClassificationChip classification={resistance.classification} confidence={resistance.confidence} level={resistance} size="xs" />
+                  <span className="text-micro text-text-muted uppercase tracking-wider">overhead</span>
+                </div>
                 <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtLevel(resistance)}</div>
               </div>
               <div className="text-right">
@@ -228,9 +262,11 @@ export default function FocusMode({
           <div className="border border-signal-support/30 bg-signal-supportSoft rounded-lg px-4 py-3 shadow-card">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-micro text-signal-support font-bold uppercase tracking-wider">
-                  {support.id} — Support
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-text-tertiary font-bold">{support.id}</span>
+                  <ClassificationChip classification={support.classification} confidence={support.confidence} level={support} size="xs" />
+                  <span className="text-micro text-text-muted uppercase tracking-wider">below</span>
+                </div>
                 <div className="text-lg2 font-bold text-text-primary font-price mt-0.5">{fmtLevel(support)}</div>
               </div>
               <div className="text-right">

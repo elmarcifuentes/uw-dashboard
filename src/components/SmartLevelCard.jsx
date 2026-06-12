@@ -3,9 +3,10 @@ import DpSparkline from './DpSparkline'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import { levelNq } from '../utils/levelNq'
 import { formatNarrative } from '../utils/formatNarrative'
+import ClassificationChip from './ClassificationChip'
 
-const CLS_COLOR  = { sell_resistance: 'text-red-400',   buy_support: 'text-green-400',  no_edge: 'text-text-secondary',  continuation: 'text-blue-400'  }
-const CLS_BORDER = { sell_resistance: 'border-red-900',  buy_support: 'border-green-900', no_edge: 'border-border-subtle', continuation: 'border-blue-900' }
+// Card border tracks scored bias (action accent); level ID itself renders neutral.
+const CLS_BORDER = { sell_resistance: 'border-signal-resistance/40', buy_support: 'border-signal-support/40', no_edge: 'border-border-subtle', continuation: 'border-signal-continuation/40' }
 
 export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative, dpHistory, variant = 'standard', label, touches, activeSymbol = 'NQ' }) {
   const [expanded, setExpanded] = useState(false)
@@ -29,20 +30,20 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
   const distStr   = dist != null ? (dist >= 0 ? `+${dist.toFixed(2)}` : dist.toFixed(2)) : null
   const distNq    = dist != null && nqRatio ? Math.round(Math.abs(dist) * nqRatio * 4) / 4 : null
   const clsCls    = level.classification || 'no_edge'
-  const textColor = CLS_COLOR[clsCls]  || CLS_COLOR.no_edge
   const borderCls = CLS_BORDER[clsCls] || CLS_BORDER.no_edge
 
   if (variant === 'compact') return (
     <div className={`border rounded-lg p-3 bg-bg-card ${borderCls}`}>
       <div className="flex items-center justify-between">
-        <span className={`text-sm font-bold ${textColor}`}>{level.id}</span>
+        {/* Structural name = neutral; bias goes on the chip below */}
+        <span className="text-sm font-bold text-text-tertiary">{level.id}</span>
         <span className="text-xs font-mono text-text-primary">
           {activeSymbol === 'NQ'
             ? (nq != null ? '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
             : (level.price != null ? '$' + level.price.toFixed(2) : '—')}
         </span>
       </div>
-      <div className="text-xs text-text-tertiary mt-0.5">{clsCls.replace('_', ' ').toUpperCase()}</div>
+      <div className="mt-1"><ClassificationChip classification={level.classification} confidence={level.confidence} level={level} size="xs" /></div>
       {(() => {
         if (activeSymbol === 'NQ') {
           if (distNq == null) return null
@@ -73,20 +74,16 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
       <div className="px-4 pt-3 pb-2 flex items-start justify-between gap-2">
         <div>
           <div className="flex items-baseline gap-2">
-            <span className={`text-xl font-bold ${textColor}`}>{level.id}</span>
+            {/* Structural name = neutral; bias goes on the chip below */}
+            <span className="text-xl font-bold text-text-tertiary">{level.id}</span>
             <span className="text-text-primary font-mono font-semibold text-lg">
               {activeSymbol === 'NQ'
                 ? (nq != null ? '$' + nq.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—')
                 : (level.price != null ? '$' + level.price.toFixed(2) : '—')}
             </span>
           </div>
-          <div className={`text-xs font-medium mt-1 ${textColor}`}>
-            {level.classification?.replace('_', ' ').toUpperCase()}
-            {level.confidence && level.confidence.toLowerCase() !== 'none' && (
-              <span className="text-text-tertiary font-normal ml-1.5">
-                {level.confidence.toLowerCase()}
-              </span>
-            )}
+          <div className="mt-1">
+            <ClassificationChip classification={level.classification} confidence={level.confidence} level={level} />
           </div>
         </div>
 
@@ -125,10 +122,10 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
               const dp  = level.dark_pool || 0
               const pct = ((dp + 1) / 2) * 100
               return pct >= 50 ? (
-                <div className="absolute inset-y-0 left-1/2 bg-green-500 rounded-r"
+                <div className="absolute inset-y-0 left-1/2 bg-signal-support rounded-r"
                      style={{ width: `${(pct - 50) * 2}%` }} />
               ) : (
-                <div className="absolute inset-y-0 right-1/2 bg-red-500 rounded-l"
+                <div className="absolute inset-y-0 right-1/2 bg-signal-resistance rounded-l"
                      style={{ width: `${(50 - pct) * 2}%` }} />
               )
             })()}
@@ -148,8 +145,8 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
           <div style={{ flex: 1, minWidth: 0 }}
                className="h-1.5 bg-bg-elevated rounded overflow-hidden">
             <div className={`h-full rounded ${
-              level.classification === 'sell_resistance' ? 'bg-red-500'
-                : level.classification === 'buy_support' ? 'bg-green-500'
+              level.classification === 'sell_resistance' ? 'bg-signal-resistance'
+                : level.classification === 'buy_support' ? 'bg-signal-support'
                 : 'bg-bg-card2'
             }`}
                  style={{ width: `${Math.min(level.score || 0, 100)}%` }} />
@@ -172,8 +169,8 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
       {level.dp_condition && (
         <div className="px-4 pb-2">
           <span className={`text-xs ${
-            level.classification === 'sell_resistance' ? 'text-red-400'
-              : level.classification === 'buy_support' ? 'text-green-400'
+            level.classification === 'sell_resistance' ? 'text-signal-resistance'
+              : level.classification === 'buy_support' ? 'text-signal-support'
               : 'text-text-tertiary'
           }`}>
             {level.dp_condition}

@@ -10,6 +10,7 @@ import CascadeHealth from '../trade/CascadeHealth'
 import HoldExitGuide from '../trade/HoldExitGuide'
 import TradeEntryForm from '../trade/TradeEntryForm'
 import InstrumentSelector from '../trade/InstrumentSelector'
+import ClassificationChip from '../ClassificationChip'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -287,18 +288,7 @@ export default function RightRail({
                   </span>
                 </div>
 
-                <div className={`text-xs font-medium ${
-                  activeLevelData.classification === 'sell_resistance' ? 'text-signal-resistance'
-                    : activeLevelData.classification === 'buy_support' ? 'text-signal-support'
-                    : 'text-text-tertiary'
-                }`}>
-                  {activeLevelData.classification?.replace('_', ' ').toUpperCase()}
-                  {activeLevelData.confidence && activeLevelData.confidence.toLowerCase() !== 'none' && (
-                    <span className="text-text-muted font-normal ml-1">
-                      · {activeLevelData.confidence.toLowerCase()}
-                    </span>
-                  )}
-                </div>
+                <ClassificationChip classification={activeLevelData.classification} confidence={activeLevelData.confidence} level={activeLevelData} />
 
                 {activeLevelData.full_stack && (
                   <div className="text-xs text-accent-price font-bold">★ FULL STACK</div>
@@ -330,14 +320,9 @@ export default function RightRail({
             <div className="space-y-1">
               {levels?.filter(l => l.classification !== 'no_edge').map(l => (
                 <div key={l.id} className="flex items-center justify-between gap-2">
-                  <span className={`text-xs font-bold shrink-0 ${
-                    l.classification === 'sell_resistance' ? 'text-signal-resistance' : 'text-signal-support'
-                  }`}>
-                    {l.id}
-                  </span>
-                  <span className="text-xs text-text-tertiary truncate">
-                    {l.classification?.replace('_', ' ')}
-                  </span>
+                  {/* Structural name neutral; bias on the chip */}
+                  <span className="text-xs font-bold shrink-0 text-text-tertiary">{l.id}</span>
+                  <ClassificationChip classification={l.classification} confidence={l.confidence} level={l} size="xs" />
                   <span className="text-xs font-price text-text-muted shrink-0">
                     DP {l.dark_pool?.toFixed(3)}
                   </span>

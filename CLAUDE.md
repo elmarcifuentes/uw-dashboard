@@ -51,8 +51,14 @@ present findings, get confirmation, then edit. Never edit-first on the engine.
 **Tailwind tokens** (`tailwind.config.js`) — use tokens, not raw hex, in the core trading UI
 (levels, ladder, catalyst). Color = meaning, one job each:
 
-- `signal-support` (green) / `signal-resistance` (red) = **market structure only** (support/resistance, directional bias).
-- `signal-continuation` (blue) = MID continuation only.
+- `signal-support` (green) / `signal-resistance` (red) = **SCORED directional bias (the action) only, app-wide.**
+  Structural identity (R/S names, unscored Predictive-Ranges bands) renders in **neutral treatments**
+  (`text-text-tertiary` family) with text labels — never `signal-*`. **MID** keeps its blue continuation token
+  as the range anchor. Surfaces showing unscored structure carry a **"structure — not scored bias"** caption.
+  **Conflicted levels** (structure opposing classification) are **always flagged inline and never filtered
+  out** of any surface. (Shared `ClassificationChip` + `src/utils/classification.js` are the one source for
+  bias label/color/icon/conflict-tag; the chip's Lucide icon satisfies the Lucide-only rule.)
+- `signal-continuation` (blue) = MID continuation + the structural range anchor.
 - `state-hold` (teal) = **HOLD only** (and target/holding rows).
 - `state-cascadeWatch` (amber) / `state-cascadeActive` (orange) = **CASCADE only**.
 - `accent-price` (yellow) = **current price only** ("now"/crosshair).

@@ -3,6 +3,7 @@ import { levelNq } from '../../utils/levelNq'
 import { dpConditionLabel, midDpWarning } from '../../utils/dpLabels'
 import { getLevelProximity, getProximityStyles } from '../../utils/proximity'
 import DpSparkline from '../DpSparkline'
+import ClassificationChip from '../ClassificationChip'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 import { calculateTradeSetup } from '../../utils/tradeSetup'
 import { formatNarrative } from '../../utils/formatNarrative'
@@ -238,7 +239,8 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
             )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-price font-bold text-sm w-8" style={{ color: colors.text }}>
+                {/* Structural name = informational only → neutral, never an action color */}
+                <span className="font-price font-bold text-sm w-8 text-text-tertiary">
                   {level.id}
                 </span>
                 <span className="text-text-primary font-price font-medium">
@@ -253,25 +255,19 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                   if (activeSymbol === 'NQ') {
                     if (nqDist == null) return null
                     const sign = dist >= 0 ? '+' : '-'
-                    return <span className={`text-xs font-price tabular-nums ${isAbove ? 'text-signal-support' : 'text-signal-resistance'}`}>{sign}${nqDist.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    return <span className="text-xs font-price tabular-nums text-text-secondary">{sign}${nqDist.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   } else {
                     if (dist == null) return null
                     const sign = dist >= 0 ? '+' : '-'
-                    return <span className={`text-xs font-price tabular-nums ${isAbove ? 'text-signal-support' : 'text-signal-resistance'}`}>{sign}${Math.abs(dist).toFixed(2)}</span>
+                    return <span className="text-xs font-price tabular-nums text-text-secondary">{sign}${Math.abs(dist).toFixed(2)}</span>
                   }
                 })()}
               </div>
             </div>
 
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-xs font-medium" style={{ color: colors.text }}>
-                {level.classification === 'buy_support'     ? 'BUY SUPPORT'     :
-                 level.classification === 'sell_resistance' ? 'SELL RESISTANCE' :
-                 level.classification === 'continuation'    ? 'CONTINUATION'    : 'NO EDGE'}
-                {level.confidence && level.confidence !== 'none' && (
-                  <span className="text-text-muted font-normal ml-1">· {level.confidence}</span>
-                )}
-              </span>
+            <div className="flex items-center justify-between mt-1 gap-2">
+              {/* Scored bias = the action (dominant). Conflict tag rides the chip in neutral. */}
+              <ClassificationChip classification={level.classification} confidence={level.confidence} level={level} />
               {level.net_gex != null && level.net_gex < 0 && (
                 <span className="text-xs font-price px-1 rounded bg-signal-resistanceSoft text-signal-resistance font-bold">
                   GEX ⚠ {((level.net_gex ?? 0) / 1000).toFixed(0)}K EXP

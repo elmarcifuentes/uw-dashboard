@@ -9,8 +9,9 @@ const LEVEL_IDS = ['R2', 'R1', 'MID', 'S1', 'S2']
 const calcNQ = (qqqPrice, ratio, offset = 0) => Math.round(qqqPrice * ratio * 4) / 4 + offset
 
 const LEVEL_COLORS = {
-  R2: 'text-red-400', R1: 'text-orange-400', MID: 'text-yellow-400',
-  S1: 'text-blue-400', S2: 'text-indigo-400',
+  // Structural identity = neutral (MID keeps the continuation anchor); never action colors.
+  R2: 'text-text-secondary', R1: 'text-text-secondary', MID: 'text-signal-continuation',
+  S1: 'text-text-secondary', S2: 'text-text-secondary',
 }
 
 const emptyLevels = () => ({
@@ -142,7 +143,7 @@ function LevelPreviewTable({ qqq, nq, ratio }) {
       {LEVEL_IDS.map(id => (
         <div key={id} className="flex items-center justify-between text-xs">
           <span className={`font-bold w-8 ${
-            id === 'R2' || id === 'R1' ? 'text-red-400' : id === 'MID' ? 'text-blue-400' : 'text-green-400'
+            id === 'MID' ? 'text-signal-continuation' : 'text-text-secondary'
           }`}>{id}</span>
           <span className="text-text-primary font-mono">${qqq[id]?.toFixed(2)}</span>
           <span className="text-text-tertiary font-mono">
@@ -616,10 +617,10 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                         const moved = Math.abs(parseFloat(d)) > 0.01
                         return (
                           <div key={id} className="flex items-center justify-between text-xs">
-                            <span className={`font-bold w-8 ${id === 'MID' ? 'text-yellow-400' : id[0] === 'R' ? 'text-red-400' : 'text-blue-400'}`}>{id}</span>
+                            <span className={`font-bold w-8 ${id === 'MID' ? 'text-signal-continuation' : 'text-text-secondary'}`}>{id}</span>
                             <span className="font-mono text-text-primary">${nv}</span>
                             <span className="font-mono text-text-muted w-16 text-right">was ${cv}</span>
-                            <span className={`font-mono w-14 text-right ${!moved ? 'text-text-disabled' : parseFloat(d) > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            <span className={`font-mono w-14 text-right ${!moved ? 'text-text-disabled' : 'text-text-secondary'}`}>
                               {moved ? `${parseFloat(d) > 0 ? '+' : ''}${d}` : '—'}
                             </span>
                           </div>
