@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Copy, Check } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const API_URL   = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -256,7 +257,7 @@ export default function LevelsTab() {
     finally { setSaving(false) }
   }
 
-  const copyForTradingView = async () => {
+  const copyLevelsJson = async () => {
     try {
       const res  = await fetch(`${API_URL}/levels/json`)
       const data = await res.json()
@@ -566,10 +567,11 @@ export default function LevelsTab() {
       {/* Copy JSON */}
       {isToday && (
         <button
-          onClick={copyForTradingView}
-          className="w-full py-2 rounded text-sm font-medium bg-bg-elevated hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"
+          onClick={copyLevelsJson}
+          className="w-full py-2 rounded text-sm font-medium bg-bg-elevated hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors inline-flex items-center justify-center gap-1.5"
         >
-          {copied ? '✓ Copied!' : '📋 Copy JSON for TradingView'}
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? 'Copied!' : 'Copy Levels (JSON)'}
         </button>
       )}
 

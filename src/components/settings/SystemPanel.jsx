@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { PenLine } from 'lucide-react'
+import { PenLine, Copy, Check } from 'lucide-react'
 import Controls from '../intraday/Controls'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -387,7 +387,7 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
     finally { setSaving(false) }
   }
 
-  const copyForTradingView = async () => {
+  const copyLevelsJson = async () => {
     try {
       const res  = await fetch(`${API_URL}/levels/json`)
       const data = await res.json()
@@ -753,10 +753,11 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
           )}
           {isToday && (
             <button
-              onClick={copyForTradingView}
-              className="w-full py-2 rounded text-sm font-medium bg-bg-elevated hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors mb-3"
+              onClick={copyLevelsJson}
+              className="w-full py-2 rounded text-sm font-medium bg-bg-elevated hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors mb-3 inline-flex items-center justify-center gap-1.5"
             >
-              {copied ? '✓ Copied!' : '📋 Copy JSON for TradingView'}
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? 'Copied!' : 'Copy Levels (JSON)'}
             </button>
           )}
           {history.length > 0 && (

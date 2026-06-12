@@ -7,7 +7,7 @@ const GUIDE_SECTIONS = [
   {
     icon: '🎯',
     title: 'The Five Levels',
-    content: `Every morning, five price levels are calculated from a TradingView indicator: R2 (second resistance), R1 (first resistance), MID (midpoint), S1 (first support), and S2 (second support). These are the only levels that matter for the day. The scoring engine fetches live institutional data for each level and determines its signal quality.`,
+    content: `Every morning, five price levels are calculated natively by the app's Predictive Ranges engine (Polygon NQ futures bars run through the LuxAlgo recurrence): R2 (second resistance), R1 (first resistance), MID (midpoint), S1 (first support), and S2 (second support). These are the only levels that matter for the day. The scoring engine fetches live institutional data for each level and determines its signal quality.`,
   },
   {
     icon: '🔄',
