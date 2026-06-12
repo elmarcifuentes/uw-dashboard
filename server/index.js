@@ -43,6 +43,29 @@ const PORT = process.env.PORT || 3001
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*'
 const SERVER_START = Date.now()
 
+// ── Webhook auth (TASK-WEBHOOK-AUTH) ──────────────────────────────────────────
+// Only the EXTERNAL inbound path (/webhook/levels) is protected; the accept/dismiss/
+// pending/last siblings are called by our own frontend and stay open (the browser can't
+// hold a secret). TradingView alerts may carry the secret in the header OR as ?secret=.
+// If WEBHOOK_SECRET is unset we keep current open behavior (with a startup warning) so a
+// deploy doesn't brick the flow before the var is set.
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || null
+let _lastWebhookRejectLog = 0
+function checkWebhookSecret(req, res) {
+  if (!WEBHOOK_SECRET) return true   // unset → open (warned at startup)
+  const provided = req.get('X-Webhook-Secret') || req.query.secret
+  if (provided === WEBHOOK_SECRET) return true
+  // Rate-limit the rejection log to once per minute (not per attempt) to avoid log spam.
+  const now = Date.now()
+  if (now - _lastWebhookRejectLog >= 60000) {
+    _lastWebhookRejectLog = now
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown'
+    console.warn(`[webhook] rejected: bad/missing secret from ${ip}`)
+  }
+  res.status(401).json({ error: 'unauthorized' })
+  return false
+}
+
 app.use(cors({ origin: ALLOWED_ORIGINS }))
 app.use(express.json())
 
@@ -1653,6 +1676,7 @@ function parseTradingViewPayload(raw) {
 
 // POST /webhook/levels — TradingView webhook receiver
 app.post('/webhook/levels', express.text({ type: '*/*' }), (req, res) => {
+  if (!checkWebhookSecret(req, res)) return   // external inbound — secret required (when set)
   const timestamp = new Date().toISOString()
   const raw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {})
   console.log('[webhook] Raw payload:', raw)
@@ -3415,4 +3439,9 @@ app.post('/catalyst/fetch', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[server] UW Dashboard API listening on port ${PORT}`)
+  if (!WEBHOOK_SECRET) {
+    console.warn('[webhook] WEBHOOK_SECRET is unset — /webhook/levels is OPEN (no auth). Set WEBHOOK_SECRET in Railway to require X-Webhook-Secret / ?secret=.')
+  } else {
+    console.log('[webhook] auth enabled — /webhook/levels requires X-Webhook-Secret header or ?secret= query param')
+  }
 })

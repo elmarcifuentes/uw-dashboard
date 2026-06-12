@@ -278,7 +278,18 @@ Every 60s, checks ET time:
 | POST | `/system/pause` | Pause UW polling + auto-rescore |
 | POST | `/system/resume` | Resume |
 
-> **Webhook auth:** `/webhook/levels` is currently **unauthenticated** (the old `ACTION_SECRET` HMAC belonged to the removed draw-relay, not the webhook). Inbound levels land as **pending** and require an explicit **Accept** in the Levels tab before reaching scoring — that human accept-gate is today's only protection. Adding a real shared-secret/HMAC check is tracked as **TASK-WEBHOOK-AUTH** in [docs/TASKS.md](docs/TASKS.md).
+> **Webhook auth (TASK-WEBHOOK-AUTH):** `/webhook/levels` — the only externally-reachable inbound
+> endpoint — requires a shared secret. Set **`WEBHOOK_SECRET`** in Railway → Variables, then have the
+> caller present it as **either** an `X-Webhook-Secret` request header **or** a `?secret=` query param
+> (use the query param for TradingView alerts, where custom headers usually aren't configurable —
+> e.g. `https://<host>/webhook/levels?secret=YOUR_SECRET`). A request with a missing/wrong secret gets
+> **401**, and the server logs `[webhook] rejected: bad/missing secret from {ip}` at most once per minute.
+>
+> If `WEBHOOK_SECRET` is **unset**, the endpoint stays **open** (current behavior) and the server logs a
+> startup warning — so a deploy never bricks the flow before you set the var. The `accept` / `dismiss` /
+> `pending` / `last` endpoints are **app-internal** (called by the dashboard's own frontend, which can't
+> hold a secret) and are intentionally left open; the human **Accept**-gate in the Levels tab remains the
+> second line of defense before any levels reach scoring.
 
 ---
 
