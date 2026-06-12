@@ -111,20 +111,7 @@ db.exec(`
     value      TEXT,
     updated_at TEXT DEFAULT (datetime('now'))
   );
-
-  CREATE TABLE IF NOT EXISTS pending_levels (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    date        TEXT NOT NULL,
-    r2_nq REAL, r2_qqq REAL,
-    r1_nq REAL, r1_qqq REAL,
-    mid_nq REAL, mid_qqq REAL,
-    s1_nq REAL, s1_qqq REAL,
-    s2_nq REAL, s2_qqq REAL,
-    nq_ratio    REAL,
-    source      TEXT DEFAULT 'webhook',
-    status      TEXT DEFAULT 'pending',
-    received_at TEXT DEFAULT (datetime('now'))
-  );
 `)
+// pending_levels table removed with the TradingView webhook feature (levels are native now).
 
 export default db

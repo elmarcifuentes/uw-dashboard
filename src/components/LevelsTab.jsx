@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import AlertBadge from './AlertBadge'
 
 const API_URL   = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const LEVEL_IDS = ['R2', 'R1', 'MID', 'S1', 'S2']
@@ -73,9 +72,6 @@ export default function LevelsTab() {
   const [history, setHistory]       = useState([])
   const [saving, setSaving]         = useState(false)
   const [saveResult, setSaveResult] = useState(null)
-  const [pending, setPending]       = useState(null)
-  const [accepting, setAccepting]   = useState(false)
-  const pendingPollRef              = useRef(null)
 
   const [levelSourceMode, setLevelSourceMode]   = useState('auto')
   const [nqOffsets, setNqOffsets]               = useState({ ratio: null, R2: 0, R1: 0, MID: 0, S1: 0, S2: 0 })
@@ -124,16 +120,6 @@ export default function LevelsTab() {
       .then(r => r.json())
       .then(data => setHistory(data.levels || []))
       .catch(() => {})
-
-    const pollPending = () => {
-      fetch(`${API_URL}/webhook/pending`)
-        .then(r => r.json())
-        .then(data => setPending(data.pending || null))
-        .catch(() => {})
-    }
-    pollPending()
-    pendingPollRef.current = setInterval(pollPending, 15_000)
-    return () => clearInterval(pendingPollRef.current)
   }, [])
 
   useEffect(() => {
@@ -330,83 +316,6 @@ export default function LevelsTab() {
         )}
       </div>
 
-      {/* Pending webhook banner */}
-      {pending && (
-        <div className="border border-amber-700/60 rounded-lg bg-amber-950/20 p-3 space-y-3">
-          <AlertBadge
-            type="watch"
-            label="📡 New levels from TradingView"
-            detail={`Received ${new Date(pending.received_at + 'Z').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })} ET — review and accept to update scoring`}
-          />
-          <div className="mb-3 text-xs space-y-0.5">
-            <div className="grid grid-cols-5 gap-1 mb-1">
-              <div className="text-text-tertiary">Level</div>
-              <div className="text-text-tertiary text-center">Cur NQ</div>
-              <div className="text-text-tertiary text-center">Cur QQQ</div>
-              <div className="text-amber-400 text-center">New NQ</div>
-              <div className="text-amber-400 text-center">New QQQ</div>
-            </div>
-            {['R2','R1','MID','S1','S2'].map(id => {
-              const key        = id.toLowerCase()
-              const currentNq  = parseFloat(levels[id]?.nq)
-              const currentQqq = parseFloat(levels[id]?.qqq)
-              const incomingNq  = parseFloat(pending[`${key}_nq`])
-              const incomingQqq = parseFloat(pending[`${key}_qqq`])
-              const nqChanged  = !isNaN(currentNq)  && !isNaN(incomingNq)  && Math.abs(currentNq  - incomingNq)  > 0.25
-              const qqqChanged = !isNaN(currentQqq) && !isNaN(incomingQqq) && Math.abs(currentQqq - incomingQqq) > 0.01
-              const anyChanged = nqChanged || qqqChanged
-              return (
-                <div key={id} className={`grid grid-cols-5 gap-1 py-0.5 ${anyChanged ? 'bg-amber-950 rounded px-1' : ''}`}>
-                  <div className="font-bold text-text-secondary">{id}</div>
-                  <div className="text-center font-mono text-text-tertiary">{!isNaN(currentNq)  ? currentNq.toFixed(2)        : '—'}</div>
-                  <div className="text-center font-mono text-text-secondary">{!isNaN(currentQqq) ? `$${currentQqq.toFixed(2)}` : '—'}</div>
-                  <div className={`text-center font-mono ${nqChanged  ? 'text-amber-300 font-bold' : 'text-text-secondary'}`}>
-                    {!isNaN(incomingNq)  ? incomingNq.toFixed(2)        : '—'}{nqChanged  ? ' ←' : ''}
-                  </div>
-                  <div className={`text-center font-mono ${qqqChanged ? 'text-amber-300 font-bold' : 'text-text-secondary'}`}>
-                    {!isNaN(incomingQqq) ? `$${incomingQqq.toFixed(2)}` : '—'}{qqqChanged ? ' ←' : ''}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          {pending.nq_ratio && (
-            <div className="text-xs text-text-tertiary mb-3">Ratio: {parseFloat(pending.nq_ratio).toFixed(3)}</div>
-          )}
-          <div className="flex gap-2">
-            <button
-              disabled={accepting}
-              onClick={async () => {
-                setAccepting(true)
-                try {
-                  const res  = await fetch(`${API_URL}/webhook/accept`, { method: 'POST' })
-                  const data = await res.json()
-                  if (data.success) {
-                    setPending(null)
-                    await reloadLevels()
-                  }
-                } catch {}
-                finally { setAccepting(false) }
-              }}
-              className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
-                accepting ? 'bg-amber-800 text-amber-400 cursor-wait' : 'bg-amber-600 hover:bg-amber-500 text-text-primary'
-              }`}
-            >
-              {accepting ? '⟳ Accepting…' : '✓ Accept — Update Levels'}
-            </button>
-            <button
-              onClick={async () => {
-                await fetch(`${API_URL}/webhook/dismiss`, { method: 'POST' })
-                setPending(null)
-              }}
-              className="px-4 py-1.5 rounded text-sm font-medium bg-bg-elevated hover:bg-bg-card2 text-text-primary"
-            >
-              ✗ Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Level Source Mode */}
       <div className="bg-bg-card border border-border-subtle rounded-lg p-4">
         <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Level Source Mode</div>
@@ -580,7 +489,7 @@ export default function LevelsTab() {
                 <div className={`text-xs font-bold ${levelSourceMode === 'manual' ? 'text-text-secondary' : 'text-text-tertiary'}`}>
                   ✏️ Manual — QQQ + NQ
                 </div>
-                <div className="text-xs text-text-muted mt-0.5">Levels only change when you save manually or accept webhook</div>
+                <div className="text-xs text-text-muted mt-0.5">Levels only change when you save manually or apply auto levels</div>
               </div>
               {levelSourceMode === 'manual' && <span className="text-text-secondary text-xs shrink-0 ml-2">● active</span>}
             </div>

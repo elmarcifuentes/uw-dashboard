@@ -273,23 +273,12 @@ Every 60s, checks ET time:
 | POST | `/labs/active-interval` | Set active PR timeframe (`5m` / `1m`) — loads that tf's state |
 | POST | `/labs/reset-avg` | Clear ratcheting avg |
 | POST | `/ratio/lock` | Manually lock a ratio value |
-| POST | `/webhook/levels` | Inbound TradingView alert → saves levels as **pending** (see auth note) |
-| POST | `/webhook/accept` | Accept pending TradingView levels → `daily_levels` + rescore |
 | POST | `/system/pause` | Pause UW polling + auto-rescore |
 | POST | `/system/resume` | Resume |
 
-> **Webhook auth (TASK-WEBHOOK-AUTH):** `/webhook/levels` — the only externally-reachable inbound
-> endpoint — requires a shared secret. Set **`WEBHOOK_SECRET`** in Railway → Variables, then have the
-> caller present it as **either** an `X-Webhook-Secret` request header **or** a `?secret=` query param
-> (use the query param for TradingView alerts, where custom headers usually aren't configurable —
-> e.g. `https://<host>/webhook/levels?secret=YOUR_SECRET`). A request with a missing/wrong secret gets
-> **401**, and the server logs `[webhook] rejected: bad/missing secret from {ip}` at most once per minute.
->
-> If `WEBHOOK_SECRET` is **unset**, the endpoint stays **open** (current behavior) and the server logs a
-> startup warning — so a deploy never bricks the flow before you set the var. The `accept` / `dismiss` /
-> `pending` / `last` endpoints are **app-internal** (called by the dashboard's own frontend, which can't
-> hold a secret) and are intentionally left open; the human **Accept**-gate in the Levels tab remains the
-> second line of defense before any levels reach scoring.
+> **TradingView webhook ingestion removed** — the app generates levels natively via Predictive Ranges,
+> so inbound level injection from TradingView is obsolete. With the outbound draw bridge already gone,
+> **TradingView coupling is now zero and the app has no external write paths.** (Git history is the archive.)
 
 ---
 

@@ -152,7 +152,7 @@ function GuideOverview() {
           {[
             { time: 'Pre-Market',
               steps: [
-                'Settings tab → PIN → ⚙ System → review TradingView webhook banner → Accept',
+                'Levels generate natively (Predictive Ranges) — auto-apply when Level Source is Auto',
                 'OR: choose Level Source mode → enter 5 NQ + 5 QQQ prices manually → Save Levels',
               ]},
             { time: 'During Session',
@@ -553,10 +553,10 @@ function GuideInterface() {
         <p className="text-xs text-text-muted mt-2">Toggle in Settings → System. Off by default.</p>
       </GuideCard>
 
-      <GuideCard title="TradingView Integration">
+      <GuideCard title="Level Sources">
         <div className="space-y-1.5">
-          <Row label="Webhook (recommended)" value="TradingView alert → Railway"      sub="Auto-populates Levels tab with pending banner" />
-          <Row label="Manual entry"          value="Levels tab → NQ + QQQ prices"    sub="Ratio auto-calculated from entries" />
+          <Row label="Native (default)"  value="Predictive Ranges → auto-apply"   sub="App generates R2/R1/MID/S1/S2 itself; no external feed" />
+          <Row label="Manual entry"      value="Levels tab → NQ + QQQ prices"     sub="Ratio auto-calculated from entries" />
         </div>
       </GuideCard>
     </div>

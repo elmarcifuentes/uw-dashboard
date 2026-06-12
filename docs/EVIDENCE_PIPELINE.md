@@ -228,7 +228,7 @@ cascade / levelNarratives / assistantRead / chartStale …`. `Intraday.jsx` deri
 | `narrative_update` / `level_narratives_update` / `session_brief_update` / `assistant_read_update` | index.js:955/964/972/981 (+manual/scoreNow) | LLM text | narrative blocks |
 
 Control/meta events (not evidence): `labs_levels_update`, `labs_levels_changed`, `labs_no_fresh_data`,
-`levels_auto_updated`, `levels_pending/dismissed`, `ratio_locked`, `contract_rollover/ready`,
+`levels_auto_updated`, `ratio_locked`, `contract_rollover/ready`,
 `system_paused/resumed`, `symbol_changed`, `chart_synced`, `heartbeat`, `trade_entered/exited`,
 `auto_score_changed`, `level_source_mode_changed`, `level_update_alert`. (No event of `type:'sentiment'`
 is ever emitted — sentiment rides inside `rescore`.)

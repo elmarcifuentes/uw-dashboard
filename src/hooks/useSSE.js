@@ -15,7 +15,6 @@ export function useSSE(url) {
   const [narrative, setNarrative]             = useState([])
   const [sentiment, setSentiment]             = useState(null)
   const [narrativeMode, setNarrativeMode]     = useState('template')
-  const [pendingLevels, setPendingLevels]     = useState(null)
   const [levelNarratives, setLevelNarratives] = useState({})
   const [sessionBrief, setSessionBrief]       = useState(null)
   const [tacticalBrief, setTacticalBrief]     = useState(null)
@@ -233,9 +232,6 @@ export function useSSE(url) {
           setLevelNarratives(data.narratives || {})
           return
         }
-        if (data.type === 'levels_pending')   { setPendingLevels(data.levels); return }
-        if (data.type === 'levels_dismissed') { setPendingLevels(null);        return }
-        if (data.type === 'levels_updated')   { setPendingLevels(null);        return }
         if (data.type === 'system_paused')    { setSystemPaused(true);  setPausedAt(data.pausedAt || null);  return }
         if (data.type === 'system_resumed')   { setSystemPaused(false); setPausedAt(null);                   return }
         if (data.type === 'level_source_mode_changed') { console.log('[levels] source mode:', data.mode);          return }
@@ -301,8 +297,6 @@ export function useSSE(url) {
     narrative,
     sentiment,
     narrativeMode,
-    pendingLevels,
-    clearPendingLevels: () => setPendingLevels(null),
     levelNarratives,
     sessionBrief,
     tacticalBrief,

@@ -43,29 +43,6 @@ const PORT = process.env.PORT || 3001
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*'
 const SERVER_START = Date.now()
 
-// ── Webhook auth (TASK-WEBHOOK-AUTH) ──────────────────────────────────────────
-// Only the EXTERNAL inbound path (/webhook/levels) is protected; the accept/dismiss/
-// pending/last siblings are called by our own frontend and stay open (the browser can't
-// hold a secret). TradingView alerts may carry the secret in the header OR as ?secret=.
-// If WEBHOOK_SECRET is unset we keep current open behavior (with a startup warning) so a
-// deploy doesn't brick the flow before the var is set.
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || null
-let _lastWebhookRejectLog = 0
-function checkWebhookSecret(req, res) {
-  if (!WEBHOOK_SECRET) return true   // unset → open (warned at startup)
-  const provided = req.get('X-Webhook-Secret') || req.query.secret
-  if (provided === WEBHOOK_SECRET) return true
-  // Rate-limit the rejection log to once per minute (not per attempt) to avoid log spam.
-  const now = Date.now()
-  if (now - _lastWebhookRejectLog >= 60000) {
-    _lastWebhookRejectLog = now
-    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown'
-    console.warn(`[webhook] rejected: bad/missing secret from ${ip}`)
-  }
-  res.status(401).json({ error: 'unauthorized' })
-  return false
-}
-
 app.use(cors({ origin: ALLOWED_ORIGINS }))
 app.use(express.json())
 
@@ -73,7 +50,6 @@ app.use(express.json())
 let latest            = null
 let previousResult    = null
 let chartSynced       = true
-let lastWebhookPayload = null
 let lastNarrative           = []
 let priceHistory            = []   // max 50 points for mini chart
 let lastTrackedPrice        = null
@@ -1482,6 +1458,7 @@ app.post('/levels', (req, res) => {
     `).run(today, r2_nq, r2_qqq, r1_nq, r1_qqq, mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq, nq_ratio)
 
     if (latest && nq_ratio) latest.nq_ratio = nq_ratio
+    // no frontend listener; displays refresh via the rescore SSE — kept as a deliberate no-op emit
     sseEmitter.emit('event', { type: 'levels_updated', date: today, nq_ratio, timestamp: new Date().toISOString() })
     console.log(`[server] Levels saved for ${today} | ratio: ${nq_ratio?.toFixed(3)}`)
     res.json({ success: true, date: today, nq_ratio })
@@ -1644,165 +1621,7 @@ app.get('/api-data/flow-expiry', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// Parse TradingView pipe-delimited payload:
-// "date=2026-06-05 | ratio=41.193 | R2_nq=29512.25 | ..."
-function parseTradingViewPayload(raw) {
-  const result = {}
-  for (const pair of raw.split('|').map(s => s.trim())) {
-    const eq = pair.indexOf('=')
-    if (eq < 1) continue
-    const key = pair.slice(0, eq).trim().toLowerCase()
-    const val = pair.slice(eq + 1).trim()
-    if (key && val) result[key] = val
-  }
-  const required = ['r2_nq','r2_qqq','r1_nq','r1_qqq','mid_nq','mid_qqq','s1_nq','s1_qqq','s2_nq','s2_qqq']
-  const missing = required.filter(k => !result[k])
-  if (missing.length > 0) throw new Error(`Missing fields: ${missing.join(', ')}`)
-  return {
-    date:     result.date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
-    r2_nq:    parseFloat(result.r2_nq),
-    r2_qqq:   parseFloat(result.r2_qqq),
-    r1_nq:    parseFloat(result.r1_nq),
-    r1_qqq:   parseFloat(result.r1_qqq),
-    mid_nq:   parseFloat(result.mid_nq),
-    mid_qqq:  parseFloat(result.mid_qqq),
-    s1_nq:    parseFloat(result.s1_nq),
-    s1_qqq:   parseFloat(result.s1_qqq),
-    s2_nq:    parseFloat(result.s2_nq),
-    s2_qqq:   parseFloat(result.s2_qqq),
-    nq_ratio: result.ratio ? parseFloat(result.ratio) : null,
-  }
-}
-
-// POST /webhook/levels — TradingView webhook receiver
-app.post('/webhook/levels', express.text({ type: '*/*' }), (req, res) => {
-  if (!checkWebhookSecret(req, res)) return   // external inbound — secret required (when set)
-  const timestamp = new Date().toISOString()
-  const raw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {})
-  console.log('[webhook] Raw payload:', raw)
-  try {
-    const parsed = parseTradingViewPayload(raw)
-    console.log('[webhook] Parsed:', JSON.stringify(parsed))
-    db.prepare(`
-      INSERT INTO pending_levels (
-        date, r2_nq, r2_qqq, r1_nq, r1_qqq,
-        mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq,
-        nq_ratio, source, status, received_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webhook', 'pending', datetime('now'))
-    `).run(
-      parsed.date,
-      parsed.r2_nq,  parsed.r2_qqq,
-      parsed.r1_nq,  parsed.r1_qqq,
-      parsed.mid_nq, parsed.mid_qqq,
-      parsed.s1_nq,  parsed.s1_qqq,
-      parsed.s2_nq,  parsed.s2_qqq,
-      parsed.nq_ratio
-    )
-    lastWebhookPayload = { raw, parsed, timestamp, status: 'pending — awaiting confirmation' }
-    sseEmitter.emit('event', { type: 'levels_pending', levels: parsed, source: 'tradingview', timestamp })
-    console.log('[webhook] Levels saved as pending for', parsed.date)
-    res.status(200).json({ received: true, status: 'pending', date: parsed.date, timestamp })
-  } catch (err) {
-    console.error('[webhook] Parse error:', err.message)
-    res.status(400).json({ error: err.message, raw })
-  }
-})
-
-// GET /webhook/last — inspect last received payload
-app.get('/webhook/last', (req, res) => {
-  res.json(lastWebhookPayload || { message: 'No webhook received yet' })
-})
-
-// GET /webhook/pending — latest pending levels
-app.get('/webhook/pending', (req, res) => {
-  try {
-    const row = db.prepare(
-      `SELECT * FROM pending_levels WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1`
-    ).get()
-    res.json({ pending: row || null })
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
-
-// POST /webhook/accept — promote pending → daily_levels + rescore
-app.post('/webhook/accept', async (req, res) => {
-  try {
-    const pending = db.prepare(
-      `SELECT * FROM pending_levels WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1`
-    ).get()
-    if (!pending) return res.status(404).json({ error: 'No pending levels' })
-
-    db.prepare(`
-      INSERT INTO daily_levels (
-        date, r2_nq, r2_qqq, r1_nq, r1_qqq,
-        mid_nq, mid_qqq, s1_nq, s1_qqq, s2_nq, s2_qqq,
-        nq_ratio, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(date) DO UPDATE SET
-        r2_nq=excluded.r2_nq, r2_qqq=excluded.r2_qqq,
-        r1_nq=excluded.r1_nq, r1_qqq=excluded.r1_qqq,
-        mid_nq=excluded.mid_nq, mid_qqq=excluded.mid_qqq,
-        s1_nq=excluded.s1_nq, s1_qqq=excluded.s1_qqq,
-        s2_nq=excluded.s2_nq, s2_qqq=excluded.s2_qqq,
-        nq_ratio=excluded.nq_ratio, updated_at=datetime('now')
-    `).run(
-      pending.date,
-      pending.r2_nq,  pending.r2_qqq,
-      pending.r1_nq,  pending.r1_qqq,
-      pending.mid_nq, pending.mid_qqq,
-      pending.s1_nq,  pending.s1_qqq,
-      pending.s2_nq,  pending.s2_qqq,
-      pending.nq_ratio
-    )
-    db.prepare(`UPDATE pending_levels SET status = 'accepted' WHERE id = ?`).run(pending.id)
-
-    sseEmitter.emit('event', {
-      type: 'levels_updated', date: pending.date,
-      nq_ratio: pending.nq_ratio, source: 'webhook_accepted',
-      timestamp: new Date().toISOString(),
-    })
-
-    res.json({ success: true, date: pending.date })
-
-    // Auto-rescore with new levels
-    if (runFullScore) {
-      try {
-        const levelsOverride = getLevelsForScoring(db)
-        const result = await runScoreWithNq({ trigger: 'webhook_accept', levelsOverride })
-        result._received_at = new Date().toISOString()
-        latest = result
-        history.unshift(result)
-        if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
-        provider.setLevels(result.levels)
-        updateDpHistory(result)
-        const sent = computeSentiment(result)
-        result._sentiment = sent
-        sseEmitter.emit('event', {
-          type: 'rescore', result, trigger: 'webhook levels accepted',
-          price: result.current_price,
-          dpHistory: { ...dpHistory }, sentiment: sent,
-          timestamp: new Date().toISOString(),
-        })
-        generateNarrativeForMode(result, dpHistory)
-          .then(narrative => {
-            if (narrative?.length > 0)
-              sseEmitter.emit('event', { type: 'narrative_update', narrative, timestamp: new Date().toISOString() })
-          })
-          .catch(err => console.warn('[webhook accept] narrative failed:', err.message))
-      } catch (err) {
-        console.error(`[scorer] rescore failed at source: ${err.source || 'unknown'} (webhook-accept): ${err.message}`)
-      }
-    }
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
-
-// POST /webhook/dismiss — discard pending levels
-app.post('/webhook/dismiss', (req, res) => {
-  try {
-    db.prepare(`UPDATE pending_levels SET status = 'dismissed' WHERE status = 'pending'`).run()
-    sseEmitter.emit('event', { type: 'levels_dismissed', timestamp: new Date().toISOString() })
-    res.json({ success: true })
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
+// TradingView webhook ingestion removed — the app generates levels natively via Predictive Ranges.
 
 // GET /dp-history — per-level dark pool history
 app.get('/dp-history', (req, res) => {
@@ -3439,9 +3258,4 @@ app.post('/catalyst/fetch', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[server] UW Dashboard API listening on port ${PORT}`)
-  if (!WEBHOOK_SECRET) {
-    console.warn('[webhook] WEBHOOK_SECRET is unset — /webhook/levels is OPEN (no auth). Set WEBHOOK_SECRET in Railway to require X-Webhook-Secret / ?secret=.')
-  } else {
-    console.log('[webhook] auth enabled — /webhook/levels requires X-Webhook-Secret header or ?secret= query param')
-  }
 })
