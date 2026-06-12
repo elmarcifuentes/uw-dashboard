@@ -5,7 +5,7 @@ Real-time intraday trading dashboard for QQQ/NQ futures. Scores price levels aga
 **Last updated:** 2026-06-12  
 **Backend:** Railway (auto-deploy from `main`)  
 **Frontend:** Vercel (auto-deploy from `main`)  
-**Latest code commit:** `2bcfc95` · Predictive Ranges deep reference: [PREDICTIVE_RANGES.md](PREDICTIVE_RANGES.md)
+**Latest code commit:** `2bcfc95` · Predictive Ranges deep reference: [PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md)
 
 ---
 
@@ -87,12 +87,20 @@ startCommand: node server/index.js
 
 ---
 
+## Deep references
+
+- **[CLAUDE.md](CLAUDE.md)** — frozen constraints, loaded every session (invariants, protected systems, design system, conventions).
+- **[docs/PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md)** — the level engine (LuxAlgo recurrence, persisted state, cold-start, feed, ratio, rounding).
+- **[docs/SCORING.md](docs/SCORING.md)** — the UW scoring pipeline (algorithm, weights/thresholds, rescore triggers, polling/budget, narratives, Catalyst).
+
+---
+
 ## Core Data Flow
 
-1. **UW polling** — server polls Unusual Whales every ~15s for flow, dark pool, GEX, sectors, news
-2. **Level scoring** — `scoreLevel.js` scores each level (R2/R1/MID/S1/S2) → `classification`, confidence, signals
-3. **SSE stream** — server pushes scored results to frontend via `/stream`
-4. **Auto levels** — Labs recalculates NQ Predictive Ranges every 5m during market hours; auto-applies when `levelSourceMode === 'auto_nq'`
+1. **Price polling** — `RestDataProvider` polls QQQ price adaptively (2–10s near levels, 5m overnight) and decides *when* to rescore (within 0.15 of a level, ≥$1 move, or 15-min fallback). See [docs/SCORING.md §4](docs/SCORING.md).
+2. **Level scoring** — on a rescore, `scoreLevel.js` fetches UW flow/dark-pool/options/GEX/etf and scores each level (R2/R1/MID/S1/S2) → `classification`, confidence, flags. See [docs/SCORING.md](docs/SCORING.md).
+3. **SSE stream** — server pushes scored results (and narratives) to the frontend via `/stream`.
+4. **Auto levels** — Labs recalculates NQ Predictive Ranges every 1m/5m during market hours; auto-applies when `levelSourceMode === 'auto_nq'`. See [docs/PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md).
 
 ---
 
@@ -154,13 +162,13 @@ To change granularity (e.g. quarter-tick `Math.round(x*4)/4`), change **only `ro
 
 ATR-based support/resistance for NQ futures. Primary auto-level source in `auto_nq` mode.
 
-> **📖 Full reference: [PREDICTIVE_RANGES.md](PREDICTIVE_RANGES.md)** — the definitive doc for the
+> **📖 Full reference: [PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md)** — the definitive doc for the
 > recurrence math, path dependence, persisted state, anchored cold-starts, the Polygon feed,
 > the apply→scoring pipeline, the ratio system, expected residuals/invariants, and
 > troubleshooting. Read it before modifying anything in the PR system.
 
 ### Data sources
-- **Primary:** Polygon.io futures — `/futures/v1/aggs/{ticker}` with `window_start.gte/.lte` (ns) + `sort=window_start.{asc|desc}` (see [PREDICTIVE_RANGES.md §5](PREDICTIVE_RANGES.md))
+- **Primary:** Polygon.io futures — `/futures/v1/aggs/{ticker}` with `window_start.gte/.lte` (ns) + `sort=window_start.{asc|desc}` (see [PREDICTIVE_RANGES.md §5](docs/PREDICTIVE_RANGES.md))
 - **Fallback:** Yahoo Finance `NQ=F`
 - **Active contract:** auto-detected via `detectActiveNQContract()`, default `NQM6`
 
@@ -210,7 +218,7 @@ gap bars, so flattening them desynced the recurrence. Function is kept (unused) 
 potential non-PR use only.
 
 ### Avg mode
-- **Daily** (the only mode) — ratcheting recurrence state persisted per timeframe in `labs_pr_avg_{tf}`; advanced one closed bar at a time, never recomputed from a window (see [PREDICTIVE_RANGES.md §2–§3](PREDICTIVE_RANGES.md))
+- **Daily** (the only mode) — ratcheting recurrence state persisted per timeframe in `labs_pr_avg_{tf}`; advanced one closed bar at a time, never recomputed from a window (see [PREDICTIVE_RANGES.md §2–§3](docs/PREDICTIVE_RANGES.md))
 
 > A short-lived **Weekly** avg mode (NQM6 weekly bars) existed briefly and was **removed** — it was built on the wrong data source and is not being pursued. See git history if revisiting. `avgMode` is retained as a vestigial always-`'daily'` settings field; any stale `'weekly'` value is coerced to `'daily'` on load.
 
@@ -284,8 +292,9 @@ Every 60s, checks ET time:
 
 | Commit | What changed |
 |---|---|
-| _next_ | **Removed Weekly avg mode** (UI + server) — was built on the wrong data source (NQM6 weekly bars) and not being pursued; dead branch deleted (`calcWeeklyAvg`, the `avgMode === 'weekly'` calc branch, the now-orphaned `calcATR`, the Daily/Weekly toggle). Daily path **untouched** (deletion only, no recurrence/state/anchor change → no cold-start on deploy). Stale `avgMode:'weekly'` coerces to `daily` on load/settings with a one-time log; `avgMode` kept as a vestigial always-`'daily'` field. |
-| `b14bbd7` | **Docs:** added [PREDICTIVE_RANGES.md](PREDICTIVE_RANGES.md) (definitive PR reference); refreshed README Labs/Known-Issues sections and cross-linked. |
+| _next_ | **Docs:** added [CLAUDE.md](CLAUDE.md) (frozen constraints) and [docs/SCORING.md](docs/SCORING.md) (UW scoring deep reference); moved PREDICTIVE_RANGES.md → `docs/`; cross-linked from README. Documentation only. |
+| `2cbd19f` | **Removed Weekly avg mode** (UI + server) — was built on the wrong data source (NQM6 weekly bars) and not being pursued; dead branch deleted (`calcWeeklyAvg`, the `avgMode === 'weekly'` calc branch, the now-orphaned `calcATR`, the Daily/Weekly toggle). Daily path **untouched** (deletion only, no recurrence/state/anchor change → no cold-start on deploy). Stale `avgMode:'weekly'` coerces to `daily` on load/settings with a one-time log; `avgMode` kept as a vestigial always-`'daily'` field. |
+| `b14bbd7` | **Docs:** added [PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md) (definitive PR reference); refreshed README Labs/Known-Issues sections and cross-linked. |
 | `2bcfc95` | **Labs PR table → six columns** — `Level · NQ Native · QQQ Equiv · Active NQ · Active QQQ · Δ`. New **Active QQQ** reads the STORED canonical `daily_levels` QQQ (`/levels` poll now carries `qqq_price`), not recomputed — doubles as a cross-tab consistency check vs Intraday/Overview. "Active" renamed "Active NQ"; Δ unchanged (rightmost). Expected QQQ Equiv vs Active QQQ residual ~$0.01–0.02 (raw vs rounded NQ basis). |
 | `03affee` | **Labs QQQ Equiv column ratio fix** — column divided by a hardcoded `41.14` (LabsPanel read `status.nq_ratio`, which `/status` never returned). Now `/status` exposes `activeRatio` (= `getActiveRatio()`); LabsPanel uses it and recomputes immediately on the `ratio_locked` SSE (via the `sessionRatio` prop), not just the 20s poll. In-use ratio shown in the header (`ratio 41.117 🔒 09:30`). Display-only; residual vs Active QQQ (~$0.01–0.02 from rounded-NQ derivation) is expected and unchanged. |
 | `77b4cba` | **Shared post-lock refresh `onRatioLocked(trigger)`** — manual `/ratio/lock` previously didn't recompute stored QQQ, so tabs showed old-ratio QQQ while NQ was correct. Now scheduled, catch-up, AND manual locks all call one function: `rewriteQqqFromRatio()` rewrites ONLY the `daily_levels` QQQ columns from canonical NQ ÷ ratio (NQ untouched; mode/pause/market-hours agnostic) → emit `ratio_locked`/`labs_levels_update` SSE → `scoreNow()` rescore so scored levels + narratives reflect new QQQ. Works after-hours. |
@@ -313,8 +322,8 @@ Every 60s, checks ET time:
 
 ## Resolved (kept for context)
 
-- **Polygon futures date-range / stale-bar bug — SOLVED** (`954ae4e`). Root cause: `/futures/v1/aggs/` is a different API family from stocks-v2 and **silently ignores** the stocks-style `from`/`to`/`sort=desc` params, so ascending+limit returned oldest-from-inception bars (1m levels stuck ~25k). Fixed by using the honored **`window_start.gte`/`window_start.lte`** (ns) + **`sort=window_start.{asc|desc}`** (dotted) params, plus the `barsAreFresh` recency guard and load-side stale-state discard. See [PREDICTIVE_RANGES.md §5](PREDICTIVE_RANGES.md).
-- **Labs-vs-scoring "discrepancy" — by design, now visible.** The gap between Labs (raw recurrence) and active scoring levels is the **>20pt / >$0.50 change guard** holding `daily_levels` until a meaningful move; the **Δ column** and the **Active NQ/QQQ columns** surface it directly. Resting Δ ±0.5 and QQQ-Equiv-vs-Active-QQQ ~$0.01–0.02 are expected ([PREDICTIVE_RANGES.md §9](PREDICTIVE_RANGES.md)).
+- **Polygon futures date-range / stale-bar bug — SOLVED** (`954ae4e`). Root cause: `/futures/v1/aggs/` is a different API family from stocks-v2 and **silently ignores** the stocks-style `from`/`to`/`sort=desc` params, so ascending+limit returned oldest-from-inception bars (1m levels stuck ~25k). Fixed by using the honored **`window_start.gte`/`window_start.lte`** (ns) + **`sort=window_start.{asc|desc}`** (dotted) params, plus the `barsAreFresh` recency guard and load-side stale-state discard. See [PREDICTIVE_RANGES.md §5](docs/PREDICTIVE_RANGES.md).
+- **Labs-vs-scoring "discrepancy" — by design, now visible.** The gap between Labs (raw recurrence) and active scoring levels is the **>20pt / >$0.50 change guard** holding `daily_levels` until a meaningful move; the **Δ column** and the **Active NQ/QQQ columns** surface it directly. Resting Δ ±0.5 and QQQ-Equiv-vs-Active-QQQ ~$0.01–0.02 are expected ([PREDICTIVE_RANGES.md §9](docs/PREDICTIVE_RANGES.md)).
 
 ## Known Issues
 
@@ -330,6 +339,6 @@ Every 60s, checks ET time:
 3. Never modify `server/scorer/scoreLevel.js` or `server/scorer/fetchData.js`
 4. Always commit and push after changes
 5. **For anything in the Predictive Ranges system** (recurrence, state, cold-start, feed, apply,
-   ratio lock, Labs table), read **[PREDICTIVE_RANGES.md](PREDICTIVE_RANGES.md)** first — it is the
+   ratio lock, Labs table), read **[PREDICTIVE_RANGES.md](docs/PREDICTIVE_RANGES.md)** first — it is the
    definitive reference and documents the invariants you must not break.
 6. This README is the high-level source of truth; PREDICTIVE_RANGES.md is the deep PR reference.

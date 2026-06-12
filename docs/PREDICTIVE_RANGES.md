@@ -473,7 +473,7 @@ canonical-first pattern inline for entry/target). The **canonical** branch is wh
 
 ## See also
 
-- **README.md** → high-level architecture, endpoints, SQLite schema, Recent Changes.
+- **../README.md** → high-level architecture, endpoints, SQLite schema, Recent Changes.
 - **Level Rounding Policy** (README) → the one-line summary of §6.
 - `server/index.js` → `initRecurrence`, `advanceRecurrence`, `levelsFromState`,
   `calculateLabsLevels`, `getColdStartAnchor`, `fetchFromPolygonFutures`, `barsAreFresh`,
