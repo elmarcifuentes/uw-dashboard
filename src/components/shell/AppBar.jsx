@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { Bot, Pause, Lock, Unlock } from 'lucide-react'
+import { Bot, Pause, Lock, Unlock, CalendarClock, RefreshCw, Check } from 'lucide-react'
 
 const SYMBOLS = [
   { id: 'NQ',  label: 'NQ',  color: 'text-signal-continuation' },
@@ -23,7 +23,7 @@ function formatPausedTime(isoString) {
   } catch { return '' }
 }
 
-export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive, systemPaused, pausedAt, activeSymbol = 'NQ', onSymbolChange, contractRollover }) {
+export default function AppBar({ connected, price, nqPrice, narrativeMode, onLockClick, unlocked, cascadeActive, systemPaused, pausedAt, activeSymbol = 'NQ', onSymbolChange, contractRollover, nqContract, daysToExpiry, nqNextContract, nqVolStatus }) {
   const [showInfo, setShowInfo] = useState(false)
 
   return (
@@ -126,16 +126,31 @@ export default function AppBar({ connected, price, nqPrice, narrativeMode, onLoc
           <span className="text-text-muted hidden sm:block">· Resume in Controls tab</span>
         </div>
       )}
-      {contractRollover?.recalibrating && (
-        <div className="bg-bg-elevated border-t border-state-cascadeWatch/30 px-4 py-1 flex items-center gap-2 text-micro">
-          <span className="text-state-cascadeWatch animate-pulse font-bold">⚡ {contractRollover.message}</span>
+      {/* NQ contract status — always visible (front month + volume migration toward next quarterly),
+          so the active contract reads like TV's NQ1!. Roll fires on a sustained 2-session volume
+          crossover or expiry; recalibrating state shown while the new contract cold-starts. */}
+      {contractRollover?.recalibrating ? (
+        <div className="bg-bg-elevated border-t border-state-cascadeWatch/30 px-4 py-1 flex items-center gap-1.5 text-micro">
+          <RefreshCw size={11} className="text-state-cascadeWatch animate-spin" />
+          <span className="text-state-cascadeWatch font-bold">{contractRollover.message}</span>
         </div>
-      )}
-      {contractRollover && !contractRollover.recalibrating && (
-        <div className="bg-bg-elevated border-t border-state-hold/30 px-4 py-1 flex items-center gap-2 text-micro">
-          <span className="text-state-hold">✓ {contractRollover.to} active</span>
+      ) : nqContract ? (
+        <div className="bg-bg-elevated border-t border-border-subtle px-4 py-1 flex items-center gap-1.5 text-micro flex-wrap">
+          <CalendarClock size={11} className="text-text-tertiary" />
+          <span className="font-price text-text-secondary font-bold">{nqContract}</span>
+          {daysToExpiry != null && (
+            <span className={daysToExpiry <= 7 ? 'text-state-exit' : 'text-text-muted'}>· exp {daysToExpiry}d</span>
+          )}
+          {nqVolStatus?.pctOfFront != null && nqNextContract && (
+            <span className={nqVolStatus.pctOfFront >= 100 ? 'text-state-cascadeWatch font-bold' : 'text-text-muted'}>
+              · {nqNextContract} vol {nqVolStatus.pctOfFront}% of front
+            </span>
+          )}
+          {contractRollover && !contractRollover.recalibrating && (
+            <span className="inline-flex items-center gap-1 text-state-hold">· <Check size={11} /> rolled to {contractRollover.to}</span>
+          )}
         </div>
-      )}
+      ) : null}
     </header>
   )
 }

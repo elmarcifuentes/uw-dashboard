@@ -32,7 +32,7 @@ function AppInner() {
   const { activeSymbol, changeSymbol } = useSymbol()
   const [pendingTrade, setPendingTrade] = useState(null)
 
-  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt, activeTrades, setActiveTrades, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, contractRollover, nqContract, nqContractExpiry, daysToExpiry } = useSSE(`${API_URL}/stream`)
+  const { connected, priceData, rescoreData, assistantRead, narrativeMode, systemPaused, pausedAt, activeTrades, setActiveTrades, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, contractRollover, nqContract, nqContractExpiry, daysToExpiry, nqNextContract, nqVolStatus } = useSSE(`${API_URL}/stream`)
   const activeTrade = activeTrades?.[activeSymbol] || null
 
   const result        = useMemo(() => rescoreData?.result ?? null, [rescoreData])
@@ -61,6 +61,10 @@ function AppInner() {
         activeSymbol={activeSymbol}
         onSymbolChange={changeSymbol}
         contractRollover={contractRollover}
+        nqContract={nqContract}
+        daysToExpiry={daysToExpiry}
+        nqNextContract={nqNextContract}
+        nqVolStatus={nqVolStatus}
       />
 
       <TabNav active={activeTab} onChange={setActiveTab} connected={connected} unlocked={unlocked} />
@@ -92,7 +96,7 @@ function AppInner() {
               }}
             />
           )}
-          {activeTab === 'Settings'     && <SettingsTab systemPaused={systemPaused} pausedAt={pausedAt} activeSymbol={activeSymbol} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} ratioIsLocked={ratioIsLocked} ratioIsFromToday={ratioIsFromToday} nqContract={nqContract} nqContractExpiry={nqContractExpiry} daysToExpiry={daysToExpiry} />}
+          {activeTab === 'Settings'     && <SettingsTab systemPaused={systemPaused} pausedAt={pausedAt} activeSymbol={activeSymbol} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} ratioIsLocked={ratioIsLocked} ratioIsFromToday={ratioIsFromToday} nqContract={nqContract} nqContractExpiry={nqContractExpiry} daysToExpiry={daysToExpiry} nqNextContract={nqNextContract} nqVolStatus={nqVolStatus} />}
           {activeTab === 'Guide'        && <GuideTab />}
         </div>
       </main>

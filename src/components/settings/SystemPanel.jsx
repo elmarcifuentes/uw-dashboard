@@ -154,7 +154,7 @@ function LevelPreviewTable({ qqq, nq, ratio }) {
   )
 }
 
-export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, nqContract, nqContractExpiry, daysToExpiry }) {
+export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, nqContract, nqContractExpiry, daysToExpiry, nqNextContract, nqVolStatus }) {
   const [levels, setLevels]         = useState(emptyLevels())
   const [savedDate, setSavedDate]   = useState(null)
   const [isToday, setIsToday]       = useState(false)
@@ -582,12 +582,18 @@ export default function SystemPanel({ systemPaused, pausedAt, sessionRatio, sess
                 Rescores the active levels. Applying NQ in Labs already scores — this is a manual refresh.
               </div>
               {nqContract && (
-                <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
+                <div className="flex items-center gap-2 pt-2 border-t border-border-subtle flex-wrap">
                   <span className="text-micro font-price text-text-tertiary font-bold">{nqContract}</span>
                   {nqContractExpiry && <span className="text-micro text-text-disabled">exp {nqContractExpiry}</span>}
                   {daysToExpiry != null && (
                     <span className={`text-micro px-1.5 py-0.5 rounded font-bold ${daysToExpiry <= 7 ? 'bg-state-exitSoft text-state-exit' : 'bg-bg-card2 text-text-muted'}`}>
                       {daysToExpiry}d
+                    </span>
+                  )}
+                  {/* Volume migration toward the next quarterly — roll fires on a sustained 2-session crossover */}
+                  {nqVolStatus?.pctOfFront != null && nqNextContract && (
+                    <span className={`text-micro px-1.5 py-0.5 rounded font-price ${nqVolStatus.pctOfFront >= 100 ? 'bg-state-cascadeWatchSoft text-state-cascadeWatch font-bold' : 'bg-bg-card2 text-text-muted'}`}>
+                      {nqNextContract} vol {nqVolStatus.pctOfFront}% of front
                     </span>
                   )}
                 </div>

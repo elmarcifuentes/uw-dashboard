@@ -1240,6 +1240,9 @@ app.get('/status', (req, res) => {
     contractRecalibrating,
     contractRolledFrom,
     daysToExpiry: nqContractDaysToExpiry,
+    nqNextContract: nextQuarterlyContract(activeNQContract),
+    nqVolStatus,   // { front, next, pctOfFront, sessions, asOf } — next-quarterly volume migration vs front month
+    nqRollTrigger: 'volume',  // volume crossover (2 completed sessions) OR expiry fallback
     // Evidence freshness (pull mirror of the price-tick fields; pure read, no logging)
     ...(() => { const f = getDataFreshness(); return { dataStale: f.dataStale, dataAgeSec: f.dataAgeSec } })(),
     degraded:          latest?.degraded || false,
@@ -1709,6 +1712,13 @@ let activeNQContractExpiry  = null
 let contractRecalibrating   = false
 let contractRolledFrom      = null
 let nqContractDaysToExpiry  = null
+// Volume-migration status (for /status visibility): the next quarterly's volume vs the front
+// month over the most recent completed session. { next, front, pctOfFront, sessions, checkedAt }
+let nqVolStatus             = null
+
+// Roll trigger: how many of the most recent COMPLETED sessions the next quarterly must lead by
+// volume to trigger a roll. 2 = sustained crossover (absorbs a lone thin-session head-fake).
+const ROLL_SUSTAINED_SESSIONS = 2
 
 async function fetchContractDetails(ticker) {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
@@ -1745,63 +1755,121 @@ async function fetchContractDetails(ticker) {
   }
 }
 
+// Next quarterly contract after a given NQ ticker (code-based, date-independent).
+// CME quarterly cycle H(Mar)→M(Jun)→U(Sep)→Z(Dec)→H(next yr). 'NQM6' → 'NQU6'; 'NQZ6' → 'NQH7'.
+function nextQuarterlyContract(ticker) {
+  const m = String(ticker || '').match(/^NQ([HMUZ])(\d)$/)
+  if (!m) return null
+  const codes = ['H', 'M', 'U', 'Z']
+  const i  = codes.indexOf(m[1])
+  const ni = (i + 1) % 4
+  const yr = ni === 0 ? (parseInt(m[2], 10) + 1) % 10 : parseInt(m[2], 10)
+  return `NQ${codes[ni]}${yr}`
+}
+
+// Daily session volumes for a contract, COMPLETED sessions only (session_end_date strictly
+// before today ET — excludes the in-progress session so a half-formed bar can't skew the roll).
+// Returns [{ date, volume }] newest-first. Uses the same /futures/v1/aggs family already in use.
+async function fetchCompletedSessionVolumes(ticker, key, todayET) {
+  const now  = Date.now()
+  const from = now - 20 * 24 * 60 * 60 * 1000
+  const url  = `https://api.polygon.io/futures/v1/aggs/${ticker}?resolution=1session&window_start.gte=${from}000000&window_start.lte=${now}000000&sort=window_start.desc&limit=15&apiKey=${key}`
+  const res  = await fetch(url)
+  const data = await res.json()
+  return (data.results || [])
+    .filter(r => r.session_end_date && r.session_end_date < todayET && r.volume != null)
+    .map(r => ({ date: r.session_end_date, volume: Number(r.volume) || 0 }))
+}
+
+// Roll trigger = VOLUME-based (matches TV NQ1!'s continuous-contract behavior) with an EXPIRY
+// FALLBACK floor so the app never strands on a dead contract. Volume: roll when the next
+// quarterly leads the front month on the ROLL_SUSTAINED_SESSIONS most recent COMPLETED sessions
+// (a lone thin-session crossover is absorbed). Detection runs daily at 6 AM ET — before the
+// 9:00 recalc and the 9:30 ratio lock — so the lock reads the new contract by construction.
 async function detectActiveNQContract() {
   const POLYGON_KEY = process.env.POLYGON_API_KEY
   if (!POLYGON_KEY) { console.warn('[contract] no POLYGON_API_KEY — keeping', activeNQContract); return }
 
-  // Step 1: update expiry for current contract via direct ticker fetch
+  // Refresh the current contract's expiry (sets activeNQContractExpiry / nqContractDaysToExpiry).
   await fetchContractDetails(activeNQContract)
 
-  // Step 2: check for rollover using product_code query, filtered to 0-120 days out
+  const next = nextQuarterlyContract(activeNQContract)
+  if (!next) { console.warn('[contract] cannot derive next quarterly from', activeNQContract); return }
+
   try {
-    const today = new Date().toISOString().split('T')[0]
-    const url   = `https://api.polygon.io/futures/v1/contracts?product_code=NQ&active=true&as_of=${today}&limit=10&apiKey=${POLYGON_KEY}`
-    console.log('[contract] rollover check:', url.replace(POLYGON_KEY, 'REDACTED'))
-    const res  = await fetch(url)
-    const text = await res.text()
-    console.log('[contract] list response:', text.slice(0, 300))
-    const data = JSON.parse(text)
-    const now  = new Date()
-    const frontMonth = (data.results || [])
-      .filter(c => {
-        if (!c.last_trade_date) return false
-        const daysOut = (new Date(c.last_trade_date) - now) / (1000 * 60 * 60 * 24)
-        return daysOut > 0 && daysOut < 120
-      })
-      .sort((a, b) => new Date(a.last_trade_date) - new Date(b.last_trade_date))[0]
-    if (!frontMonth) { console.log('[contract] no rollover candidate found'); return }
-    const newTicker = frontMonth.ticker
-    if (newTicker === activeNQContract) return  // no rollover
-    const expiry   = frontMonth.last_trade_date
-    const daysLeft = Math.max(0, Math.ceil((new Date(expiry) - now) / (1000 * 60 * 60 * 24)))
+    const now     = new Date()
+    const todayET = getETNow().date
+
+    // ── Volume migration: next quarterly vs front month over recent COMPLETED sessions ──
+    let crossedSustained = false
+    try {
+      const [curVols, nextVols] = await Promise.all([
+        fetchCompletedSessionVolumes(activeNQContract, POLYGON_KEY, todayET),
+        fetchCompletedSessionVolumes(next, POLYGON_KEY, todayET),
+      ])
+      const nextByDate = Object.fromEntries(nextVols.map(v => [v.date, v.volume]))
+      // Compare on dates BOTH contracts report, newest-first, up to the sustained window.
+      const shared = curVols.filter(v => v.date in nextByDate).slice(0, ROLL_SUSTAINED_SESSIONS)
+      crossedSustained = shared.length === ROLL_SUSTAINED_SESSIONS &&
+                         shared.every(v => (nextByDate[v.date] || 0) > v.volume)
+      const recent = curVols.find(v => v.date in nextByDate)
+      if (recent) {
+        const front = recent.volume, nextVol = nextByDate[recent.date] || 0
+        nqVolStatus = {
+          front, next: nextVol,
+          pctOfFront: front > 0 ? Math.round((nextVol / front) * 100) : null,
+          sessions: shared.length, asOf: recent.date, checkedAt: new Date().toISOString(),
+        }
+      }
+      console.log(`[contract] volume check: ${activeNQContract} vs ${next} over ${shared.length} completed sessions — sustained crossover=${crossedSustained}` +
+                  (nqVolStatus ? ` (next ${nqVolStatus.pctOfFront}% of front @ ${nqVolStatus.asOf})` : ''))
+    } catch (e) {
+      console.warn('[contract] volume check failed — expiry fallback only:', e.message)
+    }
+
+    // ── Expiry fallback floor: roll if the front month is at/past its last_trade_date ──
+    const expiryReached = !!(activeNQContractExpiry && new Date(activeNQContractExpiry) <= now)
+
+    if (!crossedSustained && !expiryReached) {
+      console.log(`[contract] no roll: ${activeNQContract} stays front (expiry ${activeNQContractExpiry}, ${nqContractDaysToExpiry}d)`)
+      return
+    }
+    const reason = crossedSustained ? 'volume-crossover' : 'expiry'
+
+    // ── ROLL ──
     const prevTicker = activeNQContract
-    console.log(`[contract] ROLLOVER: ${prevTicker} → ${newTicker} expires: ${expiry} days: ${daysLeft}`)
-    activeNQContract       = newTicker
-    activeNQContractExpiry = expiry
-    nqContractDaysToExpiry = daysLeft
-    contractRolledFrom     = prevTicker
-    db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_contract', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
-      .run(JSON.stringify({ ticker: newTicker, expiry, daysLeft, detectedAt: new Date().toISOString() }))
+    const newTicker  = next
+    activeNQContract  = newTicker
+    contractRolledFrom = prevTicker
+    await fetchContractDetails(newTicker)   // sets activeNQContractExpiry / daysToExpiry + persists nq_contract for the new ticker
+    const expiry   = activeNQContractExpiry
+    const daysLeft = nqContractDaysToExpiry
+    console.log(`[contract] ROLLOVER (${reason}): ${prevTicker} → ${newTicker} expires: ${expiry} days: ${daysLeft}`)
     db.prepare(`DELETE FROM settings WHERE key IN ('labs_pr_avg', 'labs_pr_avg_5m', 'labs_pr_avg_1m')`).run()
     // Drop stale cold-start anchors so the new contract computes fresh ones on first cold-start
     db.prepare(`DELETE FROM settings WHERE key LIKE 'labs_pr_anchor_%'`).run()
     console.log('[contract] PR state + anchors cleared (both timeframes) for new contract convergence')
     contractRecalibrating = true
     sseEmitter.emit('event', {
-      type: 'contract_rollover', from: prevTicker, to: newTicker, expiry,
-      message: `NQ rolled ${prevTicker}→${newTicker} — recalibrating levels`,
+      type: 'contract_rollover', from: prevTicker, to: newTicker, expiry, reason,
+      message: `NQ rolled ${prevTicker}→${newTicker} (${reason}) — recalibrating levels`,
       timestamp: new Date().toISOString(),
     })
-    calculateLabsLevels(labsSettings.interval, { reason: 'rollover' }).then(() => {
-      contractRecalibrating = false
-      sseEmitter.emit('event', {
-        type: 'contract_ready', contract: newTicker,
-        message: `${newTicker} levels active`, timestamp: new Date().toISOString(),
+    // Fresh cold-start on the new contract, THEN apply immediately so daily_levels /
+    // latest.nq_ratio reflect the new contract at 6 AM — the 9:30 lock then reads new-NQ ÷ QQQ
+    // by construction, not relying on the 9:00 recalc to propagate.
+    calculateLabsLevels(labsSettings.interval, { reason: 'rollover' })
+      .then(() => applyAutoLevelsIfEnabled())
+      .then(() => {
+        contractRecalibrating = false
+        sseEmitter.emit('event', {
+          type: 'contract_ready', contract: newTicker,
+          message: `${newTicker} levels active`, timestamp: new Date().toISOString(),
+        })
+      }).catch(err => {
+        contractRecalibrating = false
+        console.warn('[contract] recalibration failed:', err.message)
       })
-    }).catch(err => {
-      contractRecalibrating = false
-      console.warn('[contract] recalibration failed:', err.message)
-    })
   } catch (err) {
     console.warn('[contract] rollover check failed:', err.message)
   }

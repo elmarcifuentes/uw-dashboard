@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import SystemPanel from './SystemPanel'
 import LabsPanel from './LabsPanel'
 
-export default function SettingsTab({ systemPaused, pausedAt, activeSymbol, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, nqContract, nqContractExpiry, daysToExpiry }) {
+export default function SettingsTab({ systemPaused, pausedAt, activeSymbol, sessionRatio, sessionRatioLockedAt, ratioIsLocked, ratioIsFromToday, nqContract, nqContractExpiry, daysToExpiry, nqNextContract, nqVolStatus }) {
   const { unlocked, unlock } = useAuth()
   const [pinInput, setPinInput] = useState('')
   const [pinError, setPinError] = useState(null)
@@ -61,7 +61,7 @@ export default function SettingsTab({ systemPaused, pausedAt, activeSymbol, sess
         </button>
       </div>
 
-      {activePanel === 'system' && <SystemPanel systemPaused={systemPaused} pausedAt={pausedAt} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} ratioIsLocked={ratioIsLocked} ratioIsFromToday={ratioIsFromToday} nqContract={nqContract} nqContractExpiry={nqContractExpiry} daysToExpiry={daysToExpiry} />}
+      {activePanel === 'system' && <SystemPanel systemPaused={systemPaused} pausedAt={pausedAt} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} ratioIsLocked={ratioIsLocked} ratioIsFromToday={ratioIsFromToday} nqContract={nqContract} nqContractExpiry={nqContractExpiry} daysToExpiry={daysToExpiry} nqNextContract={nqNextContract} nqVolStatus={nqVolStatus} />}
       {activePanel === 'labs'   && <LabsPanel activeSymbol={activeSymbol} sessionRatio={sessionRatio} sessionRatioLockedAt={sessionRatioLockedAt} />}
     </div>
   )

@@ -234,15 +234,26 @@ the guard is skipped.)
 
 ### Contract detection & rollover
 
-`detectActiveNQContract()` resolves the active front-month (default `NQM6`). On a **rollover**
-the handler clears, for the new contract to converge cleanly:
+`detectActiveNQContract()` resolves the active front-month (default `NQM6`), evaluated daily at
+**6 AM ET** (before the 9:00 recalc and 9:30 ratio lock). The roll trigger is **VOLUME-based**, to
+match TradingView NQ1!'s continuous-contract behavior: it rolls to the next quarterly when that
+contract's daily `volume` (Polygon `/futures/v1/aggs?resolution=1session`) leads the front month on
+the **2 most recent *completed* sessions** (`ROLL_SUSTAINED_SESSIONS`; a lone thin-session crossover
+is absorbed). An **expiry fallback floor** also forces the roll if the front month reaches its
+`last_trade_date`, so the app never strands on a dead contract if volume never cleanly crosses.
+Volume self-adjusts to irregular expiries (e.g. a pulled-forward triple-witching) with no date
+special-casing. `/status` exposes `nqVolStatus` (next-vs-front volume %) for visibility.
+
+On a **rollover** the handler clears, for the new contract to converge cleanly:
 
 ```sql
 DELETE FROM settings WHERE key IN ('labs_pr_avg', 'labs_pr_avg_5m', 'labs_pr_avg_1m');
 DELETE FROM settings WHERE key LIKE 'labs_pr_anchor_%';
 ```
 
-i.e. **both timeframes' state AND all anchors**. The next cold-start computes fresh anchors.
+i.e. **both timeframes' state AND all anchors**. The next cold-start computes fresh anchors, then
+auto-applies immediately (same 6 AM tick) so `daily_levels` / `latest.nq_ratio` reflect the new
+contract **before** the 9:30 ratio lock reads it — the lock numerator is new-NQ ÷ QQQ by construction.
 
 ---
 
