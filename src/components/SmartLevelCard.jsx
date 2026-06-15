@@ -4,6 +4,8 @@ import { stripMarkdown } from '../utils/stripMarkdown'
 import { levelNq } from '../utils/levelNq'
 import { formatNarrative } from '../utils/formatNarrative'
 import ClassificationChip from './ClassificationChip'
+import VerdictHeader from './VerdictHeader'
+import { levelVerdict } from '../utils/levelVerdict'
 
 // Card border tracks scored bias (action accent); level ID itself renders neutral.
 const CLS_BORDER = { sell_resistance: 'border-signal-resistance/40', buy_support: 'border-signal-support/40', no_edge: 'border-border-subtle', continuation: 'border-signal-continuation/40' }
@@ -70,8 +72,11 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
         </div>
       )}
 
+      {/* Verdict leads — full data stays visible below regardless of state */}
+      <div className="px-4 pt-3"><VerdictHeader verdict={levelVerdict(level, currentPrice, nqRatio)} /></div>
+
       {/* Header — level ID + price + distance */}
-      <div className="px-4 pt-3 pb-2 flex items-start justify-between gap-2">
+      <div className="px-4 pt-2 pb-2 flex items-start justify-between gap-2">
         <div>
           <div className="flex items-baseline gap-2">
             {/* Structural name = neutral; bias goes on the chip below */}
@@ -200,13 +205,13 @@ export default function SmartLevelCard({ level, currentPrice, nqRatio, narrative
         <div className="border-t border-border-subtle/50 px-4 py-2.5">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1.5 text-xs text-purple-500 hover:text-purple-400 transition-colors w-full"
+            className="flex items-center gap-1.5 text-xs text-accent-ai hover:text-accent-ai transition-colors w-full"
           >
-            <span className="text-purple-600">{expanded ? '▼' : '▶'}</span>
+            <span className="text-accent-ai">{expanded ? '▼' : '▶'}</span>
             <span>🤖 Claude Analysis</span>
           </button>
           {expanded && (
-            <p className="text-xs text-text-secondary mt-2 leading-relaxed italic border-l-2 border-purple-900 pl-2">
+            <p className="text-xs text-text-secondary mt-2 leading-relaxed italic border-l-2 border-accent-ai/40 pl-2">
               {formatNarrative(stripMarkdown(narrative), activeSymbol)}
             </p>
           )}

@@ -3,10 +3,13 @@ import { stripMarkdown } from '../../utils/stripMarkdown'
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
 import ClassificationChip from '../ClassificationChip'
+import VerdictHeader from '../VerdictHeader'
+import { levelVerdict } from '../../utils/levelVerdict'
 
 export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRatio, dpHistory, levelNarrative, onClose, activeSymbol = 'NQ' }) {
   const level = levels?.find(l => l.id === levelId)
   if (!level) return null
+  const verdict = levelVerdict(level, currentPrice, nqRatio)
 
   const nqVal = levelNq(level, nqRatio)
   const nq   = nqVal != null ? Math.round(nqVal).toLocaleString() : null
@@ -34,6 +37,9 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
         </div>
         <button onClick={onClose} className="text-text-tertiary hover:text-text-primary text-lg px-2 py-0.5 -mr-1">✕</button>
       </div>
+
+      {/* Verdict leads — full data stays below regardless of state */}
+      <VerdictHeader verdict={verdict} size="lg" />
 
       {/* Classification (the action) + Distance */}
       <div className="flex items-center justify-between gap-2">
@@ -88,15 +94,15 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
         <div className="flex gap-2 flex-wrap">
           {level.full_stack && <span className="text-xs text-yellow-400 font-bold">★ FULL STACK</span>}
           {level.conflict   && <span className="text-xs text-orange-400">⚠ conflict</span>}
-          {level.boundary   && <span className="text-xs text-purple-400">◈ boundary</span>}
+          {level.boundary   && <span className="text-xs text-text-muted">◈ boundary</span>}
         </div>
       )}
 
-      {/* Claude narrative */}
+      {/* Claude narrative — AI accent (darker-blue accent-ai token; purple is now CONFLICT-only) */}
       {levelNarrative && (
         <div className="border-t border-border-subtle pt-3">
-          <div className="text-xs text-purple-500 mb-2">🤖 Claude Analysis</div>
-          <p className="text-xs text-text-secondary leading-relaxed border-l-2 border-purple-900 pl-2">
+          <div className="text-xs text-accent-ai mb-2">🤖 Claude Analysis</div>
+          <p className="text-xs text-text-secondary leading-relaxed border-l-2 border-accent-ai/40 pl-2">
             {formatNarrative(stripMarkdown(levelNarrative), activeSymbol)}
           </p>
         </div>

@@ -105,12 +105,12 @@ export default function OverviewTab({ onNavigate, activeSymbol = 'NQ' }) {
             <div className="border-t border-border-subtle pt-2">
               <button
                 onClick={() => setShowBrief(!showBrief)}
-                className="text-xs text-purple-700 hover:text-purple-500 transition-colors"
+                className="text-xs text-accent-ai hover:text-accent-ai transition-colors"
               >
                 {showBrief ? '▲ hide' : '▼ session brief'}
               </button>
               {showBrief && (
-                <p className="text-xs text-text-secondary mt-2 leading-relaxed border-l-2 border-purple-900 pl-2">
+                <p className="text-xs text-text-secondary mt-2 leading-relaxed border-l-2 border-accent-ai/40 pl-2">
                   {formatNarrative(sessionBrief, activeSymbol)}
                 </p>
               )}

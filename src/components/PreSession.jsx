@@ -285,10 +285,10 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
 
       {/* Session Brief — full-width above hero */}
       {sessionBrief && providerStatus?.narrativeMode === 'claude' && (
-        <div className="bg-bg-card border border-purple-900/40 rounded-lg p-4">
+        <div className="bg-bg-card border border-accent-ai/40 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-purple-500 text-xs">🤖</span>
+              <span className="text-accent-ai text-xs">🤖</span>
               <span className="text-xs text-text-tertiary uppercase tracking-wider">Session Brief</span>
               <span className="text-xs text-text-disabled">Claude Haiku</span>
             </div>
@@ -300,7 +300,7 @@ export default function PreSession({ assistantRead, activeSymbol = 'NQ' }) {
             </button>
           </div>
           {briefOpen ? (
-            <p className="text-xs text-text-secondary leading-relaxed border-l-2 border-purple-900 pl-3">
+            <p className="text-xs text-text-secondary leading-relaxed border-l-2 border-accent-ai/40 pl-3">
               {formatNarrative(sessionBrief, activeSymbol)}
             </p>
           ) : (

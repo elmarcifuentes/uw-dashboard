@@ -11,6 +11,8 @@ import HoldExitGuide from '../trade/HoldExitGuide'
 import TradeEntryForm from '../trade/TradeEntryForm'
 import InstrumentSelector from '../trade/InstrumentSelector'
 import ClassificationChip from '../ClassificationChip'
+import VerdictHeader from '../VerdictHeader'
+import { levelVerdict } from '../../utils/levelVerdict'
 import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -166,7 +168,7 @@ export default function RightRail({
                 : midDp <= CASCADE_WATCH ? 'text-state-cascadeWatch'
                 : 'text-state-hold'
             }`}>
-              {cascade?.active ? '⚠ ACTIVE' : midDp <= CASCADE_WATCH ? '⚡ APPROACHING' : '✓ SAFE'}
+              {cascade?.active ? '⚠ ACTIVE' : midDp <= CASCADE_WATCH ? '⚡ APPROACHING' : 'SAFE'}
             </div>
             <div className="text-xs text-text-secondary font-price">MID dp {midDp.toFixed(3)}</div>
             {!cascade?.active && (
@@ -217,6 +219,8 @@ export default function RightRail({
 
             {activeLevelData ? (
               <div className="space-y-2">
+                {/* Verdict leads the evidence card — all data below stays visible regardless */}
+                <VerdictHeader verdict={levelVerdict(activeLevelData, currentPrice, nqRatio)} className="mb-1" />
                 <div className="flex justify-between items-baseline">
                   <span className="text-sm font-bold text-text-primary font-price">
                     {activeSymbol === 'NQ' && nqRatio
@@ -297,17 +301,10 @@ export default function RightRail({
 
                 {levelNarratives?.[activeLevelData.id] && (
                   <div className="border-t border-border-subtle pt-2 mt-1">
-                    <p className={`text-xs text-text-secondary leading-relaxed italic border-l-2 border-accent-ai/50 pl-2 ${narrativeExpanded ? '' : 'line-clamp-4'}`}>
+                    {/* Full analysis — no clamp, so the downside half is never amputated */}
+                    <p className="text-xs text-text-secondary leading-relaxed italic border-l-2 border-accent-ai/50 pl-2">
                       {formatNarrative(stripMarkdown(levelNarratives[activeLevelData.id]), activeSymbol)}
                     </p>
-                    {levelNarratives[activeLevelData.id].length > 300 && (
-                      <button
-                        onClick={() => setNarrativeExpanded(!narrativeExpanded)}
-                        className="text-xs text-accent-ai/60 hover:text-accent-ai mt-1"
-                      >
-                        {narrativeExpanded ? '▲ less' : '▼ more'}
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -409,13 +406,13 @@ export default function RightRail({
                   onClick={() => handleExitTrade('manual')}
                   className="flex-1 py-2 rounded text-xs font-bold bg-bg-elevated hover:bg-bg-card2 text-text-primary border border-border-default"
                 >
-                  ✓ Close
+                  Close
                 </button>
                 <button
                   onClick={() => handleExitTrade('stop')}
                   className="flex-1 py-2 rounded text-xs font-bold bg-state-stopSoft hover:bg-state-stop/30 text-state-stop border border-state-stop/60"
                 >
-                  ✗ Stop Out
+                  Stop Out
                 </button>
               </div>
               <button

@@ -3,6 +3,8 @@ import { stripMarkdown } from '../../utils/stripMarkdown'
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
 import ClassificationChip from '../ClassificationChip'
+import VerdictHeader from '../VerdictHeader'
+import { levelVerdict } from '../../utils/levelVerdict'
 
 export default function LevelPlanCard({
   level, allLevels, currentPrice, nqRatio,
@@ -10,6 +12,8 @@ export default function LevelPlanCard({
   cascade, onEnterTrade,
 }) {
   const setup = calculateTradeSetup(level, allLevels, currentPrice, nqRatio)
+  const verdict = levelVerdict(level, currentPrice, nqRatio)
+  const actionable = !!verdict?.actionable
   const isNQ  = activeSymbol === 'NQ'
   const r     = nqRatio   // live ratio only — no 41.14 fallback
 
@@ -29,6 +33,8 @@ export default function LevelPlanCard({
 
   return (
     <div className="space-y-3">
+      {/* Verdict leads — full data + reference setup stay visible regardless of state */}
+      <VerdictHeader verdict={verdict} />
       {/* Level header */}
       <div>
         <div className="flex items-baseline gap-2">
@@ -64,9 +70,9 @@ export default function LevelPlanCard({
 
       {/* Trade setup */}
       {setup ? (
-        <div className="border border-border-subtle rounded-lg overflow-hidden">
+        <div className={`border border-border-subtle rounded-lg overflow-hidden ${actionable ? '' : 'opacity-60'}`}>
           <div className="px-3 py-2 bg-bg-card2/50 flex items-center justify-between">
-            <span className="text-xs text-text-tertiary uppercase tracking-wider">📍 Trade Setup</span>
+            <span className="text-xs text-text-tertiary uppercase tracking-wider">{actionable ? 'Trade Setup' : 'Reference — not active'}</span>
             <span className={`text-xs font-bold font-mono ${rrColor}`}>{setup.rr}:1 {setup.quality}</span>
           </div>
 
@@ -110,20 +116,24 @@ export default function LevelPlanCard({
           )}
 
           <div className="px-3 pb-3">
-            <button
-              onClick={() => onEnterTrade?.({
-                direction:   setup.direction,
-                entry:       isNQ ? setup.entry.nq  : setup.entry.qqq,
-                target:      isNQ ? setup.target.nq : setup.target.qqq,
-                stop:        isNQ ? setup.stop.nq   : setup.stop.qqq,
-                entryLevel:  level.id,
-                targetLevel: setup.target.level,
-                priceUnit:   activeSymbol,
-              })}
-              className="w-full py-2 rounded text-xs font-bold bg-indigo-700 hover:bg-indigo-600 text-text-primary transition-colors"
-            >
-              → Trade This
-            </button>
+            {actionable ? (
+              <button
+                onClick={() => onEnterTrade?.({
+                  direction:   setup.direction,
+                  entry:       isNQ ? setup.entry.nq  : setup.entry.qqq,
+                  target:      isNQ ? setup.target.nq : setup.target.qqq,
+                  stop:        isNQ ? setup.stop.nq   : setup.stop.qqq,
+                  entryLevel:  level.id,
+                  targetLevel: setup.target.level,
+                  priceUnit:   activeSymbol,
+                })}
+                className="w-full py-2 rounded text-xs font-bold bg-indigo-700 hover:bg-indigo-600 text-text-primary transition-colors"
+              >
+                Trade This
+              </button>
+            ) : (
+              <div className="text-center text-xs text-text-muted py-1.5">Reference only — {verdict?.state === 'CONFLICT' ? 'dark pool opposes' : verdict?.state === 'WAIT' ? 'awaiting confirmation' : 'not in play'}</div>
+            )}
           </div>
         </div>
       ) : (
@@ -136,7 +146,7 @@ export default function LevelPlanCard({
 
       {narrative && (
         <div className="border-t border-border-subtle pt-3">
-          <div className="text-xs text-purple-500 mb-1">🤖 Analysis</div>
+          <div className="text-xs text-accent-ai mb-1">🤖 Analysis</div>
           <p className="text-xs text-text-secondary leading-relaxed">{formatNarrative(stripMarkdown(narrative), activeSymbol)}</p>
         </div>
       )}

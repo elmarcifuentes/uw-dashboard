@@ -41,7 +41,7 @@ function getEventStyle(eventType) {
     'structure_break':   { color: 'bg-amber-900',  label: '⚠ BREAK',   text: 'text-amber-400' },
     'level_cross':       { color: 'bg-yellow-900', label: '⚡ CROSS',   text: 'text-yellow-400' },
     'level_touch':       { color: 'bg-indigo-900', label: '· touch',    text: 'text-indigo-400' },
-    'narrative':         { color: 'bg-purple-900', label: '🤖 AI',      text: 'text-purple-400' },
+    'narrative':         { color: 'bg-accent-aiSoft', label: '🤖 AI',      text: 'text-accent-ai' },
   }
   return map[eventType] || { color: 'bg-bg-elevated', label: eventType || '—', text: 'text-text-tertiary' }
 }

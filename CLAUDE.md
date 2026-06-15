@@ -70,11 +70,13 @@ present findings, get confirmation, then edit. Never edit-first on the engine.
   **Conflicted levels** (structure opposing classification) are **always flagged inline and never filtered
   out** of any surface. (Shared `ClassificationChip` + `src/utils/classification.js` are the one source for
   bias label/color/icon/conflict-tag; the chip's Lucide icon satisfies the Lucide-only rule.)
-- `signal-continuation` (blue) = MID continuation + the structural range anchor.
+- `signal-continuation` (blue) = MID continuation + the structural range anchor (light blue — distinct from AI).
 - `state-hold` (teal) = **HOLD only** (and target/holding rows).
-- `state-cascadeWatch` (amber) / `state-cascadeActive` (orange) = **CASCADE only**.
+- `state-cascadeWatch` (amber) / `state-cascadeActive` (orange) = **CASCADE only** (orange stays sacred for the hold/exit workflow — never reused).
 - `accent-price` (yellow) = **current price only** ("now"/crosshair).
-- `accent-ai` (purple) = **AI / Claude output only**.
+- `accent-ai` (**darker blue**, `#3b5bdb`) = **AI / Claude output only** — deliberately distinct from MID's lighter `signal-continuation` blue so the two never read as the same. Placeholder shade; swap in one place (the `accent-ai` token). Use the token, never a raw `purple-*`/`blue-*` class for AI.
+- `accent-conflict` (**purple**) = **CONFLICT / AVOID verdict state only** (freed from AI). Not cascade's orange; dedicated, no overloading.
+- **Verdict header** (`levelVerdict`/`VerdictHeader`): green=ACT buy (`signal-support`), red=ACT sell (`signal-resistance`), amber filled=SMALL (`state-exit`) vs amber outline=WAIT (`state-cascadeWatch`, differentiated by fill+icon not a new color), purple=CONFLICT (`accent-conflict`), neutral=NOT_IN_PLAY (`text-tertiary`). The verdict frames the headline + actionable gating only — it never hides level data; out-of-play levels stay full watch cards.
 - `state-stop` (red) = stop/max-loss.
 - `font-price` (IBM Plex Mono) for **all numbers/prices**. `font-ui` (Inter) for text.
 

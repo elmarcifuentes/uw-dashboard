@@ -6,6 +6,8 @@ import { calculateTradeSetup } from '../utils/tradeSetup'
 import { formatNarrative } from '../utils/formatNarrative'
 import { levelNq } from '../utils/levelNq'
 import ClassificationChip from './ClassificationChip'
+import VerdictHeader from './VerdictHeader'
+import { levelVerdict } from '../utils/levelVerdict'
 
 const CLASS_COLOR = {
   sell_resistance: 'text-signal-resistance',
@@ -66,6 +68,8 @@ export default function LevelCard({
       } ${styles.border || borderColor} ${styles.glow || ''} ${styles.pulse ? 'animate-pulse' : ''}`}
       style={tier === 1 ? { borderLeftWidth: '4px', borderLeftColor: tier1BorderColor } : undefined}
     >
+      {/* Verdict leads — full data stays visible below regardless of state */}
+      <div className="px-4 pt-3"><VerdictHeader verdict={levelVerdict(level, currentPrice, nqRatio)} /></div>
       {/* LAYER 1 — SCAN */}
       <div className="px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2 min-w-0">
@@ -228,15 +232,18 @@ export default function LevelCard({
           {(() => {
             const setup = calculateTradeSetup(level, allLevels, currentPrice, nqRatio)
             if (!setup) return null
+            const actionable = levelVerdict(level, currentPrice, nqRatio)?.actionable
             const rrColor = setup.quality === 'excellent' || setup.quality === 'good'
               ? 'text-signal-support'
               : setup.quality === 'acceptable' ? 'text-state-exit'
               : 'text-signal-resistance'
             const dirColor = setup.direction === 'short' ? 'text-signal-resistance' : 'text-signal-support'
             return (
-              <div className="border-t border-border-subtle pt-2 mt-1">
-                <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">📍 Trade Setup</div>
-                <div className={`text-xs font-bold mb-2 ${dirColor}`}>
+              <div className={`border-t border-border-subtle pt-2 mt-1 ${actionable ? '' : 'opacity-60'}`}>
+                <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">
+                  {actionable ? 'Trade Setup' : 'Reference — not active'}
+                </div>
+                <div className={`text-xs font-bold mb-2 ${actionable ? dirColor : 'text-text-tertiary'}`}>
                   {setup.direction.toUpperCase()} from {setup.entry.level}
                 </div>
                 <div className="space-y-1">
@@ -275,11 +282,11 @@ export default function LevelCard({
                   </span></div>
                   <div className={`font-price font-bold ${rrColor}`}>{setup.rr}:1</div>
                 </div>
-                <div className={`text-xs mt-1 ${rrColor}`}>
-                  {setup.quality === 'excellent' && '✅ Excellent R/R'}
-                  {setup.quality === 'good'      && '✅ Good R/R'}
-                  {setup.quality === 'acceptable' && '⚠ Acceptable R/R'}
-                  {setup.quality === 'poor'      && '✗ Poor R/R — consider skip'}
+                <div className={`text-xs mt-1 ${actionable ? rrColor : 'text-text-muted'}`}>
+                  {setup.quality === 'excellent' ? 'Excellent R/R'
+                    : setup.quality === 'good' ? 'Good R/R'
+                    : setup.quality === 'acceptable' ? 'Acceptable R/R'
+                    : 'Poor R/R — consider skip'}
                 </div>
                 {setup.flags.length > 0 && (
                   <div className="mt-1.5 space-y-0.5">

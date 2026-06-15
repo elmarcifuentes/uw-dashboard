@@ -34,7 +34,7 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
   if (!displayLines.length) return null
 
   const borderClass = isClaudeMode
-    ? 'border border-purple-900/50 bg-purple-950/20'
+    ? 'border border-accent-ai/50 bg-accent-aiSoft'
     : 'border border-border-default bg-bg-card2/80'
 
   return (
@@ -48,7 +48,7 @@ export default memo(function NarrativeBlock({ narrative, result, lastUpdate, com
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-tertiary uppercase tracking-wider">Session Read</span>
           {isClaudeMode && (
-            <span className="text-xs bg-purple-900/50 text-purple-400 px-1.5 py-0.5 rounded">
+            <span className="text-xs bg-accent-aiSoft text-accent-ai px-1.5 py-0.5 rounded">
               🤖 Claude
             </span>
           )}

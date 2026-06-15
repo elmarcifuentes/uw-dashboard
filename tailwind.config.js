@@ -51,8 +51,13 @@ export default {
         accent: {
           price:     '#f5c84c',
           priceSoft: 'rgba(245, 200, 76, 0.16)',
-          ai:        '#9b7dff',
-          aiSoft:    'rgba(155, 125, 255, 0.16)',
+          // AI/Claude output — darker blue, deliberately distinct from MID's signal-continuation
+          // (#5ba7ff) so the two never read as the same. Placeholder shade; swap here in one place.
+          ai:        '#3b5bdb',
+          aiSoft:    'rgba(59, 91, 219, 0.18)',
+          // CONFLICT/AVOID verdict state — purple (freed from AI). Dedicated; not cascade's orange.
+          conflict:     '#9b7dff',
+          conflictSoft: 'rgba(155, 125, 255, 0.16)',
           gamma:     '#53c7ff',
           gammaSoft: 'rgba(83, 199, 255, 0.14)',
         },

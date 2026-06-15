@@ -1,6 +1,8 @@
 import { formatNarrative } from '../../utils/formatNarrative'
 import { levelNq } from '../../utils/levelNq'
 import ClassificationChip from '../ClassificationChip'
+import VerdictHeader from '../VerdictHeader'
+import { levelVerdict } from '../../utils/levelVerdict'
 import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 import { CircleCheck, TriangleAlert, Zap, DoorOpen } from 'lucide-react'
 
@@ -230,6 +232,7 @@ export default function FocusMode({
 
         {resistance ? (
           <div className="border border-signal-resistance/30 bg-signal-resistanceSoft rounded-lg px-4 py-3 shadow-card">
+            <VerdictHeader verdict={levelVerdict(resistance, currentPrice, nqRatio)} className="mb-2" />
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
@@ -261,6 +264,7 @@ export default function FocusMode({
 
         {support ? (
           <div className="border border-signal-support/30 bg-signal-supportSoft rounded-lg px-4 py-3 shadow-card">
+            <VerdictHeader verdict={levelVerdict(support, currentPrice, nqRatio)} className="mb-2" />
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
@@ -350,13 +354,13 @@ export default function FocusMode({
               onClick={() => onExitTrade('manual')}
               className="px-4 py-2 bg-bg-elevated hover:bg-bg-card2 text-text-primary text-xs rounded transition-colors font-bold border border-border-default"
             >
-              ✓ Close
+              Close
             </button>
             <button
               onClick={() => onExitTrade('stop')}
               className="px-4 py-2 bg-state-stopSoft hover:bg-state-stop/30 text-state-stop text-xs rounded transition-colors font-bold border border-state-stop/60"
             >
-              ✗ Stop Out
+              Stop Out
             </button>
           </>
         ) : (

@@ -92,7 +92,7 @@ export default function Controls({ compact }) {
               title={desc}
               className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
                 narrativeMode === key
-                  ? key === 'claude' ? 'bg-purple-700 text-text-primary'
+                  ? key === 'claude' ? 'bg-accent-ai text-text-primary'
                   : key === 'off'    ? 'bg-bg-card2 text-text-secondary'
                   :                    'bg-teal-700 text-text-primary'
                   : 'bg-bg-elevated text-text-secondary hover:text-text-primary'

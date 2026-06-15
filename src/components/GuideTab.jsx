@@ -55,7 +55,7 @@ function GuideCard({ title, children, accent }) {
   const border = accent === 'red'    ? 'border-red-900/50'
     : accent === 'green'  ? 'border-green-900/50'
     : accent === 'amber'  ? 'border-amber-900/50'
-    : accent === 'purple' ? 'border-purple-900/50'
+    : accent === 'purple' ? 'border-accent-ai/50'
     : accent === 'blue'   ? 'border-blue-900/50'
     : 'border-border-subtle'
   return (
@@ -78,7 +78,7 @@ function Pill({ color, label }) {
     blue:   'bg-blue-950 text-blue-400 border border-blue-800',
     amber:  'bg-amber-950 text-amber-400 border border-amber-800',
     yellow: 'bg-yellow-950 text-yellow-400 border border-yellow-800',
-    purple: 'bg-purple-950 text-purple-400 border border-purple-800',
+    purple: 'bg-accent-aiSoft text-accent-ai border border-accent-ai/40',
   }
   return (
     <span className={`text-xs px-2 py-0.5 rounded font-medium ${colors[color]}`}>
@@ -465,9 +465,9 @@ function GuideAI() {
             trigger: 'Any meaningful signal change',
             desc: 'Where price is relative to the most important level, and what to watch next. Updates on every qualifying rescore.' },
         ].map(n => (
-          <div key={n.type} className="border border-purple-900/30 bg-purple-950/10 rounded p-3 mb-2">
+          <div key={n.type} className="border border-accent-ai/30 bg-accent-aiSoft rounded p-3 mb-2">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-purple-300">🤖 {n.type}</span>
+              <span className="text-xs font-bold text-accent-ai">🤖 {n.type}</span>
               <span className="text-xs text-text-muted">{n.tab}</span>
             </div>
             <p className="text-xs text-text-secondary mb-1">{n.desc}</p>
@@ -499,7 +499,7 @@ function GuideInterface() {
             { color: 'bg-red-500',    label: 'Red',    meaning: 'Sell resistance / bearish / danger' },
             { color: 'bg-amber-500',  label: 'Amber',  meaning: 'Watch state / approaching threshold / caution' },
             { color: 'bg-blue-500',   label: 'Blue',   meaning: 'Continuation / neutral structure' },
-            { color: 'bg-purple-500', label: 'Purple', meaning: 'Claude AI-generated content only' },
+            { color: 'bg-accent-ai', label: 'Purple', meaning: 'Claude AI-generated content only' },
             { color: 'bg-yellow-400', label: 'Yellow', meaning: 'Current price crosshair / live price locator' },
             { color: 'bg-gray-500',   label: 'Gray',   meaning: 'No edge / neutral / diagnostic' },
           ].map(c => (

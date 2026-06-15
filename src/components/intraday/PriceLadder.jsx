@@ -5,6 +5,8 @@ import { getLevelProximity, getProximityStyles } from '../../utils/proximity'
 import { CASCADE_TRIGGER, CASCADE_WATCH } from '../../utils/cascade'
 import DpSparkline from '../DpSparkline'
 import ClassificationChip from '../ClassificationChip'
+import VerdictHeader from '../VerdictHeader'
+import { levelVerdict } from '../../utils/levelVerdict'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 import { calculateTradeSetup } from '../../utils/tradeSetup'
 import { formatNarrative } from '../../utils/formatNarrative'
@@ -207,6 +209,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
         const isProximate = proximity && proximity.zone !== 'away'
         const borderCls = isProximate ? styles.border : getBaseBorderCls(level.classification)
         const bgCls     = getClassificationBg(level.classification)
+        const verdict   = levelVerdict(level, cp, nqRatio)   // decision-layer headline (display only)
 
         return (
           <Fragment key={level.id}>
@@ -216,6 +219,8 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
             className={`rounded-lg overflow-hidden px-3 py-2 transition-all duration-500 ${borderCls} ${bgCls} ${isProximate ? styles.glow : ''} ${styles.pulse && level.id === criticalLevel?.id ? 'animate-pulse' : ''} ${isFlashing ? 'ring-2 ring-text-primary/60' : ''} ${onSelect ? 'cursor-pointer' : ''} ${tier === 3 ? 'opacity-60 hover:opacity-100' : ''} ${tier === 1 ? 'shadow-card' : ''}`}
             style={tier === 1 ? { borderLeftWidth: '4px', borderLeftColor: colors.border } : undefined}
           >
+            {/* Verdict leads the card — frames emphasis; all data below stays visible regardless */}
+            {verdict && <VerdictHeader verdict={verdict} className="mb-1.5" />}
             {styles.label && (
               <div className={`text-xs font-medium mb-1.5 ${styles.labelColor}`}>{styles.label}</div>
             )}
@@ -378,10 +383,13 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                     : setup.quality === 'acceptable' ? 'text-state-exit'
                     : 'text-signal-resistance'
                   const dirColor = setup.direction === 'short' ? 'text-signal-resistance' : 'text-signal-support'
+                  const actionable = verdict?.actionable
                   return (
-                    <div className="border-t border-border-default/50 pt-2 mt-1">
-                      <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">📍 Trade Setup</div>
-                      <div className={`text-xs font-bold mb-2 ${dirColor}`}>
+                    <div className={`border-t border-border-default/50 pt-2 mt-1 ${actionable ? '' : 'opacity-60'}`}>
+                      <div className="text-micro text-text-tertiary uppercase tracking-wider mb-2">
+                        {actionable ? 'Trade Setup' : 'Reference — not active'}
+                      </div>
+                      <div className={`text-xs font-bold mb-2 ${actionable ? dirColor : 'text-text-tertiary'}`}>
                         {setup.direction.toUpperCase()} from {setup.entry.level}
                       </div>
                       <div className="space-y-1">
@@ -420,11 +428,11 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                         </span></div>
                         <div className={`font-price font-bold ${rrColor}`}>{setup.rr}:1</div>
                       </div>
-                      <div className={`text-xs mt-1 ${rrColor}`}>
-                        {setup.quality === 'excellent' && '✅ Excellent R/R'}
-                        {setup.quality === 'good'      && '✅ Good R/R'}
-                        {setup.quality === 'acceptable' && '⚠ Acceptable R/R'}
-                        {setup.quality === 'poor'      && '✗ Poor R/R — consider skip'}
+                      <div className={`text-xs mt-1 ${actionable ? rrColor : 'text-text-muted'}`}>
+                        {setup.quality === 'excellent' ? 'Excellent R/R'
+                          : setup.quality === 'good' ? 'Good R/R'
+                          : setup.quality === 'acceptable' ? 'Acceptable R/R'
+                          : 'Poor R/R — consider skip'}
                       </div>
                       {setup.flags.length > 0 && (
                         <div className="mt-1.5 space-y-0.5">
