@@ -255,6 +255,13 @@ i.e. **both timeframes' state AND all anchors**. The next cold-start computes fr
 auto-applies immediately (same 6 AM tick) so `daily_levels` / `latest.nq_ratio` reflect the new
 contract **before** the 9:30 ratio lock reads it — the lock numerator is new-NQ ÷ QQQ by construction.
 
+The roll also clears stale **`nqOffsets`** (`resetNqOffsetsOnRoll()`: per-level offsets → 0, ratio →
+null) on **both** the scheduled and the manual `POST /contract/roll` paths — per-level offsets are
+NQM6-era manual tweaks meaningless on a fresh contract, and a null ratio falls through to
+`getActiveRatio()`. An **intraday** manual roll additionally re-locks `sessionRatio` on the new
+contract's basis (today's 9:30 lock was on the old basis), since cost-of-carry (~300 NQ pts) makes the
+old ratio wrong for the new contract until the next 9:30.
+
 ---
 
 ## 6. From recurrence to scoring (the full pipeline)

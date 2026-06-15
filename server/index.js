@@ -1795,6 +1795,16 @@ async function fetchLatestFuturesClose(ticker) {
   } catch { return null }
 }
 
+// Clear stale auto_qqq offsets on a contract roll. Per-level offsets are NQM6-era manual tweaks,
+// meaningless on a fresh contract; ratio→null so the auto_qqq preview falls through to
+// getActiveRatio() (the live value). Keeps nqOffsets from desyncing across a roll.
+function resetNqOffsetsOnRoll() {
+  nqOffsets = { ratio: null, R2: 0, R1: 0, MID: 0, S1: 0, S2: 0 }
+  db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('nq_offsets', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
+    .run(JSON.stringify(nqOffsets))
+  console.log('[contract] nqOffsets reset (offsets→0, ratio→null) for new contract')
+}
+
 // Roll trigger = VOLUME-based (matches TV NQ1!'s continuous-contract behavior) with an EXPIRY
 // FALLBACK floor so the app never strands on a dead contract. Volume: roll when the next
 // quarterly leads the front month on the ROLL_SUSTAINED_SESSIONS most recent COMPLETED sessions
@@ -1863,6 +1873,7 @@ async function detectActiveNQContract() {
     // Drop stale cold-start anchors so the new contract computes fresh ones on first cold-start
     db.prepare(`DELETE FROM settings WHERE key LIKE 'labs_pr_anchor_%'`).run()
     console.log('[contract] PR state + anchors cleared (both timeframes) for new contract convergence')
+    resetNqOffsetsOnRoll()
     contractRecalibrating = true
     sseEmitter.emit('event', {
       type: 'contract_rollover', from: prevTicker, to: newTicker, expiry, reason,
@@ -2418,9 +2429,12 @@ try {
 
 const nqRound = v => Math.round(v * 4) / 4
 
-// Returns session-locked ratio if available, otherwise falls back to live
+// Single authority for the global NQ ratio (ticker + scoring derivation): locked session ratio,
+// else the latest live ratio, else today's DB value, else the documented floor. nqOffsets.ratio
+// is deliberately NOT in this chain — it is auto_qqq-mode-only config and a stale manual copy must
+// never be able to drive the global/auto_nq ratio (see CLAUDE.md ratio invariants).
 function getActiveRatio() {
-  return sessionRatio || nqOffsets.ratio || latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
+  return sessionRatio || latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
 }
 
 // Live NQ/QQQ ratio from the latest score, only if FRESH (≤30 min). null → defer the lock.
@@ -3086,6 +3100,7 @@ app.post('/contract/roll', async (req, res) => {
     db.prepare(`DELETE FROM settings WHERE key IN ('labs_pr_avg', 'labs_pr_avg_5m', 'labs_pr_avg_1m')`).run()
     db.prepare(`DELETE FROM settings WHERE key LIKE 'labs_pr_anchor_%'`).run()
     console.log('[contract] PR state + anchors cleared (both timeframes) for new contract convergence')
+    resetNqOffsetsOnRoll()
     contractRecalibrating = true
     sseEmitter.emit('event', {
       type: 'contract_rollover', from: prevTicker, to: newTicker, expiry: activeNQContractExpiry, reason: 'manual',

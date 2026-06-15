@@ -36,6 +36,12 @@ present findings, get confirmation, then edit. Never edit-first on the engine.
 - Date comparisons in **ET** (`getETNow` / `toLocaleDateString('en-CA', { timeZone: 'America/New_York' })`).
   Never use server-local/UTC dates for the daily lock.
 - Never lock stale prices — `getFreshLiveRatio()` requires `latest._received_at` ≤ 30 min; otherwise **defer**.
+- **`getActiveRatio()` / `sessionRatio` is the SINGLE authority** for the global NQ ratio (live ticker +
+  scoring derivation). Chain: `sessionRatio ‖ latest?.nq_ratio ‖ getNqRatioFromDb(db) ‖ 41.14`. **Never put a
+  second mutable copy ahead of the live value** (a stale copy must not be able to win — cf. the removed
+  `nqOffsets.ratio` fallback). `nqOffsets` is **auto_qqq-mode-only** config: its `ratio` defaults to
+  `getActiveRatio()` when null, and its per-level offsets **reset to 0 on every contract roll**
+  (`resetNqOffsetsOnRoll()`) so a fresh contract never inherits stale NQM6-era tweaks.
 
 ## Scoring invariants (see docs/SCORING.md)
 
