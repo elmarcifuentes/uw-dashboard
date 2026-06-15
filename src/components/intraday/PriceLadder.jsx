@@ -326,7 +326,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
                     {(level.confidence || 'none').toUpperCase()}
                   </span>
                   <span>ETF {level.etf_direction === 'bullish' ? '↑' : level.etf_direction === 'bearish' ? '↓' : '—'}</span>
-                  {level.conflict   && <span className="text-state-cascadeWatch">⚠ conflict</span>}
+                  {/* structural conflict is shown by the ClassificationChip's conflict tag above — no duplicate badge */}
                   {level.boundary   && <span className="text-accent-price">⚡ boundary</span>}
                   {level.lower_high && <span className="text-accent-ai">↙ lower high</span>}
                 </div>

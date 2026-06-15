@@ -90,10 +90,10 @@ export default function LevelDetailSheet({ levelId, levels, currentPrice, nqRati
       )}
 
       {/* Flags */}
-      {(level.full_stack || level.conflict || level.boundary) && (
+      {(level.full_stack || level.boundary) && (
         <div className="flex gap-2 flex-wrap">
           {level.full_stack && <span className="text-xs text-yellow-400 font-bold">★ FULL STACK</span>}
-          {level.conflict   && <span className="text-xs text-orange-400">⚠ conflict</span>}
+          {/* structural conflict is shown by the ClassificationChip's conflict tag above — no duplicate badge */}
           {level.boundary   && <span className="text-xs text-text-muted">◈ boundary</span>}
         </div>
       )}
