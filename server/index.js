@@ -1781,6 +1781,20 @@ async function fetchCompletedSessionVolumes(ticker, key, todayET) {
     .map(r => ({ date: r.session_end_date, volume: Number(r.volume) || 0 }))
 }
 
+// Latest 1-min close for a futures ticker (for the intraday-roll ratio numerator). Returns null
+// if unavailable / out of NQ range. Cheap single-bar fetch via the existing aggs family.
+async function fetchLatestFuturesClose(ticker) {
+  const key = process.env.POLYGON_API_KEY
+  if (!key) return null
+  const now = Date.now(), from = now - 6 * 60 * 60 * 1000
+  const url = `https://api.polygon.io/futures/v1/aggs/${ticker}?resolution=1min&window_start.gte=${from}000000&window_start.lte=${now}000000&sort=window_start.desc&limit=1&apiKey=${key}`
+  try {
+    const d = await (await fetch(url)).json()
+    const c = d.results?.[0]?.close
+    return (c && c > 20000 && c < 50000) ? c : null
+  } catch { return null }
+}
+
 // Roll trigger = VOLUME-based (matches TV NQ1!'s continuous-contract behavior) with an EXPIRY
 // FALLBACK floor so the app never strands on a dead contract. Volume: roll when the next
 // quarterly leads the front month on the ROLL_SUSTAINED_SESSIONS most recent COMPLETED sessions
@@ -3023,6 +3037,85 @@ app.post('/ratio/lock', async (req, res) => {
   // rescore). Runs regardless of market hours / pause — it's a derivation rewrite.
   await onRatioLocked('manual')
   res.json({ success: true, ratio: sessionRatio, lockedAt: sessionRatioLockedAt })
+})
+
+// POST /contract/roll — MANUAL force-roll to the next quarterly on demand (don't wait for the
+// 6 AM volume check). Runs the SAME rollover machinery as the scheduler. Because an intraday roll
+// happens AFTER today's 9:30 lock (which was on the OLD contract's basis), it ALSO re-locks the
+// ratio on the NEW contract's basis — otherwise applyAutoLevels would derive QQQ from new-NQ ÷
+// old-(lower)-ratio and inflate QQQ by the cost-of-carry (~300 NQ pts ≈ ~1% / ~7 QQQ pts).
+// Body: { confirm: true, ratio?: <new-basis NQ÷QQQ override> }. If ratio omitted it auto-computes
+// from live new-contract close ÷ live QQQ. Guarded by `confirm` (the UI gates by PIN; curl must opt in).
+app.post('/contract/roll', async (req, res) => {
+  const { confirm, ratio: ratioOverride } = req.body || {}
+  if (confirm !== true) return res.status(400).json({ error: 'manual roll requires { "confirm": true }' })
+  const prevTicker = activeNQContract
+  const newTicker  = nextQuarterlyContract(prevTicker)
+  if (!newTicker) return res.status(400).json({ error: `cannot derive next quarterly from ${prevTicker}` })
+  try {
+    const todayET = getETNow().date
+    const nowStr  = new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' })
+
+    // ── Re-lock the ratio on the NEW contract's basis (set sessionRatio directly — NOT via
+    //    onRatioLocked, whose QQQ rewrite would read the still-old daily_levels NQ; the cold-start
+    //    + applyAutoLevels below writes correct QQQ = new-NQ ÷ this ratio). ──
+    let lockedRatio = ratioOverride != null ? parseFloat(ratioOverride) : null
+    if (!(lockedRatio > 0)) {
+      const qqq   = provider.getStatus()?.lastPrice
+      const nqNew = await fetchLatestFuturesClose(newTicker)
+      if (qqq > 0 && nqNew > 0) lockedRatio = parseFloat((nqNew / qqq).toFixed(4))
+    }
+    let ratioReLocked = false
+    if (lockedRatio > 0) {
+      sessionRatio         = lockedRatio
+      sessionRatioDate     = todayET
+      sessionRatioLockedAt = `${nowStr} (roll)`
+      db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('session_ratio', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
+        .run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date: todayET }))
+      ratioReLocked = true
+      console.log(`[contract] manual roll: ratio re-locked ${sessionRatio} on ${newTicker} basis`)
+    } else {
+      console.warn(`[contract] manual roll: could NOT compute ${newTicker}-basis ratio — QQQ stays on old basis until a manual /ratio/lock or tomorrow's 9:30`)
+    }
+
+    // ── Roll (identical machinery to detectActiveNQContract) ──
+    activeNQContract   = newTicker
+    contractRolledFrom = prevTicker
+    await fetchContractDetails(newTicker)   // sets activeNQContractExpiry / daysToExpiry + persists nq_contract
+    console.log(`[contract] MANUAL ROLLOVER: ${prevTicker} → ${newTicker} (broker already migrated)`)
+    db.prepare(`DELETE FROM settings WHERE key IN ('labs_pr_avg', 'labs_pr_avg_5m', 'labs_pr_avg_1m')`).run()
+    db.prepare(`DELETE FROM settings WHERE key LIKE 'labs_pr_anchor_%'`).run()
+    console.log('[contract] PR state + anchors cleared (both timeframes) for new contract convergence')
+    contractRecalibrating = true
+    sseEmitter.emit('event', {
+      type: 'contract_rollover', from: prevTicker, to: newTicker, expiry: activeNQContractExpiry, reason: 'manual',
+      message: `NQ manually rolled ${prevTicker}→${newTicker} — recalibrating levels`,
+      timestamp: new Date().toISOString(),
+    })
+
+    // Cold-start on the new contract, then apply immediately (ratio guard) — awaited so the
+    // response confirms levels are live. Cold-start processes the full anchored history in one
+    // pass, so levels are live on return (seconds), not after a multi-bar warmup.
+    await calculateLabsLevels(labsSettings.interval, { reason: 'rollover' })
+    await applyAutoLevelsIfEnabled()
+    contractRecalibrating = false
+    sseEmitter.emit('event', {
+      type: 'contract_ready', contract: newTicker,
+      message: `${newTicker} levels active`, timestamp: new Date().toISOString(),
+    })
+
+    res.json({
+      success: true, from: prevTicker, to: newTicker, expiry: activeNQContractExpiry,
+      ratio: sessionRatio, ratioReLocked,
+      note: ratioReLocked
+        ? `Rolled to ${newTicker}; ratio re-locked on ${newTicker} basis (${sessionRatio}). Levels live.`
+        : `Rolled to ${newTicker} but ratio NOT re-locked — QQQ on old basis until you POST /ratio/lock with the ${newTicker} ratio.`,
+    })
+  } catch (err) {
+    contractRecalibrating = false
+    console.error('[contract] manual roll failed:', err.message)
+    res.status(500).json({ error: err.message })
+  }
 })
 
 app.post('/levels/nq-offsets', async (req, res) => {
