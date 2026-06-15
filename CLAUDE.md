@@ -35,7 +35,13 @@ present findings, get confirmation, then edit. Never edit-first on the engine.
 - All lock paths (scheduled / catch-up / manual) go through `onRatioLocked()`. Do not fork them.
 - Date comparisons in **ET** (`getETNow` / `toLocaleDateString('en-CA', { timeZone: 'America/New_York' })`).
   Never use server-local/UTC dates for the daily lock.
-- Never lock stale prices — `getFreshLiveRatio()` requires `latest._received_at` ≤ 30 min; otherwise **defer**.
+- The 9:30 lock **samples a live NQ÷QQQ pair**, it does NOT read a stored/sticky ratio: NQ = active
+  contract's latest 1-min close (Polygon futures), QQQ = `provider.lastPrice` (the existing UW poll —
+  no extra calls), **median of 3 ticks (09:30/31/32)**, **sanity-bounded** (±2% of prior, or `[40,43]`
+  with no prior) → reject + keep prior + retry; **defer** if a leg is unavailable. (Catch-up after a
+  restart samples the *then-current* basis — it cannot recover the open without a historical QQQ feed,
+  which the plan lacks; basis stability makes this single-digit-points and self-healing.) The manual
+  `/contract/roll` re-lock uses the same median + bound. See `maybeLockSessionRatio`.
 - **`getActiveRatio()` / `sessionRatio` is the SINGLE authority** for the global NQ ratio (live ticker +
   scoring derivation). Chain: `sessionRatio ‖ latest?.nq_ratio ‖ getNqRatioFromDb(db) ‖ 41.14`. **Never put a
   second mutable copy ahead of the live value** (a stale copy must not be able to win — cf. the removed

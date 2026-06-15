@@ -170,7 +170,7 @@ is in `server/scorer/index.js`. Every magic number with its location:
 
 | Data type | Freshness guard? | Max age before render | Marked stale on screen? |
 |---|---|---|---|
-| **Ratio lock** | ✅ `getFreshLiveRatio` 30-min (index.js:2481) — defers lock if `_received_at` >30 min | n/a (defers) | n/a |
+| **Ratio lock** | ✅ `maybeLockSessionRatio` samples a live NQ÷QQQ pair (median-of-3, sanity-bounded); defers if a leg is unavailable | n/a (defers) | n/a |
 | **PR / Labs bars** | ✅ `barsAreFresh` 30-min during market hours (index.js:2291) — aborts, state not written | 30 min | `labs_no_fresh_data` SSE |
 | **Score result `_received_at`** | stamped on every result (index.js:923, 1110, 2703…) | — | **never checked on consumption** |
 | **Dark-pool prints** | ❌ none (scoreLevel.js:34) | unbounded — whatever UW returns | no |

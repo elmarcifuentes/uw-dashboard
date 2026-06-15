@@ -1795,6 +1795,19 @@ async function fetchLatestFuturesClose(ticker) {
   } catch { return null }
 }
 
+// The N most-recent 1-min closes for a futures ticker (newest-first), NQ-range filtered. Used by
+// the manual roll's median sample to smooth a single bad futures tick. One Polygon (futures) call.
+async function fetchRecentFuturesCloses(ticker, n) {
+  const key = process.env.POLYGON_API_KEY
+  if (!key) return []
+  const now = Date.now(), from = now - 6 * 60 * 60 * 1000
+  const url = `https://api.polygon.io/futures/v1/aggs/${ticker}?resolution=1min&window_start.gte=${from}000000&window_start.lte=${now}000000&sort=window_start.desc&limit=${n}&apiKey=${key}`
+  try {
+    const d = await (await fetch(url)).json()
+    return (d.results || []).map(r => r.close).filter(c => c > 20000 && c < 50000).slice(0, n)
+  } catch { return [] }
+}
+
 // Clear stale auto_qqq offsets on a contract roll. Per-level offsets are NQM6-era manual tweaks,
 // meaningless on a fresh contract; ratio→null so the auto_qqq preview falls through to
 // getActiveRatio() (the live value). Keeps nqOffsets from desyncing across a roll.
@@ -2437,13 +2450,69 @@ function getActiveRatio() {
   return sessionRatio || latest?.nq_ratio || getNqRatioFromDb(db) || 41.14
 }
 
-// Live NQ/QQQ ratio from the latest score, only if FRESH (≤30 min). null → defer the lock.
-function getFreshLiveRatio() {
-  const r = latest?.nq_ratio
-  if (!r || r <= 0) return null
-  const ts = latest?._received_at ? Date.parse(latest._received_at) : 0
-  if (!ts || (Date.now() - ts) > 30 * 60 * 1000) return null
-  return parseFloat(r.toFixed(4))
+// (getFreshLiveRatio removed — the 9:30 lock no longer reads the sticky stored ratio; it samples
+//  a live NQ÷QQQ pair via maybeLockSessionRatio. See the ratio-sampling section below.)
+
+// ── Ratio sampling (the 9:30 lock SOURCE) ─────────────────────────────────────
+// The lock no longer reads the sticky stored ratio; it samples a live NQ÷QQQ pair, median over
+// 3 ticks, sanity-bounded. NQ leg = active contract's latest 1-min close (Polygon futures); QQQ
+// leg = provider.lastPrice (the EXISTING UW poll — no extra UW calls). Sources unauthorized for a
+// historical QQQ open bar, so we sample live at the lock ticks (≈ the open for the scheduled path).
+const RATIO_BAND_LO = 40.0, RATIO_BAND_HI = 43.0   // absolute NQ/QQQ sanity range (no-prior fallback)
+const median = (xs) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2 }
+const ratioInBand = (r, prior) => {
+  const lo = prior ? prior * 0.98 : RATIO_BAND_LO
+  const hi = prior ? prior * 1.02 : RATIO_BAND_HI
+  return r >= lo && r <= hi
+}
+// One live NQ÷QQQ pair sampled NOW (NQ Polygon latest, QQQ from the existing poll). null if either leg missing.
+async function sampleLiveRatio() {
+  const qqq = provider.getStatus()?.lastPrice
+  if (!(qqq > 0)) return null
+  const nq = await fetchLatestFuturesClose(activeNQContract)
+  if (!(nq > 0)) return null
+  return nq / qqq
+}
+
+let _ratioSampleBuffer = []   // today's accumulated live samples (median-of-3 for the scheduled lock)
+let _ratioSampleDate   = null // ET date the buffer belongs to
+let _ratioLockInFlight = false
+
+// Scheduled/catch-up 9:30 lock: accumulate 3 live samples across consecutive ticks, lock the median
+// (sanity-bounded). Respects the date guard (a manual lock owns the day). Fire-and-forget per tick.
+async function maybeLockSessionRatio(date, currentMinute) {
+  if (sessionRatioDate === date) return   // manual or prior lock already owns today
+  if (_ratioLockInFlight) return
+  _ratioLockInFlight = true
+  try {
+    if (_ratioSampleDate !== date) { _ratioSampleDate = date; _ratioSampleBuffer = [] }
+    const r = await sampleLiveRatio()
+    if (r == null) {
+      if (_ratioDeferDate !== date) { _ratioDeferDate = date; console.warn('[ratio] lock deferred: NQ/QQQ live price unavailable — retry next tick') }
+      return
+    }
+    _ratioSampleBuffer.push(r)
+    if (_ratioSampleBuffer.length < 3) return   // need 3 ticks (09:30/31/32) for the median
+    const candidate = parseFloat(median(_ratioSampleBuffer).toFixed(4))
+    const prior = sessionRatio
+    if (!ratioInBand(candidate, prior)) {
+      console.warn(`[ratio] open-sample rejected (${candidate} outside ±2% of ${prior ? prior.toFixed(4) : '[40.0,43.0]'}) — keeping prior, retry`)
+      _ratioSampleBuffer = []   // reset → re-sample on later ticks
+      return
+    }
+    if (sessionRatioDate === date) return   // re-check after the await (manual lock may have landed)
+    const isScheduled = currentMinute <= 9 * 60 + 35
+    sessionRatio         = candidate
+    sessionRatioLockedAt = new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    sessionRatioDate     = date
+    db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('session_ratio', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
+      .run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date }))
+    const mode = isScheduled ? 'scheduled, median-of-3' : 'catch-up, current-basis'
+    console.log(`[ratio] LOCKED ${sessionRatio} at ${sessionRatioLockedAt} (${mode}) [samples ${_ratioSampleBuffer.map(x => x.toFixed(4)).join(', ')}]`)
+    onRatioLocked(mode).catch(err => console.error('[ratio] post-lock failed:', err.message))
+  } finally {
+    _ratioLockInFlight = false
+  }
 }
 
 // Rewrite ONLY the stored QQQ columns from the canonical rounded NQ ÷ ratio. NQ stays the
@@ -2779,29 +2848,11 @@ setInterval(() => {
   // Locks once per ET day at/after 9:30. A missed 9:30 tick, a restart after 9:30, or a
   // price hiccup self-heals on a later tick instead of failing for the day. The guard is
   // the persisted lock's ET date (sessionRatioDate) — never an in-memory "done" flag.
+  // Daily ratio lock — samples a live NQ÷QQQ pair (median-of-3 across ticks), sanity-bounded;
+  // see maybeLockSessionRatio. Date-aware + catch-up preserved; manual lock owns the day via the
+  // sessionRatioDate guard. Fire-and-forget (async) so the labs recalc below isn't blocked.
   if (currentMinute >= 9 * 60 + 30 && currentMinute < 16 * 60) {
-    if (sessionRatioDate !== date) {                      // no lock yet for today (ET)
-      const liveRatio = getFreshLiveRatio()
-      if (liveRatio) {
-        const mode = currentMinute <= 9 * 60 + 35 ? 'scheduled' : 'catch-up'
-        sessionRatio         = liveRatio
-        sessionRatioLockedAt = new Date().toLocaleTimeString('en-US', {
-          timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit'
-        })
-        sessionRatioDate = date
-        db.prepare(`
-          INSERT INTO settings (key, value, updated_at)
-          VALUES ('session_ratio', ?, datetime('now'))
-          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-        `).run(JSON.stringify({ ratio: sessionRatio, lockedAt: sessionRatioLockedAt, date }))
-        console.log(`[ratio] LOCKED ${sessionRatio} at ${sessionRatioLockedAt} (${mode})`)
-        // Shared post-lock refresh (QQQ rewrite + SSE + rescore) — same as the manual path
-        onRatioLocked(mode).catch(err => console.error('[ratio] post-lock failed:', err.message))
-      } else if (_ratioDeferDate !== date) {
-        _ratioDeferDate = date
-        console.warn('[ratio] lock deferred: prices unavailable — will retry on later ticks')
-      }
-    }
+    maybeLockSessionRatio(date, currentMinute)
   }
 
   // Intraday labs recalc: 9:00–16:00 ET
@@ -3075,9 +3126,16 @@ app.post('/contract/roll', async (req, res) => {
     //    + applyAutoLevels below writes correct QQQ = new-NQ ÷ this ratio). ──
     let lockedRatio = ratioOverride != null ? parseFloat(ratioOverride) : null
     if (!(lockedRatio > 0)) {
-      const qqq   = provider.getStatus()?.lastPrice
-      const nqNew = await fetchLatestFuturesClose(newTicker)
-      if (qqq > 0 && nqNew > 0) lockedRatio = parseFloat((nqNew / qqq).toFixed(4))
+      // Median of the 3 most-recent new-contract 1-min closes ÷ live QQQ — smooths a single bad
+      // futures tick (the single-sample method mis-fired to 41.447 today). Absolute [40,43] band
+      // (NOT ±2% of prior: a roll legitimately steps the basis off the old contract).
+      const qqq    = provider.getStatus()?.lastPrice
+      const closes = await fetchRecentFuturesCloses(newTicker, 3)
+      if (qqq > 0 && closes.length) {
+        const cand = parseFloat(median(closes.map(c => c / qqq)).toFixed(4))
+        if (cand >= RATIO_BAND_LO && cand <= RATIO_BAND_HI) lockedRatio = cand
+        else console.warn(`[ratio] roll sample rejected (${cand} outside [${RATIO_BAND_LO},${RATIO_BAND_HI}]) — leaving ratio for the 9:30 lock`)
+      }
     }
     let ratioReLocked = false
     if (lockedRatio > 0) {

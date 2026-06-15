@@ -328,24 +328,32 @@ sessionRatio || nqOffsets.ratio || latest?.nq_ratio || getNqRatioFromDb(db) || 4
 
 ### Daily lock — date-aware, self-healing
 
-Evaluated **every scheduler tick** within `9:30 ≤ ET < 16:00`:
+Evaluated **every scheduler tick** within `9:30 ≤ ET < 16:00` (`maybeLockSessionRatio`):
 
 ```js
 if (sessionRatioDate !== date) {            // no lock yet for today (ET) — the guard is the DATE
-  const liveRatio = getFreshLiveRatio()     // latest.nq_ratio, only if _received_at ≤ 30 min old
-  if (liveRatio) {
-    const mode = currentMinute <= 9*60+35 ? 'scheduled' : 'catch-up'
-    // set sessionRatio/LockedAt/Date, persist session_ratio row, then:
-    onRatioLocked(mode)
-  } else { /* [ratio] lock deferred: prices unavailable — will retry on later ticks */ }
+  const r = await sampleLiveRatio()         // active-contract latest 1-min close (Polygon) ÷ provider.lastPrice (UW poll)
+  buffer.push(r)                            // accumulate across ticks
+  if (buffer.length < 3) return             // median-of-3 (09:30/31/32)
+  const candidate = median(buffer)
+  if (!ratioInBand(candidate, sessionRatio)) { /* reject + keep prior + retry */ }
+  else { /* set sessionRatio/LockedAt/Date, persist, then onRatioLocked(mode) */ }
 }
 ```
 
-- **Guard is the persisted ET `date`**, never an in-memory "done" flag → a missed 9:30 tick,
-  a restart after 9:30, or a price hiccup self-heals on a later tick (`catch-up`).
-- **Freshness gate:** `getFreshLiveRatio()` returns `latest.nq_ratio` only if `latest._received_at`
-  is within **30 minutes**; otherwise the lock defers (logs once/day) and retries.
-- ET dates throughout (no UTC flip at 8pm ET).
+- **The lock SAMPLES a live NQ÷QQQ pair** — it does **not** read the stored/sticky ratio. NQ leg =
+  active contract's latest 1-min close (Polygon futures); QQQ leg = `provider.lastPrice` (the existing
+  UW poll — **no extra calls**). This is what makes the lock independently reproduce TV's open basis
+  (~41.5 on NQU6) instead of carrying a stale value forward.
+- **Median-of-3** across the first 3 ticks (locks ~09:33, inside the ≤9:35 scheduled window) smooths a
+  transient single-tick feed misalignment. **Sanity bound** ±2% of the prior locked ratio (or `[40,43]`
+  with no prior) → reject + keep prior + retry. **Defer** if a leg is unavailable.
+- **Guard is the persisted ET `date`** → a missed 9:30 tick or restart self-heals (`catch-up`). A
+  catch-up lock samples the *then-current* basis (no historical QQQ feed to recover the open; Polygon
+  stocks is not authorized on the plan) — logged `(catch-up, current-basis)`; basis stability makes it
+  single-digit-points off and self-healing next morning.
+- **Manual override wins:** a `/ratio/lock` (or any path setting `sessionRatioDate = today`) makes the
+  auto-sample skip that day. ET dates throughout (no UTC flip at 8pm ET).
 
 ### `onRatioLocked(trigger)` — one sequence, three callers
 
@@ -495,7 +503,7 @@ canonical-first pattern inline for entry/target). The **canonical** branch is wh
 - **Level Rounding Policy** (README) → the one-line summary of §6.
 - `server/index.js` → `initRecurrence`, `advanceRecurrence`, `levelsFromState`,
   `calculateLabsLevels`, `getColdStartAnchor`, `fetchFromPolygonFutures`, `barsAreFresh`,
-  `roundAppliedLevels`, `scoreNow`, `getActiveRatio`, `getFreshLiveRatio`, `rewriteQqqFromRatio`,
+  `roundAppliedLevels`, `scoreNow`, `getActiveRatio`, `maybeLockSessionRatio`/`sampleLiveRatio`, `rewriteQqqFromRatio`,
   `onRatioLocked`.
 - `src/components/labs/LevelComparison.jsx`, `src/components/settings/LabsPanel.jsx`,
   `src/utils/levelNq.js`.
