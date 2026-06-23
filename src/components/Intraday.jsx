@@ -374,7 +374,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
               {gammaExpanded && gamma && (
                 <div className="mb-2 p-3 rounded-lg border border-accent-gamma/30 bg-bg-subtle">
                   <div className="text-micro text-text-muted uppercase tracking-wider mb-2">Full near-spot gamma topography · {gamma.strikes?.length || 0} strikes</div>
-                  <GammaRail gamma={gamma} currentPrice={currentPrice} height={560} />
+                  <GammaRail gamma={gamma} currentPrice={currentPrice} nqRatio={nqRatio} activeSymbol={activeSymbol} height={560} />
                 </div>
               )}
               {/* Gamma top-6 woven INTO the ladder card stack by price (collapsed default) */}

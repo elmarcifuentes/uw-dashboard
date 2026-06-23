@@ -199,7 +199,7 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
     if (!inBand.length) return null
     inBand.sort((a, b) => b.price - a.price)
     return inBand.map((it) => it.kind === 'gamma'
-      ? <GammaLevelRow key={`g${it.g.strike}`} item={it.g} />
+      ? <GammaLevelRow key={`g${it.g.strike}`} item={it.g} activeSymbol={activeSymbol} />
       : priceMarkerEl(pos === 'top' ? ' — above structure' : pos === 'bottom' ? ' — below structure' : ''))
   }
 

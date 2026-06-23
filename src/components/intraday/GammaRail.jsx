@@ -16,7 +16,8 @@ const fmtM = (n) => {
 }
 const fmtNq = (nq) => (nq != null ? Math.round(nq).toLocaleString('en-US') : '—')
 
-export default function GammaRail({ gamma, currentPrice, height = 520, width = 320 }) {
+export default function GammaRail({ gamma, currentPrice, nqRatio, activeSymbol = 'NQ', height = 520, width = 320 }) {
+  const isNQ = activeSymbol === 'NQ'
   if (!gamma || !gamma.strikes?.length || !gamma.window) {
     return (
       <div className="flex flex-col items-center justify-center text-text-tertiary text-xs" style={{ width, height }}>
@@ -35,16 +36,19 @@ export default function GammaRail({ gamma, currentPrice, height = 520, width = 3
   const markerStrikes = new Set([gamma.magnet?.strike, gamma.callWall?.strike, gamma.putWall?.strike].filter(v => v != null))
 
   // A labelled cyan marker line. Label rides a dark chip for guaranteed contrast over the terrain.
+  // Primary price follows the active-symbol toggle; the detail line keeps the OTHER price for cross-ref.
   const Marker = ({ strike, nq, icon: Icon, label, detail, emphatic }) => {
     if (strike == null) return null
+    const primary = isNQ ? `NQ ${fmtNq(nq)}` : `${strike}`
+    const other   = isNQ ? `${strike}` : `NQ ${fmtNq(nq)}`
     return (
       <div className="absolute left-0 right-0 flex items-center pointer-events-none" style={{ top: y(strike), transform: 'translateY(-50%)' }}>
         <div className="h-px flex-1 bg-accent-gamma" />
         <div className="flex items-center gap-1 pl-1 pr-1 py-0.5 rounded bg-bg-base/85 text-accent-gamma">
           <Icon size={emphatic ? 14 : 12} />
           <div className="leading-tight">
-            <div className={`font-price ${emphatic ? 'text-xs font-bold' : 'text-micro font-semibold'}`}>{label} {strike}</div>
-            <div className="text-micro text-text-secondary font-price">NQ {fmtNq(nq)} · {detail}</div>
+            <div className={`font-price ${emphatic ? 'text-xs font-bold' : 'text-micro font-semibold'}`}>{label} {primary}</div>
+            <div className="text-micro text-text-secondary font-price">{other} · {detail}</div>
           </div>
         </div>
       </div>
@@ -80,7 +84,9 @@ export default function GammaRail({ gamma, currentPrice, height = 520, width = 3
         {spot != null && spot >= lo && spot <= hi && (
           <div className="absolute left-0 right-0 flex items-center" style={{ top: y(spot), transform: 'translateY(-50%)' }}>
             <div className="h-px flex-1 bg-accent-price" />
-            <span className="text-micro text-accent-price font-price pl-0.5 pr-1 rounded bg-bg-base/85">{spot.toFixed(2)}</span>
+            <span className="text-micro text-accent-price font-price pl-0.5 pr-1 rounded bg-bg-base/85">
+              {isNQ && nqRatio ? (Math.round(spot * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : spot.toFixed(2)}
+            </span>
           </div>
         )}
 
