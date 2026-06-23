@@ -58,8 +58,11 @@ export default {
           // CONFLICT/AVOID verdict state — purple (freed from AI). Dedicated; not cascade's orange.
           conflict:     '#9b7dff',
           conflictSoft: 'rgba(155, 125, 255, 0.16)',
-          gamma:     '#53c7ff',
-          gammaSoft: 'rgba(83, 199, 255, 0.14)',
+          // Gamma data class (topography rail) — cyan, deliberately distinct from teal-hold (#20c997)
+          // and the indigo blues (AI #3b5bdb / MID #5ba7ff). Terrain bands render neutral slate;
+          // only the gamma markers (magnet / walls / regime) use this accent.
+          gamma:     '#22d3ee',
+          gammaSoft: 'rgba(34, 211, 238, 0.14)',
         },
       },
       fontFamily: {

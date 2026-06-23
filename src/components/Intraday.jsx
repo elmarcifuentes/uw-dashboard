@@ -5,6 +5,7 @@ import { calcPnL } from '../utils/pnl'
 import { formatNarrative } from '../utils/formatNarrative'
 import { useLayout } from '../context/LayoutContext'
 import PriceLadder from './intraday/PriceLadder'
+import GammaRail from './intraday/GammaRail'
 import PriceSparkline from './intraday/PriceSparkline'
 import DarkPoolChart from './intraday/DarkPoolChart'
 import EtfTideChart from './intraday/EtfTideChart'
@@ -28,6 +29,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
     chartStale, staleChanges,
     midDpHistory, dpHistory, narrative, narrativeMode, levelNarratives, tacticalBrief,
     assistantRead, priceVelocity, priceHistory, levelTouches,
+    gamma,
   } = useSSE(`${API_URL}/stream`)
 
   const { compact, toggle } = useLayout()
@@ -347,7 +349,13 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
               /* Partial score → subtle dim (never hidden) to signal the evidence is incomplete */
               <div className={result?.degraded ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} />
+              <div className="flex gap-3">
+                {/* Gamma topography rail — self-scaled, beside the ladder (display-only, Stage 1) */}
+                <div className="hidden lg:block shrink-0 pt-1"><GammaRail gamma={gamma} currentPrice={currentPrice} /></div>
+                <div className="flex-1 min-w-0">
+                  <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} />
+                </div>
+              </div>
               </div>
             )}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}

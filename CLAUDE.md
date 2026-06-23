@@ -76,6 +76,7 @@ present findings, get confirmation, then edit. Never edit-first on the engine.
 - `accent-price` (yellow) = **current price only** ("now"/crosshair).
 - `accent-ai` (**darker blue**, `#3b5bdb`) = **AI / Claude output only** — deliberately distinct from MID's lighter `signal-continuation` blue so the two never read as the same. Placeholder shade; swap in one place (the `accent-ai` token). Use the token, never a raw `purple-*`/`blue-*` class for AI.
 - `accent-conflict` (**purple**) = **CONFLICT / AVOID verdict state only** (freed from AI). Not cascade's orange; dedicated, no overloading.
+- `accent-gamma` (**cyan `#22d3ee`**) = the **gamma data class only** (gamma-magnet topography rail: magnet / call-wall / put-wall markers + the regime chip). Deliberately distinct from teal-`state-hold` (#20c997) and the indigo blues (AI #3b5bdb / MID #5ba7ff) so gamma never reads as an action or as AI. **Gamma terrain bands render NEUTRAL SLATE (intensity-only — opacity = |γ| magnitude), never a meaning-hue**; only the named markers carry the cyan. Gamma is reference topography, not a scored signal — it must never adopt `signal-*`, verdict, or cascade colors. Reserved; no overloading.
 - **Verdict header** (`levelVerdict`/`VerdictHeader`): green=ACT buy (`signal-support`), red=ACT sell (`signal-resistance`), amber filled=SMALL (`state-exit`) vs amber outline=WAIT (`state-cascadeWatch`, differentiated by fill+icon not a new color), purple=CONFLICT (`accent-conflict`), neutral=NOT_IN_PLAY (`text-tertiary`). The verdict frames the headline + actionable gating only — it never hides level data; out-of-play levels stay full watch cards.
 - `state-stop` (red) = stop/max-loss.
 - `font-price` (IBM Plex Mono) for **all numbers/prices**. `font-ui` (Inter) for text.
@@ -102,7 +103,7 @@ commitment. SCAN (where is price vs this level) → DECISION (why: dark pool, sc
   draw — replacement is TASK-PINE, a native TV indicator — and the *inbound* webhook ingestion — removed,
   levels are native. See [docs/TASKS.md](docs/TASKS.md).)
 - **Log prefixes** bracketed by subsystem: `[server]`, `[labs]` (with `[labs] [5m]`/`[1m]`), `[ratio]`, `[levels]`,
-  `[narrative]`, `[DataProvider]`. Keep them.
+  `[narrative]`, `[DataProvider]`, `[gamma]`. Keep them.
 - **SSE emit pattern** is always: `sseEmitter.emit('event', { type: '<name>', ...payload, timestamp: new Date().toISOString() })`.
 - **ESM** (`"type": "module"`). Railway runs `node server/index.js` from repo root.
 - **Ship discipline:** commit + push on every change → Railway (backend) + Vercel (frontend) auto-deploy from `main`.

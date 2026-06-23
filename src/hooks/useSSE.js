@@ -35,6 +35,7 @@ export function useSSE(url) {
   const [daysToExpiry, setDaysToExpiry]         = useState(null)
   const [nqNextContract, setNqNextContract]     = useState(null)
   const [nqVolStatus, setNqVolStatus]           = useState(null)
+  const [gamma, setGamma]                       = useState(null)   // Stage 1 gamma-magnet topography (display-only)
   const esRef = useRef(null)
   const lastRescoreRef = useRef(0)
   const priceHistoryRef = useRef([])
@@ -62,6 +63,7 @@ export function useSSE(url) {
             }
             if (data?.systemPaused !== undefined) setSystemPaused(data.systemPaused)
             if (data?.pausedAt !== undefined) setPausedAt(data.pausedAt)
+            if (data?.gamma) setGamma(data.gamma)   // restore gamma topography on connect (rail shows immediately)
           })
           .catch(() => {})
         // Restore assistant read
@@ -271,6 +273,10 @@ export function useSSE(url) {
           setContractRollover(prev => prev ? { ...prev, recalibrating: false } : null)
           return
         }
+        if (data.type === 'gamma') {
+          if (data.gamma) setGamma(data.gamma)
+          return
+        }
       }
 
       es.onerror = () => {
@@ -322,5 +328,6 @@ export function useSSE(url) {
     daysToExpiry,
     nqNextContract,
     nqVolStatus,
+    gamma,
   }
 }

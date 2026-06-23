@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { EventEmitter } from 'events'
 import SmartDataProvider from './dataProvider/SmartDataProvider.js'
 import pollingConfig from './dataProvider/pollingConfig.js'
+import { computeGammaTopography } from './gamma/computeGammaTopography.js'
 // Scoring engine — always available (scorer lives in server/scorer/)
 let runFullScore = null
 try {
@@ -48,6 +49,8 @@ app.use(express.json())
 
 // In-memory store
 let latest            = null
+let gammaTopo         = null   // Stage 1 gamma-magnet topography (display-only; keep-last-good on fetch hiccup)
+let gammaUpdatedAt    = null
 let previousResult    = null
 let chartSynced       = true
 let lastNarrative           = []
@@ -1243,6 +1246,8 @@ app.get('/status', (req, res) => {
     nqNextContract: nextQuarterlyContract(activeNQContract),
     nqVolStatus,   // { front, next, pctOfFront, sessions, asOf } — next-quarterly volume migration vs front month
     nqRollTrigger: 'volume',  // volume crossover (2 completed sessions) OR expiry fallback
+    gamma: gammaTopo,                 // Stage 1 gamma-magnet topography (display-only; null until first poll)
+    gammaUpdatedAt,
     // Evidence freshness (pull mirror of the price-tick fields; pure read, no logging)
     ...(() => { const f = getDataFreshness(); return { dataStale: f.dataStale, dataAgeSec: f.dataAgeSec } })(),
     degraded:          latest?.degraded || false,
@@ -1622,6 +1627,12 @@ app.get('/api-data/flow-expiry', async (req, res) => {
     )
     res.json(await r.json())
   } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// GET /gamma — latest gamma-magnet topography (Stage 1, display-only). Served from the poller's
+// last-good snapshot so reconnecting clients get it immediately (the SSE pushes updates after).
+app.get('/gamma', (req, res) => {
+  res.json({ gamma: gammaTopo, updatedAt: gammaUpdatedAt })
 })
 
 // TradingView webhook ingestion removed — the app generates levels natively via Predictive Ranges.
@@ -2817,6 +2828,61 @@ function getETNow() {
     day:  e.getDay(),
     date: d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
   }
+}
+
+// ── Gamma-magnet topography poller (Stage 1, display-only) ─────────────────────────────────────
+// Polls UW near-spot per-strike spot-exposures every 45s, computes the topography, pushes it via SSE.
+// ADDITIVE: reads provider.lastPrice (spot window) + getActiveRatio() (NQ conversion) only — never the
+// scorer, ratio lock, or PR engine. Tolerates empty/rate-limited responses with KEEP-LAST-GOOD so the
+// rail never blanks on a hiccup. 3 UW calls/cycle, spaced, budget-counted.
+const GAMMA_POLL_MS = 45_000
+const GAMMA_WINDOW  = 25   // strikes ± spot
+const GAMMA_UW_HEADERS = () => ({
+  Authorization: `Bearer ${process.env.UW_API_KEY}`,
+  'UW-CLIENT-API-ID': '100001',   // match fetchData.js / the validated probe
+})
+async function uwGammaGet(path) {
+  const base = process.env.UW_API_BASE || 'https://api.unusualwhales.com'
+  const r = await fetch(`${base}${path}`, { headers: GAMMA_UW_HEADERS() })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  const j = await r.json()
+  return j?.data ?? j
+}
+async function pollGammaTopography() {
+  if (systemPaused || !process.env.UW_API_KEY) return
+  const spot = Number(provider.getStatus()?.lastPrice)
+  if (!spot || isNaN(spot)) return   // no spot yet → keep last-good
+
+  const lo = Math.round(spot - GAMMA_WINDOW)
+  const hi = Math.round(spot + GAMMA_WINDOW)
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  const ratio = getActiveRatio()
+  try {
+    const rows0dte   = await uwGammaGet(`/api/stock/QQQ/spot-exposures/expiry-strike?expirations[]=${today}&min_strike=${lo}&max_strike=${hi}`).catch(() => [])
+    await new Promise(r => setTimeout(r, 800))
+    const rowsAllExp = await uwGammaGet(`/api/stock/QQQ/spot-exposures/strike?min_strike=${lo}&max_strike=${hi}`).catch(() => [])
+    await new Promise(r => setTimeout(r, 800))
+    const aggArr     = await uwGammaGet('/api/stock/QQQ/spot-exposures').catch(() => null)
+    provider.recordExternalCalls?.(3)   // 3 UW fetches per cycle (budget accounting)
+
+    const aggregate = Array.isArray(aggArr) ? aggArr[aggArr.length - 1] : null
+    const asOf = (Array.isArray(rows0dte) && rows0dte[0]?.time) || (Array.isArray(rowsAllExp) && rowsAllExp[0]?.time) || null
+    const topo = computeGammaTopography({ rows0dte, rowsAllExp, aggregate, spot, ratio, asOf })
+    if (!topo) {   // every source empty (transient/rate-limit) → keep last-good, never blank
+      console.warn('[gamma] empty response — keeping last-good snapshot')
+      return
+    }
+    gammaTopo = topo
+    gammaUpdatedAt = new Date().toISOString()
+    sseEmitter.emit('event', { type: 'gamma', gamma: topo, updatedAt: gammaUpdatedAt, timestamp: gammaUpdatedAt })
+    console.log(`[gamma] magnet ${topo.magnet?.strike} | CW ${topo.callWall?.strike} PW ${topo.putWall?.strike} | ${topo.regime?.label} | ${topo.strikes.length} strikes`)
+  } catch (err) {
+    console.warn('[gamma] poll failed — keeping last-good:', err.message)
+  }
+}
+if (process.env.UW_API_KEY) {
+  setInterval(pollGammaTopography, GAMMA_POLL_MS)
+  setTimeout(pollGammaTopography, 5_000)   // first run shortly after boot, once a price exists
 }
 
 // Minute-tick scheduler — replaces node-cron, no external package required
