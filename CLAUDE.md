@@ -76,7 +76,7 @@ present findings, get confirmation, then edit. Never edit-first on the engine.
 - `accent-price` (yellow) = **current price only** ("now"/crosshair).
 - `accent-ai` (**darker blue**, `#3b5bdb`) = **AI / Claude output only** — deliberately distinct from MID's lighter `signal-continuation` blue so the two never read as the same. Placeholder shade; swap in one place (the `accent-ai` token). Use the token, never a raw `purple-*`/`blue-*` class for AI.
 - `accent-conflict` (**purple**) = **CONFLICT / AVOID verdict state only** (freed from AI). Not cascade's orange; dedicated, no overloading.
-- `accent-gamma` (**cyan `#22d3ee`**) = the **gamma data class only** (gamma-magnet topography rail: magnet / call-wall / put-wall markers + the regime chip). Deliberately distinct from teal-`state-hold` (#20c997) and the indigo blues (AI #3b5bdb / MID #5ba7ff) so gamma never reads as an action or as AI. **Gamma terrain bands render NEUTRAL SLATE (intensity-only — opacity = |γ| magnitude), never a meaning-hue**; only the named markers carry the cyan. Gamma is reference topography, not a scored signal — it must never adopt `signal-*`, verdict, or cascade colors. Reserved; no overloading.
+- `accent-gamma` (**cyan `#22d3ee`**) = the **gamma data class only** (gamma-magnet topography: magnet / call-wall / put-wall markers, regime chip, the interleaved gamma rows, and the Stage-2 **reaction-probability line**). Deliberately distinct from teal-`state-hold` (#20c997) and the indigo blues (AI #3b5bdb / MID #5ba7ff) so gamma never reads as an action or as AI. **Gamma terrain bands render NEUTRAL SLATE (intensity-only — opacity = |γ| magnitude), never a meaning-hue**; only the named markers carry the cyan. Gamma is reference topography, not a scored signal — it must never adopt `signal-*`, verdict, or cascade colors. Reserved; no overloading.
 - **Verdict header** (`levelVerdict`/`VerdictHeader`): green=ACT buy (`signal-support`), red=ACT sell (`signal-resistance`), amber filled=SMALL (`state-exit`) vs amber outline=WAIT (`state-cascadeWatch`, differentiated by fill+icon not a new color), purple=CONFLICT (`accent-conflict`), neutral=NOT_IN_PLAY (`text-tertiary`). The verdict frames the headline + actionable gating only — it never hides level data; out-of-play levels stay full watch cards.
 - `state-stop` (red) = stop/max-loss.
 - `font-price` (IBM Plex Mono) for **all numbers/prices**. `font-ui` (Inter) for text.
@@ -103,7 +103,7 @@ commitment. SCAN (where is price vs this level) → DECISION (why: dark pool, sc
   draw — replacement is TASK-PINE, a native TV indicator — and the *inbound* webhook ingestion — removed,
   levels are native. See [docs/TASKS.md](docs/TASKS.md).)
 - **Log prefixes** bracketed by subsystem: `[server]`, `[labs]` (with `[labs] [5m]`/`[1m]`), `[ratio]`, `[levels]`,
-  `[narrative]`, `[DataProvider]`, `[gamma]`. Keep them.
+  `[narrative]`, `[DataProvider]`, `[gamma]`, `[reaction]`. Keep them.
 - **SSE emit pattern** is always: `sseEmitter.emit('event', { type: '<name>', ...payload, timestamp: new Date().toISOString() })`.
 - **ESM** (`"type": "module"`). Railway runs `node server/index.js` from repo root.
 - **Ship discipline:** commit + push on every change → Railway (backend) + Vercel (frontend) auto-deploy from `main`.
@@ -143,3 +143,26 @@ the fix; the data was there all along).
 **Acceptance for any data-availability question:** either **"here's the endpoint + params that return it,
 with values matching the known-good source"** or **"here's exhaustively what I tried (params, variants, docs
 sections) and the specific reason it's unreachable"** — never a bare "not available."
+
+---
+
+## Outcome Logging — a shown probability must earn its authority
+
+**Any time the UI displays a probability/percentage prediction, the system must log the prediction and
+later resolve it against what actually happened** — the number earns trust from recorded outcomes, not
+from the model's assumptions. Required:
+
+1. **Log at prediction time**: the predicted distribution + every input that produced it + a timestamp.
+   The **displayed** prediction must equal the **logged** one (compute once, server-side — no drift between
+   what the user saw and what we score).
+2. **Resolve mechanically**: define a concrete, tunable resolution rule (window + tolerances) and log the
+   actual outcome when it resolves. Exclude un-resolvable cases (not-tested / no-data) from accuracy.
+3. **Provisional until calibrated**: until a prediction bucket has ≥ a minimum number of resolved samples,
+   mark its display **provisional** (e.g. `est.`) so it isn't over-trusted. Drop the marker once the bucket
+   has enough resolved outcomes.
+4. **Surface calibration**: accumulate a Brier score + reliability bins (does "64%" happen ~64% of the
+   time?) in `/status` so the weights can be tuned to reality over time.
+
+First implementation: the Stage-2 gamma reaction model (`server/gamma/levelReaction.js` weights are
+hypotheses; `gamma_predictions` table + `gammaCalibration` resolve them). Weights/refs/tolerances are
+**named constants in one place**, explicitly flagged as calibration-tunable — never silently hard-coded truth.

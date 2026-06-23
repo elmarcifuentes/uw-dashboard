@@ -6,6 +6,8 @@ import { EventEmitter } from 'events'
 import SmartDataProvider from './dataProvider/SmartDataProvider.js'
 import pollingConfig from './dataProvider/pollingConfig.js'
 import { computeGammaTopography } from './gamma/computeGammaTopography.js'
+import { levelReaction, computePush, RESOLUTION, MIN_CALIBRATION_SAMPLES } from './gamma/levelReaction.js'
+import { initCalibrationTable, logPrediction, resolvePending, aggregateCalibration } from './gamma/calibration.js'
 // Scoring engine — always available (scorer lives in server/scorer/)
 let runFullScore = null
 try {
@@ -51,6 +53,9 @@ app.use(express.json())
 let latest            = null
 let gammaTopo         = null   // Stage 1 gamma-magnet topography (display-only; keep-last-good on fetch hiccup)
 let gammaUpdatedAt    = null
+let gammaCalibration  = null   // Stage 2 calibration summary (Brier + reliability + provisional gate)
+const reactionPriceLog = []    // [{ ts, price }] ring buffer (~25 min) for outcome resolution
+const _lastPredLog     = {}    // { levelId: ms } — throttle prediction logging
 let previousResult    = null
 let chartSynced       = true
 let lastNarrative           = []
@@ -177,6 +182,13 @@ db.exec(`
     notes TEXT, entered_at TEXT DEFAULT (datetime('now')), exited_at TEXT
   )
 `)
+
+// Gamma reaction calibration (Stage 2) — additive table; load any prior aggregate on boot.
+try {
+  initCalibrationTable(db)
+  gammaCalibration = aggregateCalibration(db)
+  console.log(`[reaction] calibration loaded — ${gammaCalibration.totalResolved} resolved, brier ${gammaCalibration.brier ?? 'n/a'}`)
+} catch (e) { console.warn('[reaction] calibration init failed:', e.message) }
 
 // Restore active trades (per-symbol)
 try {
@@ -1051,6 +1063,10 @@ provider.onPriceUpdate((price) => {
   lastEmittedPrice = price
   priceHistory.push({ price, ts: Date.now() })
   if (priceHistory.length > 50) priceHistory.shift()
+  // Reaction-resolution price buffer — keep ~25 min so a 15-min outcome window is fully covered.
+  const _nowMs = Date.now()
+  reactionPriceLog.push({ ts: _nowMs, price })
+  while (reactionPriceLog.length && reactionPriceLog[0].ts < _nowMs - 25 * 60 * 1000) reactionPriceLog.shift()
   if (latest?.levels) trackLevelTouches(price, latest.levels, db)
 
   // The price tick is the cheapest live freshness carrier — it keeps flowing every poll even
@@ -1248,6 +1264,7 @@ app.get('/status', (req, res) => {
     nqRollTrigger: 'volume',  // volume crossover (2 completed sessions) OR expiry fallback
     gamma: gammaTopo,                 // Stage 1 gamma-magnet topography (display-only; null until first poll)
     gammaUpdatedAt,
+    gammaCalibration,                 // Stage 2 reaction calibration (Brier + reliability + provisional gate)
     // Evidence freshness (pull mirror of the price-tick fields; pure read, no logging)
     ...(() => { const f = getDataFreshness(); return { dataStale: f.dataStale, dataAgeSec: f.dataAgeSec } })(),
     degraded:          latest?.degraded || false,
@@ -1632,7 +1649,7 @@ app.get('/api-data/flow-expiry', async (req, res) => {
 // GET /gamma — latest gamma-magnet topography (Stage 1, display-only). Served from the poller's
 // last-good snapshot so reconnecting clients get it immediately (the SSE pushes updates after).
 app.get('/gamma', (req, res) => {
-  res.json({ gamma: gammaTopo, updatedAt: gammaUpdatedAt })
+  res.json({ gamma: gammaTopo, updatedAt: gammaUpdatedAt, calibration: gammaCalibration })
 })
 
 // TradingView webhook ingestion removed — the app generates levels natively via Predictive Ranges.
@@ -2863,7 +2880,9 @@ async function pollGammaTopography() {
     const rowsAllExp = await uwGammaGet(`/api/stock/QQQ/spot-exposures/strike?min_strike=${lo}&max_strike=${hi}`).catch(() => [])
     await new Promise(r => setTimeout(r, 800))
     const aggArr     = await uwGammaGet('/api/stock/QQQ/spot-exposures').catch(() => null)
-    provider.recordExternalCalls?.(3)   // 3 UW fetches per cycle (budget accounting)
+    await new Promise(r => setTimeout(r, 800))
+    const npArr      = await uwGammaGet('/api/stock/QQQ/net-prem-ticks').catch(() => null)   // Stage 2 directional push
+    provider.recordExternalCalls?.(4)   // 4 UW fetches per cycle (budget accounting)
 
     const aggregate = Array.isArray(aggArr) ? aggArr[aggArr.length - 1] : null
     const asOf = (Array.isArray(rows0dte) && rows0dte[0]?.time) || (Array.isArray(rowsAllExp) && rowsAllExp[0]?.time) || null
@@ -2872,13 +2891,62 @@ async function pollGammaTopography() {
       console.warn('[gamma] empty response — keeping last-good snapshot')
       return
     }
+
+    // Stage 2 — directional push (keep-last-good) + per-level reaction predictions.
+    if (Array.isArray(npArr) && npArr.length) gammaPush = computePush(npArr)
+    topo.push = gammaPush
+    topo.reactions = computeReactions(topo, spot, gammaPush)
+
     gammaTopo = topo
     gammaUpdatedAt = new Date().toISOString()
     sseEmitter.emit('event', { type: 'gamma', gamma: topo, updatedAt: gammaUpdatedAt, timestamp: gammaUpdatedAt })
-    console.log(`[gamma] magnet ${topo.magnet?.strike} | CW ${topo.callWall?.strike} PW ${topo.putWall?.strike} | ${topo.regime?.label} | ${topo.strikes.length} strikes`)
+    console.log(`[gamma] magnet ${topo.magnet?.strike} | CW ${topo.callWall?.strike} PW ${topo.putWall?.strike} | ${topo.regime?.label} | push ${gammaPush.toFixed(2)} | ${topo.strikes.length} strikes`)
+
+    resolveGammaPredictions()   // resolve any predictions whose 15-min window has closed
   } catch (err) {
     console.warn('[gamma] poll failed — keeping last-good:', err.message)
   }
+}
+
+// Per-level reaction predictions (Stage 2). Reads scored outputs (latest.levels) + gamma + push — never
+// writes scoring. Logs a throttled prediction per in-range level during market hours for calibration.
+let gammaPush = 0
+function computeReactions(topo, spot, push) {
+  const reactions = {}
+  const levels = latest?.levels
+  if (!Array.isArray(levels)) return reactions
+  const nowMs = Date.now()
+  const isMkt = (() => { try { return provider.getStatus().isMarketHours } catch { return false } })()
+  for (const lvl of levels) {
+    const rx = levelReaction(lvl, topo, push, spot)
+    if (!rx) continue
+    if (rx.inRange && gammaCalibration?.provisional) rx.provisional = !!gammaCalibration.provisional[rx.dominant]
+    reactions[lvl.id] = rx
+    // Log a prediction (throttled to ≤1 / level / 5 min) so the SHOWN dist == the LOGGED dist.
+    if (rx.inRange && isMkt && nowMs - (_lastPredLog[lvl.id] || 0) > 5 * 60 * 1000) {
+      try {
+        logPrediction(db, {
+          ts: nowMs, level_id: lvl.id, level_price: lvl.price, spot,
+          regime: rx.inputs.regime, dominant: rx.dominant, conf_bucket: rx.confidence.bucket,
+          dist: rx.dist, inputs: rx.inputs,
+        })
+        _lastPredLog[lvl.id] = nowMs
+        console.log(`[reaction] ${lvl.id} predicted ${rx.dominant} ${rx.dist[rx.dominant]}% (regime=${rx.inputs.regime}, magnet=${rx.inputs.magnet}, push=${push.toFixed(2)})`)
+      } catch (e) { console.warn('[reaction] log failed:', e.message) }
+    }
+  }
+  return reactions
+}
+
+function resolveGammaPredictions() {
+  try {
+    const getSamples = (t0, t1) => reactionPriceLog.filter(s => s.ts >= t0 && s.ts <= t1)
+    const n = resolvePending(db, Date.now(), getSamples, RESOLUTION, (p, outcome) => {
+      const dist = (() => { try { return JSON.parse(p.dist) } catch { return {} } })()
+      console.log(`[reaction] ${p.level_id} OUTCOME: ${outcome} (predicted ${p.dominant} ${dist[p.dominant] ?? '?'}%)`)
+    })
+    if (n > 0) gammaCalibration = aggregateCalibration(db)   // refresh summary + provisional gate
+  } catch (e) { console.warn('[reaction] resolve failed:', e.message) }
 }
 if (process.env.UW_API_KEY) {
   setInterval(pollGammaTopography, GAMMA_POLL_MS)

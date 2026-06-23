@@ -11,6 +11,7 @@ import { stripMarkdown } from '../../utils/stripMarkdown'
 import { calculateTradeSetup } from '../../utils/tradeSetup'
 import { formatNarrative } from '../../utils/formatNarrative'
 import GammaLevelRow from './GammaLevelRow'
+import GammaReactionLine from './GammaReactionLine'
 import { selectGammaInterleave } from '../../utils/gammaInterleave'
 
 const LEVEL_DESCRIPTIONS = {
@@ -243,6 +244,8 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           >
             {/* Verdict leads the card — frames emphasis; all data below stays visible regardless */}
             {verdict && <VerdictHeader verdict={verdict} className="mb-1.5" />}
+            {/* Stage 2 — gamma reaction-probability line, below the verdict (display-only) */}
+            <GammaReactionLine reaction={gamma?.reactions?.[level.id]} />
             {styles.label && (
               <div className={`text-xs font-medium mb-1.5 ${styles.labelColor}`}>{styles.label}</div>
             )}
