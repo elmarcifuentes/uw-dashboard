@@ -150,19 +150,31 @@ sections) and the specific reason it's unreachable"** — never a bare "not avai
 
 **Any time the UI displays a probability/percentage prediction, the system must log the prediction and
 later resolve it against what actually happened** — the number earns trust from recorded outcomes, not
-from the model's assumptions. Required:
+from the model's assumptions. **This is the standard pattern for ALL predictive/probabilistic features,
+present and future — not gamma-specific.** Required:
 
 1. **Log at prediction time**: the predicted distribution + every input that produced it + a timestamp.
    The **displayed** prediction must equal the **logged** one (compute once, server-side — no drift between
    what the user saw and what we score).
-2. **Resolve mechanically**: define a concrete, tunable resolution rule (window + tolerances) and log the
-   actual outcome when it resolves. Exclude un-resolvable cases (not-tested / no-data) from accuracy.
+2. **Log the outcome when it resolves, tagged to the prediction**: define a concrete, tunable resolution
+   rule (window + tolerances) and record the actual outcome against that prediction row. Exclude
+   un-resolvable cases (not-tested / no-data) from accuracy.
 3. **Provisional until calibrated**: until a prediction bucket has ≥ a minimum number of resolved samples,
    mark its display **provisional** (e.g. `est.`) so it isn't over-trusted. Drop the marker once the bucket
    has enough resolved outcomes.
-4. **Surface calibration**: accumulate a Brier score + reliability bins (does "64%" happen ~64% of the
-   time?) in `/status` so the weights can be tuned to reality over time.
+4. **Surface calibration in a readable place**: accumulate predicted-vs-actual by bucket — a Brier score +
+   reliability bins (does "64%" happen ~64% of the time?) — in `/status` or a dedicated endpoint.
+5. **NEVER auto-modify scoring/weights/thresholds from outcomes.** Logging generates *evidence only*. Any
+   tuning of weights, refs, thresholds, or resolution rules is a **deliberate, reviewed, shipped change the
+   user approves** — never a silent runtime adjustment, never an automatic feedback loop. Frozen scoring /
+   recurrence / ratio / validated logic stay frozen unless changed **explicitly and reviewably**. Weights
+   live as **named constants in one place**, flagged calibration-tunable — they are hypotheses a human
+   edits, not state the system rewrites.
+
+**Rationale:** self-improving **via reviewed calibration** is the goal; **self-modifying at runtime is
+never permitted.** An anomalous run of sessions must not be able to silently degrade validated behavior
+through a closed feedback loop — a human reads the calibration evidence and decides whether to ship a
+change. Calibration is always the *input to a reviewed decision*, never an automatic actuator.
 
 First implementation: the Stage-2 gamma reaction model (`server/gamma/levelReaction.js` weights are
-hypotheses; `gamma_predictions` table + `gammaCalibration` resolve them). Weights/refs/tolerances are
-**named constants in one place**, explicitly flagged as calibration-tunable — never silently hard-coded truth.
+hypotheses; `gamma_predictions` table + `gammaCalibration` resolve them; tuning is a future reviewed change).
