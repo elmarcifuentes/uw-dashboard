@@ -10,6 +10,8 @@ import { levelVerdict } from '../../utils/levelVerdict'
 import { stripMarkdown } from '../../utils/stripMarkdown'
 import { calculateTradeSetup } from '../../utils/tradeSetup'
 import { formatNarrative } from '../../utils/formatNarrative'
+import GammaLevelRow from './GammaLevelRow'
+import { selectGammaInterleave } from '../../utils/gammaInterleave'
 
 const LEVEL_DESCRIPTIONS = {
   buy_support:     'Institutional buying below — price expected to be drawn upward',
@@ -138,7 +140,7 @@ function getLevelTier(level) {
   return 3
 }
 
-export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel, activeSymbol = 'NQ' }) {
+export default memo(function PriceLadder({ result, currentPrice, nqRatio, compact, dpHistory = {}, scoredAt, levelNarratives = {}, levelTouches = {}, onSelect, selectedLevel, activeSymbol = 'NQ', gamma = null }) {
   const [expandedLevel, setExpandedLevel] = useState(null)
   const [flashLevel, setFlashLevel]       = useState(null)
   const prevPriceRef = useRef(currentPrice)
@@ -172,6 +174,35 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
     ? sorted.find(l => Math.abs(cp - l.price) <= 0.15)
     : null
 
+  // Gamma levels woven into the SAME price-descending stack as the PR cards → automatic alignment.
+  const gammaItems = selectGammaInterleave(gamma, 6)
+
+  // The live-price marker, rendered at its price position within the stack.
+  const priceMarkerEl = (caption) => (
+    <div className="flex items-center gap-2 px-2 py-1" key="cp">
+      <div className="flex-1 h-px bg-accent-price/60" />
+      <span className="text-xs text-accent-price font-price font-bold shrink-0 bg-accent-price/10 px-2 py-0.5 rounded whitespace-nowrap">
+        {activeSymbol === 'NQ' && nqRatio
+          ? `▶ $${(Math.round(cp * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : `▶ $${cp?.toFixed(2)}`}{caption}
+      </span>
+      <div className="flex-1 h-px bg-accent-price/60" />
+    </div>
+  )
+
+  // Render whatever gamma rows + price marker fall in the (loPrice, hiPrice) band between two cards,
+  // ordered price-descending so they slot in correctly. `pos` only affects the price caption.
+  const renderGap = (hiPrice, loPrice, pos) => {
+    const inBand = []
+    for (const g of gammaItems) if (g.strike < hiPrice && g.strike > loPrice) inBand.push({ kind: 'gamma', price: g.strike, g })
+    if (cp != null && !isNaN(cp) && cp < hiPrice && cp > loPrice) inBand.push({ kind: 'price', price: cp })
+    if (!inBand.length) return null
+    inBand.sort((a, b) => b.price - a.price)
+    return inBand.map((it) => it.kind === 'gamma'
+      ? <GammaLevelRow key={`g${it.g.strike}`} item={it.g} />
+      : priceMarkerEl(pos === 'top' ? ' — above structure' : pos === 'bottom' ? ' — below structure' : ''))
+  }
+
   return (
     <div className="flex flex-col gap-1.5">
 
@@ -183,17 +214,8 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
 
       <StructureBreakBar sb={result.structure_break} currentPrice={cp} nqRatio={nqRatio} activeSymbol={activeSymbol} />
 
-      {cp != null && !isNaN(cp) && sorted.length > 0 && cp > sorted[0].price && (
-        <div className="flex items-center gap-2 px-2 py-1">
-          <div className="flex-1 h-px bg-accent-price/60" />
-          <span className="text-xs text-accent-price font-price font-bold shrink-0 animate-pulse bg-accent-price/10 px-2 py-0.5 rounded">
-            {activeSymbol === 'NQ' && nqRatio
-              ? `▶ $${(Math.round(cp * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — above structure`
-              : `▶ $${cp.toFixed(2)} — above structure`}
-          </span>
-          <div className="flex-1 h-px bg-accent-price/60" />
-        </div>
-      )}
+      {/* Gamma rows + price marker above the top PR card (call wall, etc.) */}
+      {sorted.length > 0 && renderGap(Infinity, sorted[0].price, 'top')}
 
       {sorted.map((level, i) => {
         const nextLevel  = sorted[i + 1]
@@ -461,33 +483,12 @@ export default memo(function PriceLadder({ result, currentPrice, nqRatio, compac
           )}
           </div>
 
-          {nextLevel && cp != null && !isNaN(cp) && cp < level.price && cp > nextLevel.price && (
-            <div className="flex items-center gap-2 px-2 py-0.5">
-              <div className="flex-1 h-px bg-accent-price/60" />
-              <span className="text-xs text-accent-price font-price font-bold shrink-0 bg-accent-price/10 px-2 py-0.5 rounded">
-                {activeSymbol === 'NQ' && nqRatio
-                  ? `▶ $${(Math.round(cp * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  : `▶ $${cp.toFixed(2)}`}
-              </span>
-              <div className="flex-1 h-px bg-accent-price/60" />
-            </div>
-          )}
+          {/* Gamma rows + price marker in the band below this card (down to the next card, or −∞) */}
+          {renderGap(level.price, nextLevel ? nextLevel.price : -Infinity, nextLevel ? 'mid' : 'bottom')}
 
           </Fragment>
         )
       })}
-
-      {cp != null && !isNaN(cp) && sorted.length > 0 && cp < sorted[sorted.length - 1].price && (
-        <div className="flex items-center gap-2 px-2 py-1">
-          <div className="flex-1 h-px bg-accent-price/60" />
-          <span className="text-xs text-accent-price font-price font-bold shrink-0 animate-pulse bg-accent-price/10 px-2 py-0.5 rounded">
-            {activeSymbol === 'NQ' && nqRatio
-              ? `▶ $${(Math.round(cp * nqRatio * 4) / 4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — below structure`
-              : `▶ $${cp.toFixed(2)} — below structure`}
-          </span>
-          <div className="flex-1 h-px bg-accent-price/60" />
-        </div>
-      )}
 
       {currentPrice != null && (() => {
         const cp = Number(currentPrice)

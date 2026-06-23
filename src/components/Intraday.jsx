@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { Magnet, Maximize2 } from 'lucide-react'
 import { useSSE } from '../hooks/useSSE'
 import { evaluateHoldExit } from '../utils/holdExit'
 import { calcPnL } from '../utils/pnl'
@@ -47,6 +48,7 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
 
   const [subTab, setSubTab]       = useState(0)
   const [focusMode, setFocusMode] = useState(false)
+  const [gammaExpanded, setGammaExpanded] = useState(false)   // full-terrain panel toggle (session-only)
   const [selectedLevel, setSelectedLevel] = useState(null)
   const [bottomSheetOpen, setBottomSheetOpen]   = useState(false)
   const [bottomSheetLevel, setBottomSheetLevel] = useState(null)
@@ -349,13 +351,34 @@ export default function Intraday({ activeSymbol = 'NQ', activeTrade = null, setA
               /* Partial score → subtle dim (never hidden) to signal the evidence is incomplete */
               <div className={result?.degraded ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
               <PriceSparkline history={priceHistory} levels={result?.levels} />
-              <div className="flex gap-3">
-                {/* Gamma topography rail — self-scaled, beside the ladder (display-only, Stage 1) */}
-                <div className="hidden lg:block shrink-0 pt-1"><GammaRail gamma={gamma} currentPrice={currentPrice} /></div>
-                <div className="flex-1 min-w-0">
-                  <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} />
+              {/* Gamma header — regime chip + expand-to-full-terrain toggle (gamma woven into ladder below) */}
+              {gamma && (
+                <div className="flex items-center gap-2 mb-1.5 px-1">
+                  {gamma.regime && (
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-accent-gamma/30 bg-accent-gamma/5 text-accent-gamma text-xs font-bold">
+                      <Magnet size={12} /> {gamma.regime.label}
+                      <span className="text-text-tertiary font-price font-normal ml-0.5">
+                        {gamma.regime.netGamma != null ? `${gamma.regime.netGamma / 1e6 >= 0 ? '+' : ''}${Math.round(gamma.regime.netGamma / 1e6)}M` : ''}
+                      </span>
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setGammaExpanded(v => !v)}
+                    className="ml-auto flex items-center gap-1 text-xs text-accent-gamma hover:text-accent-gamma/80 transition-colors"
+                  >
+                    <Maximize2 size={12} /> {gammaExpanded ? 'hide gamma map' : 'full gamma map'}
+                  </button>
                 </div>
-              </div>
+              )}
+              {/* Expanded: full near-spot terrain in a dedicated panel (analysis view; reuses GammaRail) */}
+              {gammaExpanded && gamma && (
+                <div className="mb-2 p-3 rounded-lg border border-accent-gamma/30 bg-bg-subtle">
+                  <div className="text-micro text-text-muted uppercase tracking-wider mb-2">Full near-spot gamma topography · {gamma.strikes?.length || 0} strikes</div>
+                  <GammaRail gamma={gamma} currentPrice={currentPrice} height={560} />
+                </div>
+              )}
+              {/* Gamma top-6 woven INTO the ladder card stack by price (collapsed default) */}
+              <PriceLadder result={result} currentPrice={currentPrice} nqRatio={nqRatio} compact={compact} dpHistory={dpHistory} scoredAt={rescoreData?.result?.scored_at || rescoreData?.timestamp} levelNarratives={levelNarratives} levelTouches={levelTouches} onSelect={handleLevelSelect} selectedLevel={selectedLevel} activeSymbol={activeSymbol} gamma={gamma} />
               </div>
             )}
             {subTab === 1 && <DarkPoolChart history={history} compact={compact} />}
