@@ -108,3 +108,37 @@ commitment. SCAN (where is price vs this level) → DECISION (why: dark pool, sc
 - **Ship discipline:** commit + push on every change → Railway (backend) + Vercel (frontend) auto-deploy from `main`.
   Update `docs/` + the README Recent-Changes row whenever behavior changes; resolve `_next_` to the commit hash.
 - **Verify against source, not memory** when documenting or reasoning about the engine/scoring.
+
+---
+
+## Data Sourcing — "the API doesn't have it" is never a conclusion
+
+**It is wrong params until proven otherwise.** When data appears missing/absent or an endpoint returns the
+wrong or empty result, do **NOT** conclude the data is unavailable. This has been wrong three times and cost
+real time: Polygon date-range (wrong param — `window_start.gte`, not `from`/`to`), Polygon futures volume
+(wrong endpoint family), UW near-spot gamma (undocumented 50-row truncation — `min_strike`/`max_strike` was
+the fix; the data was there all along).
+
+**Required process before EVER reporting data as unavailable:**
+
+1. **Treat a known-good view as proof the data exists.** If the user can see it on the provider's own
+   dashboard, TradingView, a broker, or any clearly API-driven UI, the data exists and the API can return it
+   — the only question is *which endpoint + params*. Never tell the user "the API doesn't have it" when they
+   can see it on the provider's screen.
+2. **Read the FULL parameter set in the provider's docs** — not just the params already tried. Hunt
+   specifically for: **range/window** filters (`min`/`max`, `from`/`to`, `near`, `atm`), **sort/order**,
+   **expiry/date** filters, **pagination/limit** (responses are often *silently truncated* — the UW case was
+   an undocumented 50-row cap with a real default of 500), and **granularity** toggles (intraday vs EOD,
+   per-strike vs aggregate).
+3. **Try parameter-name variants** — the same concept is named differently across APIs:
+   `strike_from` vs `min_strike` vs `price_from`; `expiry` vs `expiration` vs `expirations[]` vs `dte`.
+4. **Reverse-engineer from the known-good view** — if the user sees specific values on a dashboard, find the
+   endpoint + params that reproduce *those specific numbers*, and **verify the returned values match what the
+   user sees on screen**.
+5. **Only after the above is exhausted** (docs + variants + reverse-engineering) may you report data as
+   unreachable — and even then frame it as *"couldn't find the param/endpoint, here's what I tried,"* never
+   *"the data doesn't exist."*
+
+**Acceptance for any data-availability question:** either **"here's the endpoint + params that return it,
+with values matching the known-good source"** or **"here's exhaustively what I tried (params, variants, docs
+sections) and the specific reason it's unreachable"** — never a bare "not available."

@@ -58,12 +58,32 @@ Focus on gamma + intraday; the full list also includes screener/seasonality/shor
 institutions/earnings/crypto/technicals — **none scalp-relevant**, so omitted here.
 
 ### 2a. GAMMA / GEX — the priority surface
+
+> **UPDATE — probe-confirmed against the live token, 2026-06-23 (supersedes the earlier [INFERRED] notes):**
+> - **`spot-exposures/strike` is NOT blocked.** The earlier "50 rows of strikes 205–325, can't get ATM"
+>   was **undocumented server truncation**, not a real limit (doc default `limit` is 500). The fix is the
+>   strike-window params **`min_strike` / `max_strike`** (there is **no `sort` param** — bound by strike):
+>   `GET /api/stock/QQQ/spot-exposures/strike?min_strike=695&max_strike=735` → **45 near-spot rows at $1
+>   granularity (695→735, incl 712/715/718…), intraday `time` (4:14 PM ET).** Live walls: **CALL 730
+>   (call_gamma_oi 198M), PUT 715 (put_gamma_oi −845M)**. **This is the live magnet source.**
+> - **0DTE near-spot:** `GET /api/stock/QQQ/spot-exposures/expiry-strike?expirations[]=<today>&min_strike=&max_strike=`
+>   (param is the **array** `expirations[]`, ISO date; or `min_dte=0&max_dte=0`) → **0DTE gamma clusters at
+>   715 (both call & put wall = 715)**.
+> - **`gex-levels` cadence = confirmed DAILY/EOD** (no `time` field; `date` param returns dated snapshots —
+>   today `call_wall 740`, yesterday `750`). Its 740/700 are **full-chain dominant walls**, not the
+>   near-spot cluster the dashboard shows.
+> - **`gamma_flip: null` is NOT a true gap** — with the full per-strike net gamma now reachable
+>   (`greek-exposure/strike` EOD, or `spot-exposures/strike` intraday), the **zero-gamma flip is derivable
+>   ourselves** as the strike where net (call+put) gamma crosses zero.
+> - **Matches the user's UW dashboard:** heavy near-spot level ~**715**, call wall ~**730** (QQQ spot ≈715.3).
+>   The close-range view = per-strike spot/0DTE, **not** `gex-levels`.
+
 | Endpoint | Returns | Granularity | Cadence | In our code? |
 |---|---|---|---|---|
-| **`/api/stock/{t}/gex-levels`** | **`call_wall`, `put_wall`, `gamma_flip`, `gamma_magnet`** **[DOC]** | the explicit magnet/flip price levels | `date` param → likely **daily/EOD** [INFERRED — verify cadence] | **NO** ← the single highest-value gap |
-| **`/api/stock/{t}/spot-exposures`** | aggregate **intraday** γ/vanna/charm: `gamma_per_one_percent_move_{oi,vol,dir}` (+vanna/charm), `price`, `time` **[DOC]** | whole-ticker, **1-minute** | 1-min | **NO** |
-| **`/api/stock/{t}/spot-exposures/strike`** | **intraday per-strike** γ/δ/vanna/charm, split bid/ask/oi/vol (`call_gamma_oi`, `put_gamma_oi`, …) **[DOC]** | per-strike, intraday | ~1-min | **NO** ← build live walls from this |
-| `/api/stock/{t}/spot-exposures/expiry-strike` | same, by strike × expiry (isolate **0DTE** walls) **[DOC]** | strike×expiry | intraday | NO |
+| **`/api/stock/{t}/gex-levels`** | **`call_wall`, `put_wall`, `gamma_magnet`** (full-chain dominant walls); **`gamma_flip` = null for QQQ** **[LIVE]** | 4 derived levels | **daily/EOD** (date param; no time) **[LIVE]** | **NO** — coarse; not the close-range view |
+| **`/api/stock/{t}/spot-exposures`** | aggregate **intraday** γ/vanna/charm: `gamma_per_one_percent_move_{oi,vol,dir}` (+vanna/charm), `price`, `time` **[LIVE]** | whole-ticker, **1-minute** | 1-min | **NO** ← live pin/expansion regime |
+| **`/api/stock/{t}/spot-exposures/strike?min_strike=&max_strike=`** | **intraday per-strike** γ/δ/vanna/charm (`call_gamma_oi`, `put_gamma_oi`, …), $1 granularity near spot **[LIVE]** | per-strike, intraday | per-min `time` | **NO ← THE live magnet source** (use `min_strike`/`max_strike`) |
+| `/api/stock/{t}/spot-exposures/expiry-strike?expirations[]=` | same, by strike × expiry — isolate **0DTE** walls (`min_dte=0&max_dte=0`) **[LIVE]** | strike×expiry | intraday | NO ← the tight 0DTE cluster |
 | `/api/stock/{t}/greek-exposure/strike` | **static/EOD** per-strike GEX **[LIVE]** | per-strike, daily | daily | **YES — but discarded (FLAG-4)** |
 | `/api/stock/{t}/greek-exposure/expiry` | per-expiry GEX | per-expiry | daily | YES (GexByExpiry) |
 | `/api/stock/{t}/greek-exposure` | aggregate daily greeks | ticker | daily | no |
@@ -140,10 +160,11 @@ economic-calendar, news, earnings, seasonality/shorts/insider/congress/instituti
 triggers.
 
 ### Does UW expose what the model needs? — point answers
-- **Precise gamma levels beyond the heat zones we show?** **Yes, emphatically.** `gamma_flip` (zero-gamma),
-  `call_wall`/`put_wall`, and `gamma_magnet` via `/gex-levels`; full per-strike net GEX via
-  `greek-exposure/strike` (static) and `spot-exposures/strike` (intraday). We currently surface **none** of
-  these as price levels.
+- **Precise gamma levels beyond the heat zones we show?** **Yes, emphatically.** Full-chain `call_wall`/
+  `put_wall`/`gamma_magnet` via `/gex-levels` (EOD); **near-spot per-strike net GEX, intraday**, via
+  `spot-exposures/strike?min_strike=&max_strike=` (probe-confirmed) and 0DTE via `spot-exposures/expiry-strike`;
+  static full-chain via `greek-exposure/strike`. The **zero-gamma flip is derivable** from the per-strike net
+  gamma zero-crossing (UW's `gamma_flip` field is null for QQQ). We currently surface **none** as price levels.
 - **Recent/real-time dark pool with timestamps for recency?** **Yes** — `executed_at` is already in the
   responses we fetch; we just don't use it.
 - **Anything that detects the magnet pull directionally?** **Yes** — `gamma_flip` (regime: pin vs trend) +
@@ -159,9 +180,15 @@ triggers.
   reduced to a net-GEX **regime** (`expansion`/`pinning`). **This is GEX by expiry, not by price-strike** —
   it is *not* a price-magnet map, despite reading like one. The Catalyst note uses the same source
   (`netGex < -50000 → expansion`). **[CODE]**
-- **What granularity UW provides:** all of it — **walls + flip + magnet** (`/gex-levels`), **per-strike**
-  (static `greek-exposure/strike`; intraday `spot-exposures/strike`), **aggregate intraday 1-min**
-  (`spot-exposures`), **by expiry** (what we show), plus charm/vanna everywhere.
+- **The close-range gamma the user sees on the UW dashboard** = the **per-strike spot/0DTE GEX clustered
+  near spot** (probe-confirmed 2026-06-23: heavy near-spot level ~**715**, call wall ~**730**), via
+  `spot-exposures/strike?min_strike=&max_strike=` (intraday) / `spot-exposures/expiry-strike?expirations[]=`
+  (0DTE). It is **NOT** `gex-levels` (whose 740/700 are full-chain dominant walls). **[LIVE]**
+- **What granularity UW provides:** all of it — full-chain dominant **walls/magnet** (`/gex-levels`, EOD),
+  **per-strike near-spot** (static `greek-exposure/strike`; **intraday** `spot-exposures/strike` with
+  `min_strike`/`max_strike`), **0DTE per-strike** (`spot-exposures/expiry-strike`), **aggregate intraday
+  1-min** (`spot-exposures`), **by expiry** (what we show), plus charm/vanna everywhere. The **zero-gamma
+  flip is derivable** from per-strike net gamma (UW's pre-computed `gamma_flip` is null for QQQ).
 - **Gamma fields we fetch but DON'T use:** from `greek-exposure/strike` (already fetched in scoring) we
   compute per-level net GEX in `gexContext()` then **drop it from the payload (FLAG-4)** — so per-strike
   gamma, `call_delta`/`put_delta`, `call_charm`/`put_charm`, `call_vanna`/`put_vanna` are all fetched-then-
@@ -194,12 +221,14 @@ we **don't fetch at all**. The useful gamma surface is largely untouched.
   by-expiry pinning note — the subscription is hard to justify; most of that read is approximable elsewhere,
   and we already flagged large chunks as dead (expansion-GEX) or unused.
 
-**Two checks before committing the spend:**
-1. **Tier-gate test (do this first):** call `/api/stock/QQQ/gex-levels`, `/spot-exposures`,
-   `/spot-exposures/strike`, `/net-prem-ticks` with your key. If any 403/plan-error, the magnet build needs
-   the **Advanced** tier (~$375/mo) — price that into keep/cancel.
-2. **`/gex-levels` cadence:** confirm whether it updates intraday or only daily. If daily-only, the live
-   magnet must be built from `/spot-exposures/strike` (intraday) — more work, but fully supported.
+**Two checks before committing the spend — both RESOLVED by the 2026-06-23 probe:**
+1. **Tier-gate test → PASS.** `/gex-levels`, `/spot-exposures`, `/spot-exposures/strike`, `/net-prem-ticks`
+   all returned **HTTP 200** on the live token — **no Advanced-tier upgrade required.**
+2. **`/gex-levels` cadence → DAILY/EOD** (confirmed). The **live magnet is fully buildable** from
+   `/spot-exposures/strike?min_strike=&max_strike=` (intraday near-spot per-strike, $1 granularity) — the
+   earlier "blocked / wrong strikes" was undocumented truncation, fixed by the strike-window params. So the
+   **KEEP-conditional case is now strengthened**: the differentiated live-magnet data is confirmed reachable
+   on the current plan; the only remaining work is the additive build itself.
 
 **Frozen-constraints note (for the eventual build):** `fetchData.js`, the scorer, the ratio system, and
 QQQ handling are untouchable — any adoption is **additive** (new fetchers + a new gamma-levels module +
